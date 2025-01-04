@@ -1,37 +1,40 @@
 #ifndef WORKSPACE_H
 #define WORKSPACE_H
 
-#include <QDate>
-#include <QIcon>
-#include <QString>
+#include <QWidget>
+#include <QVBoxLayout>
+#include <QJsonObject>
+#include <QList>
+#include "abstract_workspace_item.h"
+#include "checkbox_item.h"
+#include "file_item.h"
+#include "image_item.h"
+#include "list_item.h"
+#include "nested_workspace_item.h"
+#include "text_item.h"
+#include "title_item.h"
+#include <qjsonarray.h>
 
-class WorkSpace
+class Workspace : public QWidget
 {
+    Q_OBJECT
+
 public:
-    WorkSpace(const QString &name,
-              const QString &link,
-              const QIcon &icon = QIcon(),
-              const QDate &startDate = QDate(),
-              const QDate &endDate = QDate());
+    explicit Workspace(const QString &name = "Новое пространство", QWidget *parent = nullptr);
 
-    QString name() const;
-    QString link() const;
-    QIcon icon() const;
-    QDate startDate() const;
-    QDate endDate() const;
-
+    QString getName() const;
     void setName(const QString &name);
-    void setLink(const QString &link);
-    void setIcon(const QIcon &icon);
-    void setStartDate(const QDate &startDate);
-    void setEndDate(const QDate &endDate);
+
+    void addItem(AbstractWorkspaceItem *item);
+    void removeItem(AbstractWorkspaceItem *item);
+
+    QJsonObject serialize() const;
+    void deserialize(const QJsonObject &json);
 
 private:
-    QString _name;
-    QString _link;
-    QIcon _icon;
-    QDate _startDate;
-    QDate _endDate;
+    QString workspaceName;
+    QVBoxLayout *layout;
+    QList<AbstractWorkspaceItem *> items;
 };
 
 #endif // WORKSPACE_H

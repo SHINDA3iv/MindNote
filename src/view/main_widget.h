@@ -5,6 +5,7 @@
 #include "left_panel.h"
 
 #include <QWidget>
+#include <memory>
 
 class MainWidget : public QWidget
 {
@@ -20,6 +21,7 @@ private:
 
     std::unique_ptr<LeftPanel> _leftPanel { nullptr };
     std::unique_ptr<EditorWidget> _editorWidget { nullptr };
+    std::unique_ptr<WorkspaceController> _workspaceController { nullptr };
 };
 
 #endif // MAIN_WIDGET_H

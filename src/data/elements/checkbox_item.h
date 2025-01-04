@@ -17,7 +17,6 @@ public:
     QString type() const override;
 
     QJsonObject serialize() const override;
-
     void deserialize(const QJsonObject &json) override;
 
 private:

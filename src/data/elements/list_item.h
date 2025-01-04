@@ -23,17 +23,7 @@ public:
     QString type() const override;
 
     QJsonObject serialize() const override;
-
-    void deserialize(const QJsonObject &json) override
-    {
-        if (json.contains("items")) {
-            QJsonArray items = json["items"].toArray();
-            listWidget->clear();
-            for (const auto &item : items) {
-                listWidget->addItem(item.toString());
-            }
-        }
-    }
+    void deserialize(const QJsonObject &json) override;
 
 private:
     QListWidget *listWidget;

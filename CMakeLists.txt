@@ -2,22 +2,26 @@ cmake_minimum_required(VERSION 3.16)
 
 project(studyProject VERSION 0.1 LANGUAGES CXX)
 
-# Настройки для C++17
+#Настройки для C++ 17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Включение автоматической генерации файлов для Qt
+#Включение автоматической генерации файлов для Qt
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-# Подключение Qt
+# --- Настройка папки для запускаемых файлов ---
+# Создаем отдельную папку для runtime (исходники + бинарники)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/root)
+
+#Подключение Qt
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Поиск исходных файлов
+#Поиск исходных файлов
 file(GLOB_RECURSE PROJECT_SOURCES
     ${SRC_DIR}/*.cpp
     ${SRC_DIR}/*.h
@@ -32,6 +36,19 @@ add_executable(studyProject ${PROJECT_SOURCES})
 
 # Подключение библиотек Qt
 target_link_libraries(studyProject PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+
+# Установка windeployqt
+# find_program(WINDEPLOYQT_EXECUTABLE windeployqt PATHS ${QT_INSTALL_DIR}/bin NO_DEFAULT_PATH)
+
+# if(WINDEPLOYQT_EXECUTABLE)
+#     add_custom_command(
+#         TARGET studyProject POST_BUILD
+#         COMMAND "${WINDEPLOYQT_EXECUTABLE}" "$<TARGET_FILE:studyProject>"
+#         COMMENT "Запуск windeployqt для упаковки зависимостей."
+#     )
+# else()
+#     message(WARNING "windeployqt.exe не найден. Убедитесь, что путь к Qt указан корректно.")
+# endif()
 
 # Добавление всех директорий в пути для заголовочных файлов
 foreach(DIR ${SRC_SUBDIRS})

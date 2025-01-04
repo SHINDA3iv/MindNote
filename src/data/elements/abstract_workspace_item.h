@@ -16,10 +16,8 @@ public:
 
     // Возвращает тип элемента (для сериализации)
     virtual QString type() const = 0;
-
     // Сериализация элемента в JSON
     virtual QJsonObject serialize() const = 0;
-
     // Десериализация элемента из JSON
     virtual void deserialize(const QJsonObject &json) = 0;
 };

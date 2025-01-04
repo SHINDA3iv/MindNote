@@ -1,62 +1,81 @@
 #include "workspace.h"
 
-WorkSpace::WorkSpace(const QString &name,
-                     const QString &link,
-                     const QIcon &icon,
-                     const QDate &startDate,
-                     const QDate &endDate) :
-    _name(name),
-    _link(link),
-    _icon(icon),
-    _startDate(startDate),
-    _endDate(endDate)
-{}
-
-QString WorkSpace::name() const
+Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), workspaceName(name)
 {
-    return _name;
+    layout = new QVBoxLayout(this);
+    setLayout(layout);
 }
 
-QString WorkSpace::link() const
+QString Workspace::getName() const
 {
-    return _link;
+    return workspaceName;
 }
 
-QIcon WorkSpace::icon() const
+void Workspace::setName(const QString &name)
 {
-    return _icon;
+    workspaceName = name;
 }
 
-QDate WorkSpace::startDate() const
+void Workspace::addItem(AbstractWorkspaceItem *item)
 {
-    return _startDate;
+    items.append(item);
+    layout->addWidget(item);
 }
 
-QDate WorkSpace::endDate() const
+void Workspace::removeItem(AbstractWorkspaceItem *item)
 {
-    return _endDate;
+    items.removeOne(item);
+    layout->removeWidget(item);
+    delete item;
 }
 
-void WorkSpace::setName(const QString &name)
+QJsonObject Workspace::serialize() const
 {
-    _name = name;
+    QJsonObject json;
+    json["name"] = workspaceName;
+
+    QJsonArray itemArray;
+    for (const AbstractWorkspaceItem *item : items) {
+        itemArray.append(item->serialize());
+    }
+    json["items"] = itemArray;
+
+    return json;
 }
 
-void WorkSpace::setLink(const QString &link)
+void Workspace::deserialize(const QJsonObject &json)
 {
-    _link = link;
-}
-void WorkSpace::setIcon(const QIcon &icon)
-{
-    _icon = icon;
-}
+    if (json.contains("name")) {
+        setName(json["name"].toString());
+    }
 
-void WorkSpace::setStartDate(const QDate &startDate)
-{
-    _startDate = startDate;
-}
+    if (json.contains("items")) {
+        QJsonArray itemArray = json["items"].toArray();
+        for (const QJsonValue &itemVal : itemArray) {
+            QJsonObject itemObj = itemVal.toObject();
+            QString type = itemObj["type"].toString();
+            AbstractWorkspaceItem *item = nullptr;
 
-void WorkSpace::setEndDate(const QDate &endDate)
-{
-    _endDate = endDate;
+            if (type == "TitleItem") {
+                item = new TitleItem();
+            } else if (type == "TextItem") {
+                item = new TextItem();
+            } else if (type == "ListItem") {
+                item = new ListItem();
+            } else if (type == "CheckboxItem") {
+                item = new CheckboxItem();
+            } else if (type == "ImageItem") {
+                item = new ImageItem();
+            } else if (type == "FileItem") {
+                item = new FileItem();
+            } else if (type == "NestedWorkspaceItem") {
+                item = new NestedWorkspaceItem();
+            }
+
+            if (item) {
+                item->deserialize(itemObj);
+                addItem(item);
+            }
+        }
+    }
 }
