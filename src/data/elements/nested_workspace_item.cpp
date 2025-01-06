@@ -1,15 +1,15 @@
 #include "nested_workspace_item.h"
 
-NestedWorkspaceItem::NestedWorkspaceItem(const QString &workspaceName, QWidget *parent) :
+NestedWorkspaceItem::NestedWorkspaceItem(const QString &workspaceName, Workspace *parent) :
     AbstractWorkspaceItem(parent),
-    workspaceButton(new QPushButton(workspaceName, this)),
-    workspaceName(workspaceName)
+    _workspaceButton(new QPushButton(workspaceName, this)),
+    _workspaceName(workspaceName)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->addWidget(workspaceButton);
+    layout->addWidget(_workspaceButton);
     setLayout(layout);
 
-    connect(workspaceButton, &QPushButton::clicked, this, &NestedWorkspaceItem::openWorkspace);
+    connect(_workspaceButton, &QPushButton::clicked, this, &NestedWorkspaceItem::openWorkspace);
 }
 
 QString NestedWorkspaceItem::type() const
@@ -21,23 +21,23 @@ QJsonObject NestedWorkspaceItem::serialize() const
 {
     QJsonObject json;
     json["type"] = type();
-    json["workspaceName"] = workspaceName;
-    json["workspaceId"] = workspaceId;
+    json["workspaceName"] = _workspaceName;
+    json["workspaceId"] = _workspaceId;
     return json;
 }
 
 void NestedWorkspaceItem::deserialize(const QJsonObject &json)
 {
     if (json.contains("workspaceName")) {
-        workspaceName = json["workspaceName"].toString();
-        workspaceButton->setText(workspaceName);
+        _workspaceName = json["workspaceName"].toString();
+        _workspaceButton->setText(_workspaceName);
     }
     if (json.contains("workspaceId")) {
-        workspaceId = json["workspaceId"].toString();
+        _workspaceId = json["workspaceId"].toString();
     }
 }
 
 void NestedWorkspaceItem::openWorkspace()
 {
-    emit requestOpenWorkspace(workspaceId);
+    emit requestOpenWorkspace(_workspaceId);
 }

@@ -2,8 +2,11 @@
 #define NESTEDWORKSPACEITEM_H
 
 #include "abstract_workspace_item.h"
+#include "workspace.h"
+
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QPointer>
 
 class NestedWorkspaceItem : public AbstractWorkspaceItem
 {
@@ -11,7 +14,7 @@ class NestedWorkspaceItem : public AbstractWorkspaceItem
 
 public:
     explicit NestedWorkspaceItem(const QString &workspaceName = "Вложенное пространство",
-                                 QWidget *parent = nullptr);
+                                 Workspace *parent = nullptr);
 
     QString type() const override;
 
@@ -25,9 +28,9 @@ private slots:
     void openWorkspace();
 
 private:
-    QPushButton *workspaceButton;
-    QString workspaceName;
-    QString workspaceId; // Уникальный идентификатор вложенного пространства
+    QPointer<QPushButton> _workspaceButton;
+    QString _workspaceName;
+    QString _workspaceId; // Уникальный идентификатор вложенного пространства
 };
 
 #endif // NESTEDWORKSPACEITEM_H

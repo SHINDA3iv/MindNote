@@ -1,11 +1,11 @@
 #include "title_item.h"
 
-TitleItem::TitleItem(const QString &title, QWidget *parent) :
+TitleItem::TitleItem(const QString &title, Workspace *parent) :
     AbstractWorkspaceItem(parent),
-    titleLabel(new QLabel(title, this))
+    _titleLabel(new QLabel(title, this))
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->addWidget(titleLabel);
+    layout->addWidget(_titleLabel);
     setLayout(layout);
 }
 
@@ -18,13 +18,13 @@ QJsonObject TitleItem::serialize() const
 {
     QJsonObject json;
     json["type"] = type();
-    json["content"] = titleLabel->text();
+    json["content"] = _titleLabel->text();
     return json;
 }
 
 void TitleItem::deserialize(const QJsonObject &json)
 {
     if (json.contains("content")) {
-        titleLabel->setText(json["content"].toString());
+        _titleLabel->setText(json["content"].toString());
     }
 }

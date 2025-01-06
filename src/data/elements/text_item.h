@@ -1,16 +1,17 @@
 #ifndef TEXTITEM_H
 #define TEXTITEM_H
 
-#include "abstract_workspace_item.h"
+#include "resizable_item.h"
 
 #include <QTextEdit>
 #include <QVBoxLayout>
+#include <QPointer>
 
-class TextItem : public AbstractWorkspaceItem
+class TextItem : public ResizableItem
 {
     Q_OBJECT
 public:
-    explicit TextItem(const QString &text = "", QWidget *parent = nullptr);
+    explicit TextItem(const QString &text = "", Workspace *parent = nullptr);
 
     QString type() const override;
 
@@ -18,7 +19,7 @@ public:
     void deserialize(const QJsonObject &json) override;
 
 private:
-    QTextEdit *textEdit;
+    QPointer<QTextEdit> _textEdit;
 };
 
 #endif // TEXTITEM_H

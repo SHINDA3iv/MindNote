@@ -26,6 +26,7 @@ private slots:
     void onWorkspaceClicked(QListWidgetItem *item);
     void onCreateWorkspace();
 
+    void showContextMenu(const QPoint &pos);
 private:
     QListWidget *_workspaceList;
     QPushButton *_createWorkspaceButton;

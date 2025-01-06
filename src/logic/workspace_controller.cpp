@@ -6,24 +6,24 @@ WorkspaceController::WorkspaceController(QObject *parent) : QObject(parent)
 Workspace *WorkspaceController::createWorkspace(const QString &name)
 {
     Workspace *workspace = new Workspace(name);
-    workspaces.append(workspace);
+    _workspaces.append(workspace);
     return workspace;
 }
 
 void WorkspaceController::removeWorkspace(Workspace *workspace)
 {
-    workspaces.removeOne(workspace);
+    _workspaces.removeOne(workspace);
     delete workspace;
 }
 
 Workspace *WorkspaceController::getWorkspace(int index) const
 {
-    return workspaces.value(index, nullptr);
+    return _workspaces.value(index, nullptr);
 }
 
 QList<Workspace *> WorkspaceController::getAllWorkspaces() const
 {
-    return workspaces;
+    return _workspaces;
 }
 
 QJsonObject WorkspaceController::serialize() const
@@ -31,7 +31,7 @@ QJsonObject WorkspaceController::serialize() const
     QJsonObject json;
     QJsonArray workspacesArray;
 
-    for (const Workspace *workspace : workspaces) {
+    for (const Workspace *workspace : _workspaces) {
         workspacesArray.append(workspace->serialize());
     }
 

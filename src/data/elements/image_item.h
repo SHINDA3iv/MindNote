@@ -1,18 +1,19 @@
 #ifndef IMAGEITEM_H
 #define IMAGEITEM_H
 
-#include "abstract_workspace_item.h"
+#include "resizable_item.h"
 
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPixmap>
+#include <QPointer>
 
-class ImageItem : public AbstractWorkspaceItem
+class ImageItem : public ResizableItem
 {
     Q_OBJECT
 
 public:
-    explicit ImageItem(const QString &imagePath = "", QWidget *parent = nullptr);
+    explicit ImageItem(const QString &imagePath = "", Workspace *parent = nullptr);
 
     QString type() const override;
 
@@ -20,8 +21,8 @@ public:
     void deserialize(const QJsonObject &json) override;
 
 private:
-    QLabel *imageLabel;
-    QString imagePath;
+    QPointer<QLabel> _imageLabel;
+    QString _imagePath;
 };
 
 #endif // IMAGEITEM_H

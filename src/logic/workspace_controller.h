@@ -38,7 +38,7 @@ public:
     void loadFromFile(const QString &filePath);
 
 private:
-    QList<Workspace *> workspaces;
+    QList<Workspace *> _workspaces;
 };
 
 #endif // WORKSPACE_CONTROLLER_H

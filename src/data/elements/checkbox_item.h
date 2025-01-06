@@ -2,9 +2,11 @@
 #define CHECKBOXITEM_H
 
 #include "abstract_workspace_item.h"
+#include "workspace.h"
 
 #include <QCheckBox>
 #include <QVBoxLayout>
+#include <QPointer>
 
 class CheckboxItem : public AbstractWorkspaceItem
 {
@@ -12,7 +14,7 @@ class CheckboxItem : public AbstractWorkspaceItem
 public:
     explicit CheckboxItem(const QString &label = "Задача",
                           bool checked = false,
-                          QWidget *parent = nullptr);
+                          Workspace *parent = nullptr);
 
     QString type() const override;
 
@@ -20,7 +22,7 @@ public:
     void deserialize(const QJsonObject &json) override;
 
 private:
-    QCheckBox *checkbox;
+    QPointer<QCheckBox> _checkbox;
 };
 
 #endif // CHECKBOXITEM_H

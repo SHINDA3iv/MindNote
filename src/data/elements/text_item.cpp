@@ -1,12 +1,12 @@
 #include "text_item.h"
 
-TextItem::TextItem(const QString &text, QWidget *parent) :
-    AbstractWorkspaceItem(parent),
-    textEdit(new QTextEdit(this))
+TextItem::TextItem(const QString &text, Workspace *parent) :
+    ResizableItem(parent),
+    _textEdit(new QTextEdit(this))
 {
-    textEdit->setText(text);
+    _textEdit->setText(text);
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->addWidget(textEdit);
+    layout->addWidget(_textEdit);
     setLayout(layout);
 }
 
@@ -19,13 +19,13 @@ QJsonObject TextItem::serialize() const
 {
     QJsonObject json;
     json["type"] = type();
-    json["content"] = textEdit->toPlainText();
+    json["content"] = _textEdit->toPlainText();
     return json;
 }
 
 void TextItem::deserialize(const QJsonObject &json)
 {
     if (json.contains("content")) {
-        textEdit->setText(json["content"].toString());
+        _textEdit->setText(json["content"].toString());
     }
 }

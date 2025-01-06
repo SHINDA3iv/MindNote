@@ -2,15 +2,17 @@
 #define TITLEITEM_H
 
 #include "abstract_workspace_item.h"
+#include "workspace.h"
 
 #include <QLabel>
 #include <QVBoxLayout>
+#include <QPointer>
 
 class TitleItem : public AbstractWorkspaceItem
 {
     Q_OBJECT
 public:
-    explicit TitleItem(const QString &title = "Заголовок", QWidget *parent = nullptr);
+    explicit TitleItem(const QString &title = "Заголовок", Workspace *parent = nullptr);
 
     QString type() const override;
 
@@ -18,7 +20,7 @@ public:
     void deserialize(const QJsonObject &json) override;
 
 private:
-    QLabel *titleLabel;
+    QPointer<QLabel> _titleLabel;
 };
 
 #endif // TITLEITEM_H

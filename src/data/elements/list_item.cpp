@@ -1,18 +1,29 @@
 #include "list_item.h"
 
-ListItem::ListItem(ListType type, QWidget *parent) :
-    AbstractWorkspaceItem(parent),
-    listWidget(new QListWidget(this)),
-    listType(type)
+ListItem::ListItem(ListType type, Workspace *parent) :
+    ResizableItem(parent),
+    _listWidget(new QListWidget(this)),
+    _listType(type)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->addWidget(listWidget);
+    layout->addWidget(_listWidget);
     setLayout(layout);
+
+    if (_listType == Ordered) {
+        _listWidget->setStyleSheet("QListWidget::item { list-style-type: decimal; }");
+    } else {
+        _listWidget->setStyleSheet("QListWidget::item { list-style-type: disc; }");
+    }
 }
 
 QString ListItem::type() const
 {
-    return listType == Ordered ? "OrderedListItem" : "UnorderedListItem";
+    return _listType == Ordered ? "OrderedListItem" : "UnorderedListItem";
+}
+
+void ListItem::addItemToList(const QString &text)
+{
+    _listWidget->addItem(text);
 }
 
 QJsonObject ListItem::serialize() const
@@ -20,8 +31,8 @@ QJsonObject ListItem::serialize() const
     QJsonObject json;
     json["type"] = type();
     QJsonArray items;
-    for (int i = 0; i < listWidget->count(); ++i) {
-        items.append(listWidget->item(i)->text());
+    for (int i = 0; i < _listWidget->count(); ++i) {
+        items.append(_listWidget->item(i)->text());
     }
     json["items"] = items;
     return json;
@@ -31,9 +42,9 @@ void ListItem::deserialize(const QJsonObject &json)
 {
     if (json.contains("items")) {
         QJsonArray items = json["items"].toArray();
-        listWidget->clear();
+        _listWidget->clear();
         for (const auto &item : items) {
-            listWidget->addItem(item.toString());
+            _listWidget->addItem(item.toString());
         }
     }
 }

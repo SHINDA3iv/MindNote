@@ -1,19 +1,16 @@
 #ifndef WORKSPACE_H
 #define WORKSPACE_H
 
+#include "abstract_workspace_item.h"
+
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QJsonObject>
 #include <QList>
-#include "abstract_workspace_item.h"
-#include "checkbox_item.h"
-#include "file_item.h"
-#include "image_item.h"
-#include "list_item.h"
-#include "nested_workspace_item.h"
-#include "text_item.h"
-#include "title_item.h"
-#include <qjsonarray.h>
+#include <QJsonArray>
+#include <QPointer>
+#include <QLabel>
+#include <QScrollArea>
 
 class Workspace : public QWidget
 {
@@ -30,11 +27,22 @@ public:
 
     QJsonObject serialize() const;
     void deserialize(const QJsonObject &json);
+    void adjustLayout();
+
+    QList<AbstractWorkspaceItem *> getItems() const;
 
 private:
-    QString workspaceName;
-    QVBoxLayout *layout;
-    QList<AbstractWorkspaceItem *> items;
+    void updateContentSize();
+
+    QString _workspaceName;
+
+    QPointer<QVBoxLayout> _layout;
+    QPointer<QScrollArea> _scrollArea;
+    QPointer<QWidget> _contentWidget;
+    QPointer<QLabel> _titleLabel;
+
+    QList<AbstractWorkspaceItem *> _items;
+    QSpacerItem *_spacerItem { nullptr };
 };
 
 #endif // WORKSPACE_H

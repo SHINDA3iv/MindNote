@@ -1,17 +1,19 @@
 #ifndef FILEITEM_H
 #define FILEITEM_H
 
-#include "abstract_workspace_item.h"
+#include "resizable_item.h"
+
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QFileInfo>
+#include <QPointer>
 
-class FileItem : public AbstractWorkspaceItem
+class FileItem : public ResizableItem
 {
     Q_OBJECT
 
 public:
-    explicit FileItem(const QString &filePath = "", QWidget *parent = nullptr);
+    explicit FileItem(const QString &filePath = "", Workspace *parent = nullptr);
 
     QString type() const override;
 
@@ -22,8 +24,8 @@ private slots:
     void openFile();
 
 private:
-    QPushButton *fileButton;
-    QString filePath;
+    QPointer<QPushButton> _fileButton;
+    QString _filePath;
 };
 
 #endif // FILEITEM_H

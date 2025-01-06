@@ -1,10 +1,12 @@
 #ifndef EDITOR_WIDGET_H
 #define EDITOR_WIDGET_H
 
+#include "workspace.h"
+
 #include <QWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include "Workspace.h"
+#include <QMenu>
 
 class EditorWidget : public QWidget
 {
@@ -17,20 +19,18 @@ public:
     void setCurrentWorkspace(Workspace *workspace);
 
 private slots:
-    void onAddTitle();
     void onAddText();
     void onAddCheckbox();
+    void onAddOrderedList();
+    void onAddUnorderedList();
     void onAddImage();
     void onAddFile();
+    void showContextMenu(const QPoint &pos);
 
 private:
-    Workspace *currentWorkspace { nullptr };
-    QVBoxLayout *layout;
-    QPushButton *addTitleButton;
-    QPushButton *addTextButton;
-    QPushButton *addCheckboxButton;
-    QPushButton *addImageButton;
-    QPushButton *addFileButton;
+    Workspace *_currentWorkspace { nullptr };
+    QVBoxLayout *_layout;
+    QMenu *_contextMenu;
 };
 
 #endif // EDITOR_WIDGET_H
