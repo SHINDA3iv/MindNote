@@ -8,7 +8,7 @@
 #include <QFileInfo>
 #include <QPointer>
 
-class FileItem : public ResizableItem
+class FileItem : public AbstractWorkspaceItem
 {
     Q_OBJECT
 

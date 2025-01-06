@@ -1,13 +1,22 @@
 #include "main_widget.h"
 
 #include <QLayout>
-#include <QPointer>
-#include <QSplitter>
+#include <QCoreApplication>
 
 MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 {
+    QString settingsPath = QCoreApplication::applicationDirPath() + "/settings.ini";
+    _settings = new QSettings(settingsPath, QSettings::IniFormat, this);
+
     initWindow();
     initConnections();
+
+    restoreSettings();
+}
+
+MainWidget::~MainWidget()
+{
+    saveSettings();
 }
 
 void MainWidget::initWindow()
@@ -19,12 +28,12 @@ void MainWidget::initWindow()
 
     _leftPanel->setWorkspaceController(_workspaceController.get());
 
-    QSplitter *mainSplitter = new QSplitter(this);
-    mainSplitter->addWidget(_leftPanel.get());
-    mainSplitter->addWidget(_editorWidget.get());
+    _mainSplitter = new QSplitter(this);
+    _mainSplitter->addWidget(_leftPanel.get());
+    _mainSplitter->addWidget(_editorWidget.get());
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->addWidget(mainSplitter);
+    mainLayout->addWidget(_mainSplitter);
     setLayout(mainLayout);
 }
 
@@ -32,4 +41,21 @@ void MainWidget::initConnections()
 {
     connect(_leftPanel.get(), &LeftPanel::workspaceSelected, _editorWidget.get(),
             &EditorWidget::setCurrentWorkspace);
+}
+
+void MainWidget::saveSettings()
+{
+    _settings->beginGroup("MainWidget");
+    _settings->setValue("splitterState", _mainSplitter->saveState());
+    _settings->endGroup();
+}
+
+void MainWidget::restoreSettings()
+{
+    _settings->beginGroup("MainWidget");
+    QByteArray splitterState = _settings->value("splitterState").toByteArray();
+    if (!splitterState.isEmpty()) {
+        _mainSplitter->restoreState(splitterState);
+    }
+    _settings->endGroup();
 }

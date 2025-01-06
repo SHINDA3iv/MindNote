@@ -3,7 +3,7 @@
 #include <QDesktopServices>
 
 FileItem::FileItem(const QString &filePath, Workspace *parent) :
-    ResizableItem(parent),
+    AbstractWorkspaceItem(parent),
     _fileButton(new QPushButton(this)),
     _filePath(filePath)
 {

@@ -28,11 +28,8 @@ Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), _w
 
     _scrollArea = new QScrollArea(this);
     _scrollArea->setWidget(_contentWidget);
-    // _scrollArea->setWidgetResizable(true);
-    _scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    _scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    _scrollArea->setWidgetResizable(false);
-    _contentWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    _scrollArea->setWidgetResizable(true);
+    _scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
     contentLayout->addWidget(_scrollArea);
     setLayout(contentLayout);
@@ -61,11 +58,11 @@ void Workspace::addItem(AbstractWorkspaceItem *item)
         _spacerItem = nullptr;
     }
 
-    // if (auto resizableItem = static_cast<ResizableItem *>(item))
-    //     connect(resizableItem, &ResizableItem::resized, this, &Workspace::adjustLayout);
+    if (auto resizableItem = static_cast<ResizableItem *>(item))
+        connect(resizableItem, &ResizableItem::resized, this, &Workspace::adjustLayout);
 
-    item->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    item->setMinimumSize(50, 50);
+    item->setMinimumHeight(50);
+    item->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
 
     item->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(item, &QWidget::customContextMenuRequested, this, [this, item](const QPoint &pos) {
@@ -81,10 +78,11 @@ void Workspace::addItem(AbstractWorkspaceItem *item)
 
     _layout->addWidget(item);
 
-    _spacerItem = new QSpacerItem(20, 0, QSizePolicy::Minimum, QSizePolicy::Expanding);
-    _layout->addItem(_spacerItem);
-    // adjustLayout();
     updateContentSize();
+
+    _spacerItem = new QSpacerItem(20, _contentWidget->height() - _contentWidget->minimumHeight(),
+                                  QSizePolicy::Minimum, QSizePolicy::Fixed);
+    _layout->addItem(_spacerItem);
 }
 
 void Workspace::removeItem(AbstractWorkspaceItem *item)
@@ -92,7 +90,7 @@ void Workspace::removeItem(AbstractWorkspaceItem *item)
     _items.removeOne(item);
     _layout->removeWidget(item);
     delete item;
-    adjustLayout();
+    updateContentSize();
 }
 
 QJsonObject Workspace::serialize() const
@@ -153,49 +151,37 @@ void Workspace::adjustLayout()
         QRect itemGeometry = item->geometry();
         itemGeometry.moveTop(currentY);
         item->setGeometry(itemGeometry);
-
         currentY += itemGeometry.height() + _layout->spacing();
     }
 
     // if (_spacerItem) {
-    //     _spacerItem->changeSize(20, 0, QSizePolicy::Minimum, QSizePolicy::Expanding);
+    //     _layout->removeItem(_spacerItem);
+    //     delete _spacerItem;
+    //     _spacerItem = nullptr;
     // }
-
-    // qDebug() << "Spacer " << _spacerItem->geometry().height() << " ЭлГеом1 "
-    //          << currentY + _layout->spacing() - _spacerItem->geometry().height() << " ЭлГеом "
-    //          << currentY + _layout->spacing() << " парент " << _layout->parentWidget()->height()
-    //          << parentWidget()->sizeHint() << parentWidget()->sizePolicy() << " ЭлХинт "
-    //          << totalHeight;
 
     // updateContentSize();
 
-    // _scrollArea->updateGeometry();
-    // _scrollArea->update();
+    // _spacerItem = new QSpacerItem(20, _contentWidget->height() - _contentWidget->minimumHeight(),
+    //                               QSizePolicy::Minimum, QSizePolicy::Fixed);
 }
 
 void Workspace::updateContentSize()
 {
     int totalHeight = 0;
+
     for (AbstractWorkspaceItem *item : _items) {
-        totalHeight += item->geometry().height() + _layout->spacing();
+        totalHeight += item->height() + _layout->spacing();
     }
 
     if (_spacerItem) {
-        totalHeight += _spacerItem->geometry().height();
+        totalHeight += _spacerItem->geometry().height() + _layout->spacing();
     }
 
-    int totalWidth = _scrollArea->viewport()->width();
-
-    // Обновляем размер `_contentWidget`
-    totalHeight = _contentWidget->height() > totalHeight ? _contentWidget->height() : totalHeight;
-    _contentWidget->resize(totalWidth, totalHeight);
-
-    // Обновляем scrollArea
-    _scrollArea->updateGeometry();
-    _scrollArea->update();
+    _contentWidget->setMinimumHeight(totalHeight);
+    _contentWidget->updateGeometry();
 }
 
-// Метод getItems в классе Workspace возвращает текущие элементы
 QList<AbstractWorkspaceItem *> Workspace::getItems() const
 {
     return _items;
