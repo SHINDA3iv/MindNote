@@ -9,6 +9,7 @@ FileItem::FileItem(const QString &filePath, Workspace *parent) :
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(_fileButton);
+    layout->setContentsMargins(0, 0, 0, 0);
     setLayout(layout);
 
     if (!filePath.isEmpty()) {

@@ -1,20 +1,30 @@
 #include "left_panel.h"
+#include <qpushbutton.h>
 
 #include <QInputDialog>
 #include <QMenu>
+#include <QIcon>
+#include <QFileDialog>
+#include <QMessageBox>
 
 LeftPanel::LeftPanel(QWidget *parent) :
     QWidget(parent),
     _workspaceList(new QListWidget(this)),
-    _createWorkspaceButton(new QPushButton("Создать пространство", this))
+    _createWorkspaceButton(new QToolButton(this))
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->addWidget(_workspaceList);
+
+    _createWorkspaceButton->setIcon(QIcon::fromTheme("document-new"));
+    _createWorkspaceButton->setIconSize(QSize(16, 16));
+    _createWorkspaceButton->setToolTip(tr("Создать новое пространство"));
+    _createWorkspaceButton->setFixedSize(32, 32);
+
     layout->addWidget(_createWorkspaceButton);
+    layout->addWidget(_workspaceList);
     setLayout(layout);
 
     connect(_workspaceList, &QListWidget::itemClicked, this, &LeftPanel::onWorkspaceClicked);
-    connect(_createWorkspaceButton, &QPushButton::clicked, this, &LeftPanel::onCreateWorkspace);
+    connect(_createWorkspaceButton, &QToolButton::clicked, this, &LeftPanel::onCreateWorkspace);
 
     _workspaceList->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(_workspaceList, &QListWidget::customContextMenuRequested, this,
@@ -27,18 +37,70 @@ void LeftPanel::setWorkspaceController(WorkspaceController *controller)
     refreshWorkspaceList();
 }
 
-void LeftPanel::refreshWorkspaceList()
+void LeftPanel::onCreateWorkspace()
 {
     if (!_workspaceController)
         return;
 
-    _workspaceList->clear();
+    QDialog *dialog = new QDialog(this);
+    dialog->setWindowTitle(tr("Создание нового пространства"));
 
-    auto workspaces = _workspaceController->getAllWorkspaces();
-    for (Workspace *workspace : workspaces) {
-        QListWidgetItem *item = new QListWidgetItem(workspace->getName(), _workspaceList);
-        item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void *>(workspace)));
-    }
+    QVBoxLayout *dialogLayout = new QVBoxLayout(dialog);
+
+    QLineEdit *nameEdit = new QLineEdit(dialog);
+    nameEdit->setPlaceholderText(tr("Введите имя нового пространства"));
+    dialogLayout->addWidget(nameEdit);
+
+    QPushButton *chooseIconButton = new QPushButton(tr("Выбрать иконку"), dialog);
+    dialogLayout->addWidget(chooseIconButton);
+
+    QLabel *iconLabel = new QLabel(dialog);
+    iconLabel->setPixmap(QPixmap());
+    dialogLayout->addWidget(iconLabel);
+
+    QIcon selectedIcon;
+
+    connect(chooseIconButton, &QPushButton::clicked, [this, iconLabel, &selectedIcon]() {
+        QString iconPath =
+         QFileDialog::getOpenFileName(this, tr("Выберите иконку"), QString(),
+                                      tr("Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"));
+        if (!iconPath.isEmpty()) {
+            selectedIcon = QIcon(iconPath);
+            iconLabel->setPixmap(selectedIcon.pixmap(32, 32));
+        }
+    });
+
+    QPushButton *createButton = new QPushButton(tr("Создать пространство"), dialog);
+    dialogLayout->addWidget(createButton);
+
+    connect(createButton, &QPushButton::clicked, [this, dialog, nameEdit, &selectedIcon]() {
+        QString workspaceName = nameEdit->text();
+
+        if (!workspaceName.isEmpty()) {
+            auto existingWorkspaces = _workspaceController->getAllWorkspaces();
+            bool nameExists = std::any_of(existingWorkspaces.begin(), existingWorkspaces.end(),
+                                          [&workspaceName](Workspace *workspace) {
+                                              return workspace->getName() == workspaceName;
+                                          });
+
+            if (nameExists) {
+                QMessageBox::warning(this, tr("Ошибка"),
+                                     tr("Пространство с таким именем уже существует."));
+                return;
+            }
+
+            Workspace *newWorkspace = _workspaceController->createWorkspace(workspaceName);
+            if (!selectedIcon.isNull()) {
+                newWorkspace->setIcon(selectedIcon);
+            }
+
+            refreshWorkspaceList();
+            emit workspaceSelected(newWorkspace);
+            dialog->accept();
+        }
+    });
+
+    dialog->exec();
 }
 
 void LeftPanel::onWorkspaceClicked(QListWidgetItem *item)
@@ -52,20 +114,24 @@ void LeftPanel::onWorkspaceClicked(QListWidgetItem *item)
     }
 }
 
-void LeftPanel::onCreateWorkspace()
+void LeftPanel::refreshWorkspaceList()
 {
     if (!_workspaceController)
         return;
 
-    bool ok;
-    QString workspaceName = QInputDialog::getText(this, tr("Создание пространства"),
-                                                  tr("Введите имя нового пространства:"),
-                                                  QLineEdit::Normal, tr("Новое пространство"), &ok);
+    _workspaceList->clear();
 
-    if (ok && !workspaceName.isEmpty()) {
-        Workspace *newWorkspace = _workspaceController->createWorkspace(workspaceName);
-        refreshWorkspaceList();
-        emit workspaceSelected(newWorkspace);
+    auto workspaces = _workspaceController->getAllWorkspaces();
+    for (Workspace *workspace : workspaces) {
+        QListWidgetItem *item = new QListWidgetItem(workspace->getName(), _workspaceList);
+
+        if (!workspace->getIcon()->pixmap().isNull()) {
+            item->setIcon(workspace->getIcon()->pixmap());
+        } else {
+            item->setIcon(QIcon().pixmap(32, 32));
+        }
+
+        item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void *>(workspace)));
     }
 }
 
@@ -80,6 +146,17 @@ void LeftPanel::showContextMenu(const QPoint &pos)
         return;
 
     QMenu contextMenu(this);
+
+    QAction *changeIconAction = contextMenu.addAction("Сменить иконку");
+    connect(changeIconAction, &QAction::triggered, [this, workspace]() {
+        QString iconPath =
+         QFileDialog::getOpenFileName(this, tr("Выберите иконку"), QString(),
+                                      tr("Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"));
+        if (!iconPath.isEmpty()) {
+            workspace->setIcon(QIcon(iconPath));
+        }
+        refreshWorkspaceList();
+    });
 
     QAction *renameAction = contextMenu.addAction("Сменить название");
     connect(renameAction, &QAction::triggered, [this, workspace, item]() {

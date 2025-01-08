@@ -7,6 +7,7 @@ TextItem::TextItem(const QString &text, Workspace *parent) :
     _textEdit->setText(text);
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(_textEdit);
+    layout->setContentsMargins(0, 0, 0, 0);
     setLayout(layout);
     resize(width(), 200);
 }

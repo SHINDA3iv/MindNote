@@ -32,6 +32,12 @@ public:
 
     void addItemByType(const QString &type);
 
+    void setIcon(const QIcon &icon);
+    QLabel *getIcon();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
     void updateContentSize();
 
@@ -41,6 +47,7 @@ private:
     QPointer<QScrollArea> _scrollArea;
     QPointer<QWidget> _contentWidget;
     QPointer<QLabel> _titleLabel;
+    QPointer<QLabel> _iconLabel;
 
     QList<AbstractWorkspaceItem *> _items;
     QSpacerItem *_spacerItem { nullptr };

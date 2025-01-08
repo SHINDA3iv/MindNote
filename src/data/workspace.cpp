@@ -13,18 +13,29 @@
 #include <QIcon>
 #include <QFileDialog>
 
-Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), _workspaceName(name)
+Workspace::Workspace(const QString &name, QWidget *parent) :
+    QWidget(parent),
+    _workspaceName(name),
+    _iconLabel(new QLabel(this))
 {
     QVBoxLayout *contentLayout = new QVBoxLayout(this);
 
     QHBoxLayout *headerLayout = new QHBoxLayout();
+
     _titleLabel = new QLabel(_workspaceName, this);
     _titleLabel->setAlignment(Qt::AlignCenter);
+
     QFont titleFont = _titleLabel->font();
     titleFont.setPointSize(16);
     titleFont.setBold(true);
     _titleLabel->setFont(titleFont);
-    contentLayout->addWidget(_titleLabel);
+
+    _iconLabel->setPixmap(QPixmap());
+    _iconLabel->setFixedSize(32, 32);
+    _iconLabel->setContentsMargins(0, 0, 0, 0);
+
+    headerLayout->addWidget(_titleLabel);
+    headerLayout->addWidget(_iconLabel);
 
     QToolButton *menuButton = new QToolButton(this);
     menuButton->setIcon(QIcon::fromTheme("menu"));
@@ -51,7 +62,6 @@ Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), _w
     menuButton->setMenu(toolMenu);
     menuButton->setPopupMode(QToolButton::InstantPopup);
 
-    headerLayout->addWidget(_titleLabel);
     headerLayout->addWidget(menuButton);
     headerLayout->setContentsMargins(0, 0, 0, 0);
 
@@ -70,18 +80,26 @@ Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), _w
     setLayout(contentLayout);
 }
 
+QLabel *Workspace::getIcon()
+{
+    return _iconLabel;
+}
+
+void Workspace::setIcon(const QIcon &icon)
+{
+    _iconLabel->setPixmap(icon.pixmap(32, 32));
+}
+
 void Workspace::addItemByType(const QString &type)
 {
     AbstractWorkspaceItem *item = nullptr;
 
     if (type == "TextItem") {
-        item = new TextItem("Новый текст", this);
+        item = new TextItem("Текст", this);
     } else if (type == "CheckboxItem") {
-        item = new CheckboxItem("Новый checkbox", this);
+        item = new CheckboxItem("Задача", this);
     } else if (type == "ListItem") {
         ListItem *list = new ListItem(ListItem::Unordered, this);
-        list->addItemToList("Первый элемент");
-        list->addItemToList("Второй элемент");
         item = list;
     } else if (type == "ImageItem") {
         QString imagePath = QFileDialog::getOpenFileName(this, "Выберите изображение", "",
@@ -128,19 +146,34 @@ void Workspace::addItem(AbstractWorkspaceItem *item)
     if (auto resizableItem = static_cast<ResizableItem *>(item))
         connect(resizableItem, &ResizableItem::resized, this, &Workspace::updateContentSize);
 
-    item->setMinimumHeight(50);
+    item->setMinimumHeight(25);
 
-    item->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(item, &QWidget::customContextMenuRequested, this, [this, item](const QPoint &pos) {
-        QMenu contextMenu(this);
+    connect(item, &AbstractWorkspaceItem::itemDeleted, this, &Workspace::removeItem);
 
-        QAction *deleteAction = contextMenu.addAction("Удалить элемент");
-        connect(deleteAction, &QAction::triggered, [item, this]() {
-            removeItem(item);
-        });
+    // if (!item->layout()) {
+    //     QVBoxLayout *itemLayout = new QVBoxLayout(item);
+    //     item->setLayout(itemLayout);
+    // }
 
-        contextMenu.exec(item->mapToGlobal(pos));
-    });
+    // QVBoxLayout *itemLayout = qobject_cast<QVBoxLayout *>(item->layout());
+
+    // if (itemLayout) {
+    //     QToolButton *deleteButton = new QToolButton(item);
+    //     deleteButton->setIcon(QIcon::fromTheme("trash"));
+    //     deleteButton->setStyleSheet("border: none;");
+    //     deleteButton->setToolTip("Удалить элемент");
+    //     deleteButton->setFixedSize(20, 20);
+
+    //     QHBoxLayout *buttonLayout = new QHBoxLayout();
+    //     buttonLayout->addWidget(deleteButton, 0, Qt::AlignRight | Qt::AlignBottom);
+    //     buttonLayout->setContentsMargins(0, 0, 0, 0);
+
+    //     itemLayout->addLayout(buttonLayout);
+
+    //     connect(deleteButton, &QToolButton::clicked, [this, item]() {
+    //         removeItem(item);
+    //     });
+    // }
 
     _layout->addWidget(item);
 
@@ -155,7 +188,7 @@ void Workspace::removeItem(AbstractWorkspaceItem *item)
 {
     _items.removeOne(item);
     _layout->removeWidget(item);
-    delete item;
+    item->deleteLater();
     updateContentSize();
 }
 
@@ -216,7 +249,6 @@ void Workspace::updateContentSize()
 
     for (AbstractWorkspaceItem *item : _items) {
         QRect itemGeometry = item->geometry();
-        qDebug() << item << itemGeometry.height();
         totalHeight += itemGeometry.height() + _layout->spacing();
     }
     totalHeight += _layout->spacing();
@@ -229,11 +261,23 @@ void Workspace::updateContentSize()
     _contentWidget->updateGeometry();
     for (AbstractWorkspaceItem *item : _items) {
         QRect itemGeometry = item->geometry();
-        qDebug() << item << itemGeometry.height();
     }
 }
 
 QList<AbstractWorkspaceItem *> Workspace::getItems() const
 {
     return _items;
+}
+
+void Workspace::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+
+    for (AbstractWorkspaceItem *item : _items) {
+        if (auto resizableItem = dynamic_cast<ResizableItem *>(item)) {
+            resizableItem->resize(width() - 20, resizableItem->height());
+        }
+    }
+
+    updateContentSize();
 }

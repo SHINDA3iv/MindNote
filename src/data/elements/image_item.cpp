@@ -6,16 +6,23 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
     _imagePath(imagePath)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
+
+    // _imageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // _imageLabel->setAlignment(Qt::AlignCenter);
+
     layout->addWidget(_imageLabel);
+    layout->setContentsMargins(0, 0, 0, 0);
+    // layout->setSpacing(0);
+
     setLayout(layout);
 
     if (!imagePath.isEmpty()) {
         QPixmap pixmap(imagePath);
-        int maxWidth = parent ? parent->width() - 20 : 200; // Задаем максимальную ширину
-        _imageLabel->setPixmap(
-         pixmap.scaled(maxWidth, pixmap.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        _imageLabel->setPixmap(pixmap.scaled(pixmap.width(), pixmap.height(), Qt::KeepAspectRatio,
+                                             Qt::SmoothTransformation));
     }
-    resize(width(), height());
+
+    resize(width(), 400);
 }
 
 QString ImageItem::type() const
@@ -37,10 +44,8 @@ void ImageItem::deserialize(const QJsonObject &json)
         _imagePath = json["imagePath"].toString();
         QPixmap pixmap(_imagePath);
 
-        int maxWidth =
-         parentWidget() ? parentWidget()->width() - 20 : 200; // Задаем максимальную ширину
-        _imageLabel->setPixmap(
-         pixmap.scaled(maxWidth, pixmap.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        _imageLabel->setPixmap(pixmap.scaled(pixmap.width(), pixmap.height(), Qt::KeepAspectRatio,
+                                             Qt::SmoothTransformation));
     }
 }
 
@@ -48,9 +53,11 @@ void ImageItem::resizeEvent(QResizeEvent *event)
 {
     if (!_imagePath.isEmpty()) {
         QPixmap pixmap(_imagePath);
-        int maxWidth = event->size().width() - 20; // Задаем максимальную ширину
+        qDebug() << event->size().width() << event->size().height();
+        int maxWidth = event->size().width() - 20;
+        int maxHeight = event->size().height() - 20;
         _imageLabel->setPixmap(
-         pixmap.scaled(maxWidth, pixmap.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+         pixmap.scaled(maxWidth, maxHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
     ResizableItem::resizeEvent(event);
 }

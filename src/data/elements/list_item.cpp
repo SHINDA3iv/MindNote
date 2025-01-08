@@ -7,6 +7,7 @@ ListItem::ListItem(ListType type, Workspace *parent) :
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(_listWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
     setLayout(layout);
 
     if (_listType == Ordered) {

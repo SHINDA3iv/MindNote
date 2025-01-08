@@ -6,7 +6,7 @@
 
 #include <QWidget>
 #include <QListWidget>
-#include <QPushButton>
+#include <QToolButton>
 
 class LeftPanel : public QWidget
 {
@@ -27,9 +27,10 @@ private slots:
     void onCreateWorkspace();
 
     void showContextMenu(const QPoint &pos);
+
 private:
     QListWidget *_workspaceList;
-    QPushButton *_createWorkspaceButton;
+    QToolButton *_createWorkspaceButton;
     WorkspaceController *_workspaceController { nullptr };
 };
 
