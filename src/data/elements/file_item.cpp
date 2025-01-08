@@ -17,6 +17,7 @@ FileItem::FileItem(const QString &filePath, Workspace *parent) :
     }
 
     connect(_fileButton, &QPushButton::clicked, this, &FileItem::openFile);
+    resize(width(), 50);
 }
 
 QString FileItem::type() const

@@ -40,7 +40,8 @@ void ResizableItem::mouseMoveEvent(QMouseEvent *event)
             newGeometry.setRight(newGeometry.right() + deltaX);
         }
 
-        resize(newGeometry.width(), newGeometry.height());
+        setFixedSize(newGeometry.width() > 50 ? newGeometry.width() : 50,
+                     newGeometry.height() > 50 ? newGeometry.height() : 50);
         _lastMousePos = event->pos();
 
         emit resized();

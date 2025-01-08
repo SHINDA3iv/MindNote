@@ -9,11 +9,15 @@
 
 #include <QScrollArea>
 #include <QMenu>
+#include <QToolButton>
+#include <QIcon>
+#include <QFileDialog>
 
 Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), _workspaceName(name)
 {
     QVBoxLayout *contentLayout = new QVBoxLayout(this);
 
+    QHBoxLayout *headerLayout = new QHBoxLayout();
     _titleLabel = new QLabel(_workspaceName, this);
     _titleLabel->setAlignment(Qt::AlignCenter);
     QFont titleFont = _titleLabel->font();
@@ -22,6 +26,37 @@ Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), _w
     _titleLabel->setFont(titleFont);
     contentLayout->addWidget(_titleLabel);
 
+    QToolButton *menuButton = new QToolButton(this);
+    menuButton->setIcon(QIcon::fromTheme("menu"));
+    menuButton->setStyleSheet("border: none;");
+    menuButton->setToolTip("Добавить элемент");
+
+    QMenu *toolMenu = new QMenu(this);
+    toolMenu->addAction(QIcon::fromTheme("text"), "Добавить текст", this, [this]() {
+        emit addItemByType("TextItem");
+    });
+    toolMenu->addAction(QIcon::fromTheme("checkbox"), "Добавить checkbox", this, [this]() {
+        emit addItemByType("CheckboxItem");
+    });
+    toolMenu->addAction(QIcon::fromTheme("list"), "Добавить список", this, [this]() {
+        emit addItemByType("ListItem");
+    });
+    toolMenu->addAction(QIcon::fromTheme("image"), "Добавить изображение", this, [this]() {
+        emit addItemByType("ImageItem");
+    });
+    toolMenu->addAction(QIcon::fromTheme("file"), "Добавить файл", this, [this]() {
+        emit addItemByType("FileItem");
+    });
+
+    menuButton->setMenu(toolMenu);
+    menuButton->setPopupMode(QToolButton::InstantPopup);
+
+    headerLayout->addWidget(_titleLabel);
+    headerLayout->addWidget(menuButton);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    contentLayout->addLayout(headerLayout);
+
     _contentWidget = new QWidget(this);
     _layout = new QVBoxLayout(_contentWidget);
     _contentWidget->setLayout(_layout);
@@ -29,10 +64,42 @@ Workspace::Workspace(const QString &name, QWidget *parent) : QWidget(parent), _w
     _scrollArea = new QScrollArea(this);
     _scrollArea->setWidget(_contentWidget);
     _scrollArea->setWidgetResizable(true);
-    _scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    _scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
     contentLayout->addWidget(_scrollArea);
     setLayout(contentLayout);
+}
+
+void Workspace::addItemByType(const QString &type)
+{
+    AbstractWorkspaceItem *item = nullptr;
+
+    if (type == "TextItem") {
+        item = new TextItem("Новый текст", this);
+    } else if (type == "CheckboxItem") {
+        item = new CheckboxItem("Новый checkbox", this);
+    } else if (type == "ListItem") {
+        ListItem *list = new ListItem(ListItem::Unordered, this);
+        list->addItemToList("Первый элемент");
+        list->addItemToList("Второй элемент");
+        item = list;
+    } else if (type == "ImageItem") {
+        QString imagePath = QFileDialog::getOpenFileName(this, "Выберите изображение", "",
+                                                         "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
+        if (!imagePath.isEmpty()) {
+            item = new ImageItem(imagePath, this);
+        }
+    } else if (type == "FileItem") {
+        QString filePath =
+         QFileDialog::getOpenFileName(this, "Выберите файл", "", "All Files (*.*)");
+        if (!filePath.isEmpty()) {
+            item = new FileItem(filePath, this);
+        }
+    }
+
+    if (item) {
+        addItem(item);
+    }
 }
 
 QString Workspace::getName() const
@@ -59,10 +126,9 @@ void Workspace::addItem(AbstractWorkspaceItem *item)
     }
 
     if (auto resizableItem = static_cast<ResizableItem *>(item))
-        connect(resizableItem, &ResizableItem::resized, this, &Workspace::adjustLayout);
+        connect(resizableItem, &ResizableItem::resized, this, &Workspace::updateContentSize);
 
     item->setMinimumHeight(50);
-    item->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
 
     item->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(item, &QWidget::customContextMenuRequested, this, [this, item](const QPoint &pos) {
@@ -144,42 +210,27 @@ void Workspace::deserialize(const QJsonObject &json)
     }
 }
 
-void Workspace::adjustLayout()
-{
-    int currentY = 0;
-    for (AbstractWorkspaceItem *item : _items) {
-        QRect itemGeometry = item->geometry();
-        itemGeometry.moveTop(currentY);
-        item->setGeometry(itemGeometry);
-        currentY += itemGeometry.height() + _layout->spacing();
-    }
-
-    // if (_spacerItem) {
-    //     _layout->removeItem(_spacerItem);
-    //     delete _spacerItem;
-    //     _spacerItem = nullptr;
-    // }
-
-    // updateContentSize();
-
-    // _spacerItem = new QSpacerItem(20, _contentWidget->height() - _contentWidget->minimumHeight(),
-    //                               QSizePolicy::Minimum, QSizePolicy::Fixed);
-}
-
 void Workspace::updateContentSize()
 {
     int totalHeight = 0;
 
     for (AbstractWorkspaceItem *item : _items) {
-        totalHeight += item->height() + _layout->spacing();
+        QRect itemGeometry = item->geometry();
+        qDebug() << item << itemGeometry.height();
+        totalHeight += itemGeometry.height() + _layout->spacing();
     }
+    totalHeight += _layout->spacing();
 
     if (_spacerItem) {
         totalHeight += _spacerItem->geometry().height() + _layout->spacing();
     }
 
-    _contentWidget->setMinimumHeight(totalHeight);
+    _contentWidget->setFixedHeight(totalHeight);
     _contentWidget->updateGeometry();
+    for (AbstractWorkspaceItem *item : _items) {
+        QRect itemGeometry = item->geometry();
+        qDebug() << item << itemGeometry.height();
+    }
 }
 
 QList<AbstractWorkspaceItem *> Workspace::getItems() const

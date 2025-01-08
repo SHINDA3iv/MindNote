@@ -14,6 +14,7 @@ ListItem::ListItem(ListType type, Workspace *parent) :
     } else {
         _listWidget->setStyleSheet("QListWidget::item { list-style-type: disc; }");
     }
+    resize(width(), 200);
 }
 
 QString ListItem::type() const

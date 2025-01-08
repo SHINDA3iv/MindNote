@@ -11,8 +11,11 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
 
     if (!imagePath.isEmpty()) {
         QPixmap pixmap(imagePath);
-        _imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio));
+        int maxWidth = parent ? parent->width() - 20 : 200; // Задаем максимальную ширину
+        _imageLabel->setPixmap(
+         pixmap.scaled(maxWidth, pixmap.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
+    resize(width(), height());
 }
 
 QString ImageItem::type() const
@@ -33,6 +36,21 @@ void ImageItem::deserialize(const QJsonObject &json)
     if (json.contains("imagePath")) {
         _imagePath = json["imagePath"].toString();
         QPixmap pixmap(_imagePath);
-        _imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio));
+
+        int maxWidth =
+         parentWidget() ? parentWidget()->width() - 20 : 200; // Задаем максимальную ширину
+        _imageLabel->setPixmap(
+         pixmap.scaled(maxWidth, pixmap.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
+}
+
+void ImageItem::resizeEvent(QResizeEvent *event)
+{
+    if (!_imagePath.isEmpty()) {
+        QPixmap pixmap(_imagePath);
+        int maxWidth = event->size().width() - 20; // Задаем максимальную ширину
+        _imageLabel->setPixmap(
+         pixmap.scaled(maxWidth, pixmap.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    ResizableItem::resizeEvent(event);
 }

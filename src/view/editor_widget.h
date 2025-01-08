@@ -18,19 +18,9 @@ public:
 
     void setCurrentWorkspace(Workspace *workspace);
 
-private slots:
-    void onAddText();
-    void onAddCheckbox();
-    void onAddOrderedList();
-    void onAddUnorderedList();
-    void onAddImage();
-    void onAddFile();
-    void showContextMenu(const QPoint &pos);
-
 private:
     Workspace *_currentWorkspace { nullptr };
     QVBoxLayout *_layout;
-    QMenu *_contextMenu;
 };
 
 #endif // EDITOR_WIDGET_H

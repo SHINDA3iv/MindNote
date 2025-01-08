@@ -27,9 +27,10 @@ public:
 
     QJsonObject serialize() const;
     void deserialize(const QJsonObject &json);
-    void adjustLayout();
 
     QList<AbstractWorkspaceItem *> getItems() const;
+
+    void addItemByType(const QString &type);
 
 private:
     void updateContentSize();

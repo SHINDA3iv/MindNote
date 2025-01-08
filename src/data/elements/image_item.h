@@ -20,6 +20,9 @@ public:
     QJsonObject serialize() const override;
     void deserialize(const QJsonObject &json) override;
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
     QPointer<QLabel> _imageLabel;
     QString _imagePath;

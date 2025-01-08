@@ -8,6 +8,7 @@ CheckboxItem::CheckboxItem(const QString &label, bool checked, Workspace *parent
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(_checkbox);
     setLayout(layout);
+    resize(width(), 50);
 }
 
 QString CheckboxItem::type() const
