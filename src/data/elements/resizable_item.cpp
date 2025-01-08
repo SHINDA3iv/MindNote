@@ -108,14 +108,3 @@ void ResizableItem::updateCursor()
         break;
     }
 }
-
-void ResizableItem::resizeEvent(QResizeEvent *event)
-{
-    AbstractWorkspaceItem::resizeEvent(event);
-
-    if (parentWidget()) {
-        int newWidth = parentWidget()->width() - 20;
-        int newHeight = height();
-        resize(newWidth, newHeight);
-    }
-}
