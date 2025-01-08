@@ -268,16 +268,3 @@ QList<AbstractWorkspaceItem *> Workspace::getItems() const
 {
     return _items;
 }
-
-void Workspace::resizeEvent(QResizeEvent *event)
-{
-    QWidget::resizeEvent(event);
-
-    for (AbstractWorkspaceItem *item : _items) {
-        if (auto resizableItem = dynamic_cast<ResizableItem *>(item)) {
-            resizableItem->resize(width() - 20, resizableItem->height());
-        }
-    }
-
-    updateContentSize();
-}

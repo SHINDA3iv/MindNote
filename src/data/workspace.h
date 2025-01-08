@@ -35,9 +35,6 @@ public:
     void setIcon(const QIcon &icon);
     QLabel *getIcon();
 
-protected:
-    void resizeEvent(QResizeEvent *event) override;
-
 private:
     void updateContentSize();
 

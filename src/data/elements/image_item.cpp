@@ -12,7 +12,7 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
 
     layout->addWidget(_imageLabel);
     layout->setContentsMargins(0, 0, 0, 0);
-    // layout->setSpacing(0);
+    layout->setSpacing(0);
 
     setLayout(layout);
 
@@ -22,7 +22,7 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
                                              Qt::SmoothTransformation));
     }
 
-    resize(width(), 400);
+    resize(_imageLabel->pixmap().width(), _imageLabel->pixmap().height());
 }
 
 QString ImageItem::type() const
