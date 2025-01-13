@@ -49,8 +49,11 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     toolMenu->addAction(QIcon::fromTheme("checkbox"), "Добавить checkbox", this, [this]() {
         emit addItemByType("CheckboxItem");
     });
-    toolMenu->addAction(QIcon::fromTheme("list"), "Добавить список", this, [this]() {
-        emit addItemByType("ListItem");
+    toolMenu->addAction(QIcon::fromTheme("list"), "Добавить нумерованный список", this, [this]() {
+        emit addItemByType("OrderedListItem");
+    });
+    toolMenu->addAction(QIcon::fromTheme("list"), "Добавить ненумерованный список", this, [this]() {
+        emit addItemByType("UnorderedListItem");
     });
     toolMenu->addAction(QIcon::fromTheme("image"), "Добавить изображение", this, [this]() {
         emit addItemByType("ImageItem");
@@ -63,7 +66,6 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     menuButton->setPopupMode(QToolButton::InstantPopup);
 
     headerLayout->addWidget(menuButton);
-    headerLayout->setContentsMargins(0, 0, 0, 0);
 
     contentLayout->addLayout(headerLayout);
 
@@ -98,7 +100,10 @@ void Workspace::addItemByType(const QString &type)
         item = new TextItem("Текст", this);
     } else if (type == "CheckboxItem") {
         item = new CheckboxItem("Задача", this);
-    } else if (type == "ListItem") {
+    } else if (type == "OrderedListItem") {
+        ListItem *list = new ListItem(ListItem::Ordered, this);
+        item = list;
+    } else if (type == "UnorderedListItem") {
         ListItem *list = new ListItem(ListItem::Unordered, this);
         item = list;
     } else if (type == "ImageItem") {
@@ -223,8 +228,10 @@ void Workspace::deserialize(const QJsonObject &json)
                 item = new TitleItem();
             } else if (type == "TextItem") {
                 item = new TextItem();
-            } else if (type == "ListItem") {
-                item = new ListItem();
+            } else if (type == "OrderedListItem") {
+                item = new ListItem(ListItem::Ordered);
+            } else if (type == "UnorderedListItem") {
+                item = new ListItem(ListItem::Unordered);
             } else if (type == "CheckboxItem") {
                 item = new CheckboxItem();
             } else if (type == "ImageItem") {

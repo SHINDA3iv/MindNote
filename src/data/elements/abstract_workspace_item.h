@@ -27,7 +27,7 @@ public:
     virtual void deserialize(const QJsonObject &json) = 0;
 
 protected slots:
-    void createContextMenu(const QPoint &pos)
+    virtual void createContextMenu(const QPoint &pos)
     {
         QMenu contextMenu(this);
 
@@ -41,7 +41,7 @@ protected slots:
 
     virtual void addCustomContextMenuActions(QMenu *contextMenu) {};
 
-protected:
+public:
     virtual void deleteItem()
     {
         emit itemDeleted(this);

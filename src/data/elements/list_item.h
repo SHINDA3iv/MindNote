@@ -19,17 +19,33 @@ public:
         Unordered // Ненумерованный список
     };
 
-    explicit ListItem(ListType type = Unordered, Workspace *parent = nullptr);
+    ListItem(ListType type, Workspace *parent = nullptr);
 
     QString type() const override;
+
     void addItemToList(const QString &text);
+    void removeItemFromList(int index);
+    void editItemInList(int index);
 
     QJsonObject serialize() const override;
     void deserialize(const QJsonObject &json) override;
 
+protected:
+    void addCustomContextMenuActions(QMenu *contextMenu) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void createContextMenu(const QPoint &pos) override;
+
+protected slots:
+    void addNewItem();
+    void removeSelectedItem();
+    void editSelectedItem();
+
 private:
     QPointer<QListWidget> _listWidget;
     ListType _listType;
+
+    int _clickedIndex = -1;
+    void setupContextMenu();
 };
 
 #endif // LISTITEM_H
