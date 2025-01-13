@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/workspaceFragment">
+
+    <fragment
+        android:id="@+id/workspaceFragment"
+        android:name="com.example.studyproject.ui.workspace.WorkspaceFragment"
+        android:label="Workspaces"
+        tools:layout="@layout/fragment_workspace">
+        <action
+            android:id="@+id/action_workspaceFragment_to_editorFragment"
+            app:destination="@id/editorFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/editorFragment"
+        android:name="com.example.studyproject.ui.repository.EditorFragment"
+        android:label="Editor"
+        tools:layout="@layout/fragment_editor">
+        <argument
+            android:name="workspaceId"
+            app:argType="string" />
+    </fragment>
+</navigation>
