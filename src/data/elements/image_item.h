@@ -22,6 +22,7 @@ public:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void addCustomContextMenuActions(QMenu *contextMenu) override;
 
 private:
     QPointer<QLabel> _imageLabel;

@@ -54,8 +54,10 @@ void LeftPanel::onCreateWorkspace()
     QPushButton *chooseIconButton = new QPushButton(tr("Выбрать иконку"), dialog);
     dialogLayout->addWidget(chooseIconButton);
 
+    // Выравнивание для QLabel с иконкой
     QLabel *iconLabel = new QLabel(dialog);
     iconLabel->setPixmap(QPixmap());
+    iconLabel->setAlignment(Qt::AlignCenter); // Выравнивание иконки по центру
     dialogLayout->addWidget(iconLabel);
 
     QIcon selectedIcon;
@@ -66,7 +68,7 @@ void LeftPanel::onCreateWorkspace()
                                       tr("Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"));
         if (!iconPath.isEmpty()) {
             selectedIcon = QIcon(iconPath);
-            iconLabel->setPixmap(selectedIcon.pixmap(32, 32));
+            iconLabel->setPixmap(selectedIcon.pixmap(64, 64)); // Размер иконки 64x64
         }
     });
 
@@ -121,15 +123,23 @@ void LeftPanel::refreshWorkspaceList()
 
     _workspaceList->clear();
 
+    // Устанавливаем размер иконок
+    QSize iconSize(28, 20); // Размер иконок 48x48
+    _workspaceList->setIconSize(iconSize);
+
     auto workspaces = _workspaceController->getAllWorkspaces();
     for (Workspace *workspace : workspaces) {
         QListWidgetItem *item = new QListWidgetItem(workspace->getName(), _workspaceList);
 
+        // Устанавливаем иконку, если она есть
         if (!workspace->getIcon()->pixmap().isNull()) {
-            item->setIcon(workspace->getIcon()->pixmap());
+            item->setIcon(workspace->getIcon()->pixmap().scaled(iconSize));
         } else {
-            item->setIcon(QIcon().pixmap(32, 32));
+            item->setIcon(QIcon().pixmap(iconSize));
         }
+
+        // Устанавливаем высоту строки
+        item->setSizeHint(QSize(0, 30));
 
         item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void *>(workspace)));
     }

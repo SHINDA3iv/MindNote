@@ -18,7 +18,16 @@ public:
     QJsonObject serialize() const override;
     void deserialize(const QJsonObject &json) override;
 
+private slots:
+    void toggleBold();
+    void toggleItalic();
+    // void insertList();
+
+    void insertOrderedList();
+    void insertUnorderedList();
+
 private:
+    void mergeCurrentCharFormat(const QTextCharFormat &format);
     QPointer<QTextEdit> _textEdit;
 };
 

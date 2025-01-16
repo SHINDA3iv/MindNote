@@ -6,10 +6,6 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
     _imagePath(imagePath)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
-
-    // _imageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    // _imageLabel->setAlignment(Qt::AlignCenter);
-
     layout->addWidget(_imageLabel);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
@@ -53,11 +49,36 @@ void ImageItem::resizeEvent(QResizeEvent *event)
 {
     if (!_imagePath.isEmpty()) {
         QPixmap pixmap(_imagePath);
-        qDebug() << event->size().width() << event->size().height();
         int maxWidth = event->size().width() - 20;
         int maxHeight = event->size().height() - 20;
         _imageLabel->setPixmap(
          pixmap.scaled(maxWidth, maxHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
     ResizableItem::resizeEvent(event);
+}
+
+void ImageItem::addCustomContextMenuActions(QMenu *contextMenu)
+{
+    // Выравнивание по центру
+    QAction *alignCenterAction = contextMenu->addAction("Выравнить по центру");
+    connect(alignCenterAction, &QAction::triggered, this, [this]() {
+        _imageLabel->setAlignment(Qt::AlignCenter);
+    });
+
+    // Выравнивание по левому краю
+    QAction *alignLeftAction = contextMenu->addAction("Выравнить по левому краю");
+    connect(alignLeftAction, &QAction::triggered, this, [this]() {
+        _imageLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    });
+
+    // Выравнивание по правому краю
+    QAction *alignRightAction = contextMenu->addAction("Выравнить по правому краю");
+    connect(alignRightAction, &QAction::triggered, this, [this]() {
+        _imageLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    });
+
+    QAction *deleteAction = contextMenu->addAction("Удалить элемент");
+    connect(deleteAction, &QAction::triggered, this, &AbstractWorkspaceItem::deleteItem);
+
+    contextMenu->exec(mapToGlobal(pos()));
 }
