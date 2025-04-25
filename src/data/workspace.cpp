@@ -154,32 +154,6 @@ void Workspace::addItem(AbstractWorkspaceItem *item)
     item->setMinimumHeight(25);
 
     connect(item, &AbstractWorkspaceItem::itemDeleted, this, &Workspace::removeItem);
-
-    // if (!item->layout()) {
-    //     QVBoxLayout *itemLayout = new QVBoxLayout(item);
-    //     item->setLayout(itemLayout);
-    // }
-
-    // QVBoxLayout *itemLayout = qobject_cast<QVBoxLayout *>(item->layout());
-
-    // if (itemLayout) {
-    //     QToolButton *deleteButton = new QToolButton(item);
-    //     deleteButton->setIcon(QIcon::fromTheme("trash"));
-    //     deleteButton->setStyleSheet("border: none;");
-    //     deleteButton->setToolTip("Удалить элемент");
-    //     deleteButton->setFixedSize(20, 20);
-
-    //     QHBoxLayout *buttonLayout = new QHBoxLayout();
-    //     buttonLayout->addWidget(deleteButton, 0, Qt::AlignRight | Qt::AlignBottom);
-    //     buttonLayout->setContentsMargins(0, 0, 0, 0);
-
-    //     itemLayout->addLayout(buttonLayout);
-
-    //     connect(deleteButton, &QToolButton::clicked, [this, item]() {
-    //         removeItem(item);
-    //     });
-    // }
-
     _layout->addWidget(item);
 
     updateContentSize();
@@ -246,6 +220,38 @@ void Workspace::deserialize(const QJsonObject &json)
                 item->deserialize(itemObj);
                 addItem(item);
             }
+        }
+    }
+}
+
+void Workspace::deserializeItems(const QJsonArray &itemsArray)
+{
+    for (const QJsonValue &itemVal : itemsArray) {
+        QJsonObject itemObj = itemVal.toObject();
+        QString type = itemObj["type"].toString();
+        AbstractWorkspaceItem *item = nullptr;
+
+        if (type == "TitleItem") {
+            item = new TitleItem();
+        } else if (type == "TextItem") {
+            item = new TextItem();
+        } else if (type == "OrderedListItem") {
+            item = new ListItem(ListItem::Ordered);
+        } else if (type == "UnorderedListItem") {
+            item = new ListItem(ListItem::Unordered);
+        } else if (type == "CheckboxItem") {
+            item = new CheckboxItem();
+        } else if (type == "ImageItem") {
+            item = new ImageItem();
+        } else if (type == "FileItem") {
+            item = new FileItem();
+        } else if (type == "NestedWorkspaceItem") {
+            item = new NestedWorkspaceItem();
+        }
+
+        if (item) {
+            item->deserialize(itemObj);
+            addItem(item);
         }
     }
 }

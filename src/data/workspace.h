@@ -28,6 +28,8 @@ public:
     QJsonObject serialize() const;
     void deserialize(const QJsonObject &json);
 
+    void deserializeItems(const QJsonArray &itemsArray);
+
     QList<AbstractWorkspaceItem *> getItems() const;
 
     void addItemByType(const QString &type);

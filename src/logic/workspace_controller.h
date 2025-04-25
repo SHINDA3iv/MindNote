@@ -2,6 +2,7 @@
 #define WORKSPACE_CONTROLLER_H
 
 #include "workspace.h"
+#include "../local_storage.h"
 
 #include <QObject>
 #include <QList>
@@ -15,10 +16,11 @@ class WorkspaceController : public QObject
     Q_OBJECT
 
 public:
-    explicit WorkspaceController(QObject *parent = nullptr);
+    explicit WorkspaceController(std::shared_ptr<LocalStorage> localStorage,
+                                 QObject *parent = nullptr);
 
     // Создание нового рабочего пространства
-    Workspace *createWorkspace(const QString &name);
+    Workspace *createWorkspace(const QString &name, const QString &id = QString());
     // Удаление рабочего пространства
     void removeWorkspace(Workspace *workspace);
 
@@ -26,6 +28,8 @@ public:
     Workspace *getWorkspace(int index) const;
     // Получение всех рабочих пространств
     QList<Workspace *> getAllWorkspaces() const;
+
+    Workspace *getWorkspaceById(const QString &id) const;
 
     // Сериализация всех рабочих пространств в JSON
     QJsonObject serialize() const;
@@ -37,8 +41,14 @@ public:
     // Загрузка рабочих пространств из файла
     void loadFromFile(const QString &filePath);
 
+    // Сохранение всех рабочих пространств
+    void saveWorkspaces();
+    // Загрузка рабочих пространств
+    void loadWorkspaces();
+
 private:
     QList<Workspace *> _workspaces;
+    std::shared_ptr<LocalStorage> _localStorage;
 };
 
 #endif // WORKSPACE_CONTROLLER_H
