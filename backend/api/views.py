@@ -8,11 +8,8 @@ from django.shortcuts import get_object_or_404
 class WorkspaceViewSet(viewsets.ModelViewSet):
     queryset = Workspace.objects.all()
     serializer_class = WorkspaceSerializer
-    
+
     def perform_create(self, serializer):
-        """
-        Переопределяем метод perform_create, чтобы назначить текущего пользователя владельцем.
-        """
         serializer.save(owner=self.request.user)
 
     
