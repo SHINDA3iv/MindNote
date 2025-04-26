@@ -9,6 +9,7 @@ LocalStorage::LocalStorage(QObject *parent) : QObject(parent)
 {
     storagePath =
      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/workspaces/";
+    qDebug() << storagePath;
 }
 
 void LocalStorage::saveWorkspaces(const QJsonArray &workspaces)

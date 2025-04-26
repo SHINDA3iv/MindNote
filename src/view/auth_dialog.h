@@ -3,6 +3,7 @@
 #define AUTH_DIALOG_H
 
 #include <QDialog>
+#include <QCloseEvent>
 #include <qtabwidget.h>
 
 class QLineEdit;
@@ -27,6 +28,10 @@ public:
 signals:
     void loginRequested(const QString &email, const QString &password);
     void registerRequested(const QString &email, const QString &password, const QString &username);
+    void guestLoginRequested();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void onLoginClicked();

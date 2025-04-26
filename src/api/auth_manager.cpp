@@ -25,15 +25,11 @@ QString AuthManager::getAuthToken() const
 
 void AuthManager::login(const QString &email, const QString &password)
 {
-    // Здесь должна быть логика отправки запроса на сервер
-    // Временная реализация для демонстрации
-
     if (email.isEmpty() || password.isEmpty()) {
         emit loginFailed("Email and password cannot be empty");
         return;
     }
 
-    // В реальном приложении здесь будет запрос к API
     _authToken =
      QCryptographicHash::hash((email + password).toUtf8(), QCryptographicHash::Sha256).toHex();
     _currentUserId = "user_" + email.split("@").first();
@@ -48,15 +44,11 @@ void AuthManager::registerUser(const QString &email,
                                const QString &password,
                                const QString &username)
 {
-    // Здесь должна быть логика отправки запроса на сервер
-    // Временная реализация для демонстрации
-
     if (email.isEmpty() || password.isEmpty() || username.isEmpty()) {
         emit registrationFailed("All fields are required");
         return;
     }
 
-    // В реальном приложении здесь будет запрос к API
     emit registrationSuccess();
 }
 

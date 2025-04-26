@@ -120,8 +120,31 @@ void LeftPanel::refreshWorkspaceList()
 {
     if (!_workspaceController)
         return;
+    if (!_workspaceController)
+        return;
 
     _workspaceList->clear();
+    _workspaceList->setStyleSheet(R"(
+        QListWidget {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+
+        QListWidget::item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        QListWidget::item:hover {
+            background-color: #f5f5f5;
+        }
+
+        QListWidget::item:selected {
+            background-color: #e0f0ff;
+            color: black;
+        }
+    )");
 
     // Устанавливаем размер иконок
     QSize iconSize(28, 20); // Размер иконок 48x48
@@ -156,34 +179,60 @@ void LeftPanel::showContextMenu(const QPoint &pos)
         return;
 
     QMenu contextMenu(this);
-
-    QAction *changeIconAction = contextMenu.addAction("Сменить иконку");
-    connect(changeIconAction, &QAction::triggered, [this, workspace]() {
-        QString iconPath =
-         QFileDialog::getOpenFileName(this, tr("Выберите иконку"), QString(),
-                                      tr("Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"));
-        if (!iconPath.isEmpty()) {
-            workspace->setIcon(QIcon(iconPath));
+    contextMenu.setStyleSheet(R"(
+        QMenu {
+            background-color: white;
+            border: 1px solid #ddd;
+            padding: 4px;
         }
-        refreshWorkspaceList();
-    });
 
-    QAction *renameAction = contextMenu.addAction("Сменить название");
+        QMenu::item {
+            padding: 6px 24px 6px 12px;
+        }
+
+        QMenu::item:selected {
+            background-color: #e0f0ff;
+        }
+    )");
+
+    QAction *renameAction = contextMenu.addAction("Переименовать");
+    renameAction->setIcon(QIcon::fromTheme("edit-rename"));
+
+    QAction *changeIconAction = contextMenu.addAction("Изменить иконку");
+    changeIconAction->setIcon(QIcon::fromTheme("image-x-generic"));
+
+    QAction *deleteAction = contextMenu.addAction("Удалить");
+    deleteAction->setIcon(QIcon::fromTheme("edit-delete"));
+    deleteAction->setIcon(QIcon::fromTheme("edit-delete"));
+
+    // Соединяем действия
     connect(renameAction, &QAction::triggered, [this, workspace, item]() {
         bool ok;
-        QString newName =
-         QInputDialog::getText(this, "Сменить название пространства",
-                               "Новое название:", QLineEdit::Normal, workspace->getName(), &ok);
+        QString newName = QInputDialog::getText(
+         this, "Переименовать", "Новое название:", QLineEdit::Normal, workspace->getName(), &ok);
         if (ok && !newName.isEmpty()) {
             workspace->setName(newName);
             item->setText(newName);
         }
     });
 
-    QAction *deleteAction = contextMenu.addAction("Удалить пространство");
+    connect(changeIconAction, &QAction::triggered, [this, workspace]() {
+        QString iconPath = QFileDialog::getOpenFileName(this, "Выберите иконку", "",
+                                                        "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
+        if (!iconPath.isEmpty()) {
+            workspace->setIcon(QIcon(iconPath));
+            refreshWorkspaceList();
+        }
+    });
+
     connect(deleteAction, &QAction::triggered, [this, workspace]() {
-        _workspaceController->removeWorkspace(workspace);
-        refreshWorkspaceList();
+        if (QMessageBox::question(this, "Подтверждение",
+                                  "Вы уверены, что хотите удалить это пространство?",
+                                  QMessageBox::Yes | QMessageBox::No)
+            == QMessageBox::Yes) {
+            _workspaceController->removeWorkspace(workspace);
+            refreshWorkspaceList();
+        }
     });
 
     contextMenu.exec(_workspaceList->viewport()->mapToGlobal(pos));

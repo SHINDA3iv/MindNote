@@ -18,6 +18,32 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     _workspaceName(name),
     _iconLabel(new QLabel(this))
 {
+    this->setStyleSheet(R"(
+        Workspace {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        QLabel {
+            margin: 5px;
+        }
+
+        QToolButton {
+            border: none;
+            padding: 4px;
+        }
+
+        QToolButton:hover {
+            background-color: #f0f0f0;
+        }
+
+        QScrollArea {
+            border: none;
+            background: transparent;
+        }
+    )");
+
     QVBoxLayout *contentLayout = new QVBoxLayout(this);
 
     QHBoxLayout *headerLayout = new QHBoxLayout();

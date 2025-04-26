@@ -41,8 +41,6 @@ void SyncManager::performFullSync()
 void SyncManager::onWorkspacesFetched(const QJsonArray &workspaces)
 {
     _localStorage->saveWorkspaces(workspaces);
-
-    // Загружаем элементы для каждого рабочего пространства
     for (const QJsonValue &workspace : workspaces) {
         QString workspaceId = workspace.toObject()["id"].toString();
         _apiClient->getWorkspaceItems(workspaceId);
@@ -59,7 +57,6 @@ void SyncManager::onSyncCompleted(const QJsonObject &response)
     _isSyncing = false;
     _localStorage->setLastSyncTime(QDateTime::currentDateTime());
 
-    // Обновляем локальные данные после успешной синхронизации
     performFullSync();
 }
 
@@ -83,13 +80,6 @@ QJsonObject SyncManager::collectLocalChanges()
 {
     QJsonObject changes;
 
-    // Получаем время последней синхронизации
-    QDateTime lastSync = _localStorage->lastSyncTime();
-
-    // Здесь должна быть логика сбора изменений с момента lastSync
-    // Например, сравнение текущего состояния с сохраненным
-
-    // Временная реализация - отправляем все данные
     QJsonArray workspaces = _localStorage->loadWorkspaces();
     changes["workspaces"] = workspaces;
 

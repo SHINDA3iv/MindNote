@@ -33,6 +33,17 @@ file(GLOB_RECURSE PROJECT_SOURCES
 file(GLOB_RECURSE SRC_SUBDIRS LIST_DIRECTORIES TRUE "${SRC_DIR}/*")
 list(REMOVE_ITEM SRC_SUBDIRS ${PROJECT_SOURCES})
 
+# qt_add_resources(PROJECT_SOURCES
+#     "application_resources"
+#     PREFIX "/"
+#     FILES
+#         resources/icons/add.png
+#         resources/icons/delete.png
+#         resources/icons/edit.png
+#         resources/icons/sync.png
+#         resources/icons/logout.png
+# )
+
 # Создание исполняемого файла
 add_executable(studyProject ${PROJECT_SOURCES})
 

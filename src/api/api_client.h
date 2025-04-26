@@ -43,6 +43,9 @@ signals:
 public:
     void login(const QString &email, const QString &password);
     void registerUser(const QString &email, const QString &password, const QString &username);
+    void getCurrentUser();
+    void updateUser(const QJsonObject &userData);
+    void deleteUser();
 
     void setAuthToken(const QString &token);
     bool isAuthenticated() const;

@@ -23,6 +23,7 @@ public:
 
 private slots:
     void onLogout();
+    void onLoginRequested();
 
 private:
     void initWindow();
@@ -45,6 +46,10 @@ private:
 
     std::unique_ptr<LeftPanel> _leftPanel { nullptr };
     std::unique_ptr<EditorWidget> _editorWidget { nullptr };
+
+    QPointer<QToolButton> _logoutButton { nullptr };
+    QPointer<QToolButton> _loginButton { nullptr };
+    QAction *_syncAction { nullptr };
 
     QPointer<QSettings> _settings;
 };
