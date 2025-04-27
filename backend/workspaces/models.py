@@ -100,7 +100,6 @@ class Page(models.Model):
         verbose_name=_("Название")
     )
     link = models.SlugField(
-        unique=True,
         verbose_name=_("Ссылка")
     )
     is_main = models.BooleanField(
@@ -116,6 +115,7 @@ class Page(models.Model):
         verbose_name = _("Страница")
         verbose_name_plural = _("Страницы")
         ordering = ["-created_at"]
+        unique_together = ['space', 'link']
 
     def __str__(self):
         return self.title
@@ -125,7 +125,7 @@ class Page(models.Model):
             base_slug = slugify(self.title)
             slug = base_slug
             counter = 1
-            while Page.objects.filter(link=slug).exists():
+            while Page.objects.filter(space=self.space, link=slug).exists():
                 slug = f"{base_slug}-{counter}"
                 counter += 1
             self.link = slug

@@ -7,11 +7,11 @@ from .serializers import WorkspaceSerializer, PageSerializer, ElementSerializer
 class WorkspaceViewSet(viewsets.ModelViewSet):
     queryset = Workspace.objects.all()
     serializer_class = WorkspaceSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        # Пользователь может видеть только свои пространства
-        return Workspace.objects.filter(author=self.request.user)
+    # def get_queryset(self):
+    #     # Пользователь может видеть только свои пространства
+    #     return Workspace.objects.filter(author=self.request.user)
 
     def perform_create(self, serializer):
         # Передаем пользователя в контекст для автоматической привязки автора
@@ -21,11 +21,11 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
 class PageViewSet(viewsets.ModelViewSet):
     queryset = Page.objects.all()
     serializer_class = PageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        # Пользователь может видеть только страницы своих пространств
-        return Page.objects.filter(space__author=self.request.user)
+    # def get_queryset(self):
+    #     # Пользователь может видеть только страницы своих пространств
+    #     return Page.objects.filter(space__author=self.request.user)
 
     def perform_destroy(self, instance):
         # Запрет на удаление главной страницы
