@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
-    "djoser",
+    "djoser", 
+    'drf_spectacular', 
     "api.apps.ApiConfig",
     "users.apps.UsersConfig",
     "workspaces.apps.WorkspacesConfig",
@@ -140,6 +141,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', 
 }
 
 # DJOSER = {
