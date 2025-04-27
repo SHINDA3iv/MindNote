@@ -1,8 +1,8 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .models import (
-    Workspace, Page, Element, ImageElement,
-    FileElement, CheckboxElement, TextElement, LinkElement
+    Workspace, Page, ImageElement, FileElement,
+    CheckboxElement, TextElement, LinkElement
 )
 
 
@@ -34,19 +34,7 @@ class LinkElementInline(admin.StackedInline):
     model = LinkElement
     extra = 0
     fields = ['linked_page']
-
-
-class ElementInline(admin.StackedInline):
-    model = Element
-    extra = 0
-    fields = ['element_type']
-    inlines = [
-        ImageElementInline,
-        FileElementInline,
-        CheckboxElementInline,
-        TextElementInline,
-        LinkElementInline
-    ]
+    fk_name = 'page'
 
 
 class PageInline(admin.StackedInline):
@@ -54,7 +42,13 @@ class PageInline(admin.StackedInline):
     extra = 0
     fields = ['title', 'link', 'is_main']
     readonly_fields = ['link']
-    inlines = [ElementInline]
+    inlines = [
+        ImageElementInline,
+        FileElementInline,
+        CheckboxElementInline,
+        TextElementInline,
+        LinkElementInline
+    ]
 
 
 @admin.register(Workspace)
@@ -85,20 +79,6 @@ class PageAdmin(admin.ModelAdmin):
     list_filter = ['is_main', 'created_at']
     search_fields = ['title', 'space__title']
     readonly_fields = ['link', 'created_at']
-    inlines = [ElementInline]
-    fieldsets = (
-        (None, {
-            'fields': ('space', 'title', 'link', 'is_main', 'created_at')
-        }),
-    )
-
-
-@admin.register(Element)
-class ElementAdmin(admin.ModelAdmin):
-    list_display = ['element_type', 'page', 'created_at']
-    list_filter = ['element_type', 'created_at']
-    search_fields = ['page__title']
-    readonly_fields = ['created_at']
     inlines = [
         ImageElementInline,
         FileElementInline,
@@ -108,13 +88,72 @@ class ElementAdmin(admin.ModelAdmin):
     ]
     fieldsets = (
         (None, {
-            'fields': ('page', 'element_type', 'created_at')
+            'fields': ('space', 'title', 'link', 'is_main', 'created_at')
         }),
     )
 
-admin.site.register(ImageElement)
-admin.site.register(FileElement)
-admin.site.register(CheckboxElement)
-admin.site.register(TextElement)
-admin.site.register(LinkElement)
+
+@admin.register(ImageElement)
+class ImageElementAdmin(admin.ModelAdmin):
+    list_display = ['id', 'page', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['page__title']
+    readonly_fields = ['created_at']
+    fieldsets = (
+        (None, {
+            'fields': ('page', 'image', 'created_at')
+        }),
+    )
+
+
+@admin.register(FileElement)
+class FileElementAdmin(admin.ModelAdmin):
+    list_display = ['id', 'page', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['page__title']
+    readonly_fields = ['created_at']
+    fieldsets = (
+        (None, {
+            'fields': ('page', 'file', 'created_at')
+        }),
+    )
+
+
+@admin.register(CheckboxElement)
+class CheckboxElementAdmin(admin.ModelAdmin):
+    list_display = ['id', 'page', 'text', 'is_checked', 'created_at']
+    list_filter = ['is_checked', 'created_at']
+    search_fields = ['page__title', 'text']
+    readonly_fields = ['created_at']
+    fieldsets = (
+        (None, {
+            'fields': ('page', 'text', 'is_checked', 'created_at')
+        }),
+    )
+
+
+@admin.register(TextElement)
+class TextElementAdmin(admin.ModelAdmin):
+    list_display = ['id', 'page', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['page__title', 'content']
+    readonly_fields = ['created_at']
+    fieldsets = (
+        (None, {
+            'fields': ('page', 'content', 'created_at')
+        }),
+    )
+
+
+@admin.register(LinkElement)
+class LinkElementAdmin(admin.ModelAdmin):
+    list_display = ['id', 'page', 'linked_page', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['page__title', 'linked_page__title']
+    readonly_fields = ['created_at']
+    fieldsets = (
+        (None, {
+            'fields': ('page', 'linked_page', 'created_at')
+        }),
+    )
 

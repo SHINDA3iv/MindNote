@@ -37,30 +37,64 @@ class PageSerializer(serializers.ModelSerializer):
 
     def get_elements(self, obj):
         elements = []
-        for element in obj.elements.all():
-            element_data = {
+        
+        # Получаем все элементы разных типов
+        image_elements = obj.image_elements.all()
+        file_elements = obj.file_elements.all()
+        checkbox_elements = obj.checkbox_elements.all()
+        text_elements = obj.text_elements.all()
+        link_elements = obj.link_elements.all()
+        
+        # Добавляем элементы изображений
+        for element in image_elements:
+            elements.append({
                 'id': element.id,
-                'element_type': element.element_type,
+                'element_type': 'image',
+                'image': element.image.url if element.image else None,
                 'created_at': element.created_at
-            }
-            
-            if element.element_type == 'image':
-                element_data['image'] = element.imageelement.image.url if element.imageelement.image else None
-            elif element.element_type == 'file':
-                element_data['file'] = element.fileelement.file.url if element.fileelement.file else None
-            elif element.element_type == 'checkbox':
-                element_data['text'] = element.checkboxelement.text
-                element_data['is_checked'] = element.checkboxelement.is_checked
-            elif element.element_type == 'text':
-                element_data['content'] = element.textelement.content
-            elif element.element_type == 'link':
-                element_data['linked_page'] = {
-                    'id': element.linkelement.linked_page.id,
-                    'title': element.linkelement.linked_page.title,
-                    'link': element.linkelement.linked_page.link
-                }
-            
-            elements.append(element_data)
+            })
+        
+        # Добавляем элементы файлов
+        for element in file_elements:
+            elements.append({
+                'id': element.id,
+                'element_type': 'file',
+                'file': element.file.url if element.file else None,
+                'created_at': element.created_at
+            })
+        
+        # Добавляем элементы чекбоксов
+        for element in checkbox_elements:
+            elements.append({
+                'id': element.id,
+                'element_type': 'checkbox',
+                'text': element.text,
+                'is_checked': element.is_checked,
+                'created_at': element.created_at
+            })
+        
+        # Добавляем элементы текстовых полей
+        for element in text_elements:
+            elements.append({
+                'id': element.id,
+                'element_type': 'text',
+                'content': element.content,
+                'created_at': element.created_at
+            })
+        
+        # Добавляем элементы ссылок
+        for element in link_elements:
+            elements.append({
+                'id': element.id,
+                'element_type': 'link',
+                'linked_page': {
+                    'id': element.linked_page.id,
+                    'title': element.linked_page.title,
+                    'link': element.linked_page.link
+                },
+                'created_at': element.created_at
+            })
+        
         return elements
 
     def validate(self, data):
@@ -69,67 +103,37 @@ class PageSerializer(serializers.ModelSerializer):
         return data
 
 
-class ElementSerializer(serializers.ModelSerializer):
+class ImageElementSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Element
-        fields = [
-            'id', 'element_type', 'created_at'
-        ]
+        model = ImageElement
+        fields = ['id', 'image', 'created_at']
         read_only_fields = ['id', 'created_at']
 
-    def create(self, validated_data):
-        page = self.context.get('page')
-        if not page:
-            raise serializers.ValidationError("Страница не указана.")
-        
-        element = Element.objects.create(page=page, **validated_data)
-        
-        element_data = self.context.get('element_data', {})
-        
-        if element.element_type == 'image' and 'image' in element_data:
-            ImageElement.objects.create(element=element, image=element_data['image'])
-        elif element.element_type == 'file' and 'file' in element_data:
-            FileElement.objects.create(element=element, file=element_data['file'])
-        elif element.element_type == 'checkbox':
-            CheckboxElement.objects.create(
-                element=element,
-                text=element_data.get('text', ''),
-                is_checked=element_data.get('is_checked', False)
-            )
-        elif element.element_type == 'text' and 'content' in element_data:
-            TextElement.objects.create(element=element, content=element_data['content'])
-        elif element.element_type == 'link' and 'linked_page' in element_data:
-            LinkElement.objects.create(
-                element=element,
-                linked_page_id=element_data['linked_page']
-            )
-        
-        return element
 
-    def update(self, instance, validated_data):
-        element_data = self.context.get('element_data', {})
-        
-        if instance.element_type == 'image' and 'image' in element_data:
-            if hasattr(instance, 'imageelement'):
-                instance.imageelement.image = element_data['image']
-                instance.imageelement.save()
-        elif instance.element_type == 'file' and 'file' in element_data:
-            if hasattr(instance, 'fileelement'):
-                instance.fileelement.file = element_data['file']
-                instance.fileelement.save()
-        elif instance.element_type == 'checkbox':
-            if hasattr(instance, 'checkboxelement'):
-                instance.checkboxelement.text = element_data.get('text', instance.checkboxelement.text)
-                instance.checkboxelement.is_checked = element_data.get('is_checked', instance.checkboxelement.is_checked)
-                instance.checkboxelement.save()
-        elif instance.element_type == 'text' and 'content' in element_data:
-            if hasattr(instance, 'textelement'):
-                instance.textelement.content = element_data['content']
-                instance.textelement.save()
-        elif instance.element_type == 'link' and 'linked_page' in element_data:
-            if hasattr(instance, 'linkelement'):
-                instance.linkelement.linked_page_id = element_data['linked_page']
-                instance.linkelement.save()
-        
-        return instance
+class FileElementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FileElement
+        fields = ['id', 'file', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class CheckboxElementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CheckboxElement
+        fields = ['id', 'text', 'is_checked', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class TextElementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TextElement
+        fields = ['id', 'content', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class LinkElementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LinkElement
+        fields = ['id', 'linked_page', 'created_at']
+        read_only_fields = ['id', 'created_at']
     

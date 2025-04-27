@@ -144,26 +144,12 @@ class Page(models.Model):
 
 class Element(models.Model):
     """
-    Базовая модель для элементов на страницах.
+    Базовая модель для всех типов элементов.
     """
-    ELEMENT_TYPES = [
-        ('image', _('Изображение')),
-        ('file', _('Файл')),
-        ('checkbox', _('Чекбокс')),
-        ('text', _('Текстовое поле')),
-        ('link', _('Ссылка на страницу')),
-    ]
-
     page = models.ForeignKey(
         'Page',
         on_delete=models.CASCADE,
-        related_name='elements',
         verbose_name=_("Страница")
-    )
-    element_type = models.CharField(
-        max_length=20,
-        choices=ELEMENT_TYPES,
-        verbose_name=_("Тип элемента")
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -171,24 +157,17 @@ class Element(models.Model):
     )
 
     class Meta:
-        verbose_name = _("Элемент")
-        verbose_name_plural = _("Элементы")
+        abstract = True
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.get_element_type_display()} - {self.page.title}"
+        return f"{self._meta.verbose_name} - {self.page.title}"
 
 
-class ImageElement(models.Model):
+class ImageElement(Element):
     """
     Модель для элементов типа "Изображение".
     """
-    element = models.OneToOneField(
-        Element,
-        on_delete=models.CASCADE,
-        related_name='imageelement',
-        verbose_name=_("Элемент")
-    )
     image = models.ImageField(
         upload_to='element_images/',
         verbose_name=_("Изображение")
@@ -198,20 +177,11 @@ class ImageElement(models.Model):
         verbose_name = _("Изображение")
         verbose_name_plural = _("Изображения")
 
-    def __str__(self):
-        return f"Изображение - {self.element.page.title}"
 
-
-class FileElement(models.Model):
+class FileElement(Element):
     """
     Модель для элементов типа "Файл".
     """
-    element = models.OneToOneField(
-        Element,
-        on_delete=models.CASCADE,
-        related_name='fileelement',
-        verbose_name=_("Элемент")
-    )
     file = models.FileField(
         upload_to='element_files/',
         verbose_name=_("Файл")
@@ -221,20 +191,11 @@ class FileElement(models.Model):
         verbose_name = _("Файл")
         verbose_name_plural = _("Файлы")
 
-    def __str__(self):
-        return f"Файл - {self.element.page.title}"
 
-
-class CheckboxElement(models.Model):
+class CheckboxElement(Element):
     """
     Модель для элементов типа "Чекбокс".
     """
-    element = models.OneToOneField(
-        Element,
-        on_delete=models.CASCADE,
-        related_name='checkboxelement',
-        verbose_name=_("Элемент")
-    )
     text = models.CharField(
         max_length=255,
         verbose_name=_("Текст")
@@ -248,20 +209,11 @@ class CheckboxElement(models.Model):
         verbose_name = _("Чекбокс")
         verbose_name_plural = _("Чекбоксы")
 
-    def __str__(self):
-        return f"Чекбокс - {self.element.page.title}"
 
-
-class TextElement(models.Model):
+class TextElement(Element):
     """
     Модель для элементов типа "Текстовое поле".
     """
-    element = models.OneToOneField(
-        Element,
-        on_delete=models.CASCADE,
-        related_name='textelement',
-        verbose_name=_("Элемент")
-    )
     content = models.TextField(
         verbose_name=_("Содержимое")
     )
@@ -270,20 +222,11 @@ class TextElement(models.Model):
         verbose_name = _("Текстовое поле")
         verbose_name_plural = _("Текстовые поля")
 
-    def __str__(self):
-        return f"Текстовое поле - {self.element.page.title}"
 
-
-class LinkElement(models.Model):
+class LinkElement(Element):
     """
     Модель для элементов типа "Ссылка на страницу".
     """
-    element = models.OneToOneField(
-        Element,
-        on_delete=models.CASCADE,
-        related_name='linkelement',
-        verbose_name=_("Элемент")
-    )
     linked_page = models.ForeignKey(
         'Page',
         on_delete=models.CASCADE,
@@ -295,11 +238,8 @@ class LinkElement(models.Model):
         verbose_name = _("Ссылка на страницу")
         verbose_name_plural = _("Ссылки на страницы")
 
-    def __str__(self):
-        return f"Ссылка - {self.element.page.title}"
-
     def clean(self):
-        if self.linked_page.space != self.element.page.space:
+        if self.linked_page.space != self.page.space:
             raise ValidationError(
                 _("Ссылка должна указывать на страницу в том же пространстве."))
 
