@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(studyProject VERSION 0.1 LANGUAGES CXX)
+project(Desktop VERSION 0.1 LANGUAGES CXX)
 
 # Настройки для C++ 17
 set(CMAKE_CXX_STANDARD 17)
@@ -45,10 +45,10 @@ list(REMOVE_ITEM SRC_SUBDIRS ${PROJECT_SOURCES})
 # )
 
 # Создание исполняемого файла
-add_executable(studyProject ${PROJECT_SOURCES})
+add_executable(Desktop ${PROJECT_SOURCES})
 
 # Подключение необходимых компонентов Qt
-target_link_libraries(studyProject PRIVATE
+target_link_libraries(Desktop PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Network
 )
@@ -56,19 +56,19 @@ target_link_libraries(studyProject PRIVATE
 # Добавление директорий включения заголовочных файлов
 foreach(DIR ${SRC_SUBDIRS})
     if(IS_DIRECTORY ${DIR})
-        target_include_directories(studyProject PRIVATE ${DIR})
+        target_include_directories(Desktop PRIVATE ${DIR})
     endif()
 endforeach()
 
 # Установка свойств для разных платформ
-set_target_properties(studyProject PROPERTIES
+set_target_properties(Desktop PROPERTIES
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
 
 # Инструкции для установки
 include(GNUInstallDirs)
-install(TARGETS studyProject
+install(TARGETS Desktop
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -76,5 +76,5 @@ install(TARGETS studyProject
 
 # Финализация для Qt6
 if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(studyProject)
+    qt_finalize_executable(Desktop)
 endif()

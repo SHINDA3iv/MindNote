@@ -2,7 +2,7 @@
 #include "auth_manager.h"
 #include <QCryptographicHash>
 
-AuthManager::AuthManager(QObject *parent) : QObject(parent), _settings("MyCompany", "StudyProject")
+AuthManager::AuthManager(QObject *parent) : QObject(parent), _settings("MyCompany", "Desktop")
 {
     _authToken = _settings.value("auth/token").toString();
     _currentUserId = _settings.value("auth/userId").toString();
