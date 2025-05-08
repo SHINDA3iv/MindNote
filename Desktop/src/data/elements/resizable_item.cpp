@@ -57,22 +57,59 @@ void ResizableItem::mouseMoveEvent(QMouseEvent *event)
         int deltaY = event->pos().y() - _lastMousePos.y();
 
         QRect newGeometry = geometry();
+        bool isShiftPressed = event->modifiers() & Qt::ShiftModifier;
 
-        if (_resizeDirection & Top) {
-            newGeometry.setTop(newGeometry.top() + deltaY);
-        }
-        if (_resizeDirection & Bottom) {
-            newGeometry.setBottom(newGeometry.bottom() + deltaY);
-        }
-        if (_resizeDirection & Left) {
-            newGeometry.setLeft(newGeometry.left() + deltaX);
-        }
-        if (_resizeDirection & Right) {
-            newGeometry.setRight(newGeometry.right() + deltaX);
+        // Проверяем, не достигнут ли минимальный размер
+        if (newGeometry.width() <= 50 && deltaX < 0) deltaX = 0;
+        if (newGeometry.height() <= 50 && deltaY < 0) deltaY = 0;
+
+        if (isShiftPressed && (_resizeDirection & (Top | Bottom)) && (_resizeDirection & (Left | Right))) {
+            // При нажатом Shift и перетаскивании за угол, масштабируем пропорционально
+            int maxDelta = qMax(qAbs(deltaX), qAbs(deltaY));
+            if (deltaX < 0) maxDelta = -maxDelta;
+            
+            // Проверяем, не достигнем ли минимального размера
+            if (newGeometry.width() + maxDelta <= 50 || newGeometry.height() + maxDelta <= 50) {
+                return;
+            }
+            
+            if (_resizeDirection & Top) {
+                newGeometry.setTop(newGeometry.top() + maxDelta);
+            }
+            if (_resizeDirection & Bottom) {
+                newGeometry.setBottom(newGeometry.bottom() + maxDelta);
+            }
+            if (_resizeDirection & Left) {
+                newGeometry.setLeft(newGeometry.left() + maxDelta);
+            }
+            if (_resizeDirection & Right) {
+                newGeometry.setRight(newGeometry.right() + maxDelta);
+            }
+        } else {
+            // Обычное масштабирование без Shift
+            if (_resizeDirection & Top) {
+                if (newGeometry.height() - deltaY >= 50) {
+                    newGeometry.setTop(newGeometry.top() + deltaY);
+                }
+            }
+            if (_resizeDirection & Bottom) {
+                if (newGeometry.height() + deltaY >= 50) {
+                    newGeometry.setBottom(newGeometry.bottom() + deltaY);
+                }
+            }
+            if (_resizeDirection & Left) {
+                if (newGeometry.width() - deltaX >= 50) {
+                    newGeometry.setLeft(newGeometry.left() + deltaX);
+                }
+            }
+            if (_resizeDirection & Right) {
+                if (newGeometry.width() + deltaX >= 50) {
+                    newGeometry.setRight(newGeometry.right() + deltaX);
+                }
+            }
         }
 
-        setFixedSize(newGeometry.width() > 50 ? newGeometry.width() : 50,
-                     newGeometry.height() > 50 ? newGeometry.height() : 50);
+        setFixedSize(newGeometry.width(), newGeometry.height());
         _lastMousePos = event->pos();
 
         emit resized();
