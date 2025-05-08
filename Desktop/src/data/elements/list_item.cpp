@@ -14,6 +14,8 @@ ListItem::ListItem(ListType type, Workspace *parent) :
     resize(width(), 200);
 
     setupContextMenu();
+    
+    _listWidget->installEventFilter(this);
 }
 
 QString ListItem::type() const

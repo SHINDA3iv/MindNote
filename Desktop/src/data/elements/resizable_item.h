@@ -32,6 +32,7 @@ protected:
 
     void updateResizeDirection(const QPoint &pos);
     void updateCursor();
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
     bool _resizing;
     ResizeDirections _resizeDirection;

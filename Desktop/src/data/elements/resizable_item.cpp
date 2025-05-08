@@ -8,6 +8,37 @@ ResizableItem::ResizableItem(Workspace *parent) :
     _resizeDirection(None)
 {}
 
+bool ResizableItem::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::MouseMove || 
+        event->type() == QEvent::MouseButtonPress || 
+        event->type() == QEvent::MouseButtonRelease) {
+        
+        QWidget *childWidget = qobject_cast<QWidget*>(watched);
+        if (childWidget) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+            QPoint globalPos = childWidget->mapTo(this, mouseEvent->pos());
+            QMouseEvent newEvent(
+                event->type(),
+                globalPos,
+                mouseEvent->button(),
+                mouseEvent->buttons(),
+                mouseEvent->modifiers()
+            );
+            
+            if (event->type() == QEvent::MouseMove) {
+                mouseMoveEvent(&newEvent);
+            } else if (event->type() == QEvent::MouseButtonPress) {
+                mousePressEvent(&newEvent);
+            } else if (event->type() == QEvent::MouseButtonRelease) {
+                mouseReleaseEvent(&newEvent);
+            }
+            return true;
+        }
+    }
+    return QObject::eventFilter(watched, event);
+}
+
 void ResizableItem::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
