@@ -9,16 +9,29 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
     layout->addWidget(_imageLabel);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+    layout->setSizeConstraint(QLayout::SetFixedSize);
 
     setLayout(layout);
 
     if (!imagePath.isEmpty()) {
         QPixmap pixmap(imagePath);
-        _imageLabel->setPixmap(pixmap.scaled(pixmap.width(), pixmap.height(), Qt::KeepAspectRatio,
-                                             Qt::SmoothTransformation));
-    }
+        _originalPixmap = pixmap;
 
-    resize(_imageLabel->pixmap().width(), _imageLabel->pixmap().height());
+        int initialWidth = qMin(pixmap.width(), 400);
+        int initialHeight = (initialWidth * pixmap.height()) / pixmap.width();
+
+        _imageLabel->setFixedSize(initialWidth, initialHeight);
+        setFixedSize(initialWidth, initialHeight);
+
+        QPixmap scaledPixmap =
+         pixmap.scaled(initialWidth, initialHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        _imageLabel->setPixmap(scaledPixmap);
+        _imageLabel->setAlignment(Qt::AlignCenter);
+        resize(_imageLabel->pixmap().width(), _imageLabel->pixmap().height());
+    } else {
+        _imageLabel->setFixedSize(200, 200);
+        setFixedSize(200, 200);
+    }
 }
 
 QString ImageItem::type() const
@@ -39,22 +52,33 @@ void ImageItem::deserialize(const QJsonObject &json)
     if (json.contains("imagePath")) {
         _imagePath = json["imagePath"].toString();
         QPixmap pixmap(_imagePath);
-
-        _imageLabel->setPixmap(pixmap.scaled(pixmap.width(), pixmap.height(), Qt::KeepAspectRatio,
-                                             Qt::SmoothTransformation));
+        _originalPixmap = pixmap;
+        updateImageSize();
     }
 }
 
 void ImageItem::resizeEvent(QResizeEvent *event)
 {
     if (!_imagePath.isEmpty()) {
-        QPixmap pixmap(_imagePath);
-        int maxWidth = event->size().width() - 20;
-        int maxHeight = event->size().height() - 20;
-        _imageLabel->setPixmap(
-         pixmap.scaled(maxWidth, maxHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        resize(event->size());
+        _imageLabel->resize(event->size());
+        updateImageSize();
     }
     ResizableItem::resizeEvent(event);
+
+    qDebug() << "Позиция" << pos() << _imageLabel->pos();
+    qDebug() << "Размер" << size() << _imageLabel->size() << _imageLabel->pixmap().size();
+}
+
+void ImageItem::updateImageSize()
+{
+    if (!_originalPixmap.isNull()) {
+        QPixmap scaledPixmap =
+         _originalPixmap.scaled(_imageLabel->width(), _imageLabel->height(), Qt::KeepAspectRatio,
+                                Qt::SmoothTransformation);
+        _imageLabel->setPixmap(scaledPixmap);
+        _imageLabel->setAlignment(Qt::AlignCenter);
+    }
 }
 
 void ImageItem::addCustomContextMenuActions(QMenu *contextMenu)

@@ -25,8 +25,10 @@ protected:
     void addCustomContextMenuActions(QMenu *contextMenu) override;
 
 private:
+    void updateImageSize();
     QPointer<QLabel> _imageLabel;
     QString _imagePath;
+    QPixmap _originalPixmap;
 };
 
 #endif // IMAGEITEM_H

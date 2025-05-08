@@ -30,7 +30,6 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
 
-private:
     void updateResizeDirection(const QPoint &pos);
     void updateCursor();
 
