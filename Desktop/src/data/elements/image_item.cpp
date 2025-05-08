@@ -52,19 +52,31 @@ void ImageItem::deserialize(const QJsonObject &json)
 
 void ImageItem::resizeEvent(QResizeEvent *event)
 {
-    ResizableItem::resizeEvent(event);
     if (!_imagePath.isEmpty()) {
         updateImageSize();
     }
+    ResizableItem::resizeEvent(event);
 }
 
 void ImageItem::updateImageSize()
 {
     if (!_originalPixmap.isNull()) {
-        QPixmap scaledPixmap = _originalPixmap.scaled(width(), height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        _imageLabel->setPixmap(scaledPixmap);
+        QPixmap scaledPixmap;
+        if (_resizeDirection & (Left | Right)) {
+            // When resizing horizontally, scale only the width
+            scaledPixmap = _originalPixmap.scaled(width(), _originalPixmap.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        } else if (_resizeDirection & (Top | Bottom)) {
+            // When resizing vertically, scale only the height
+            scaledPixmap = _originalPixmap.scaled(_originalPixmap.width(), height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        } else {
+            // When resizing diagonally or no specific direction, maintain aspect ratio
+            scaledPixmap = _originalPixmap.scaled(width(), height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        }
+        
         _imageLabel->setFixedSize(width(), height());
+        _imageLabel->setPixmap(scaledPixmap);
         _imageLabel->setAlignment(Qt::AlignCenter);
+        _imageLabel->setScaledContents(true);
     }
 }
 
