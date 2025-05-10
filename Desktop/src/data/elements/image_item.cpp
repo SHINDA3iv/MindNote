@@ -23,7 +23,7 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
     } else {
         setFixedSize(200, 200);
     }
-    
+
     _imageLabel->installEventFilter(this);
 }
 
@@ -64,15 +64,18 @@ void ImageItem::updateImageSize()
         QPixmap scaledPixmap;
         if (_resizeDirection & (Left | Right)) {
             // When resizing horizontally, scale only the width
-            scaledPixmap = _originalPixmap.scaled(width(), _originalPixmap.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+            scaledPixmap = _originalPixmap.scaled(width(), _originalPixmap.height(),
+                                                  Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
         } else if (_resizeDirection & (Top | Bottom)) {
             // When resizing vertically, scale only the height
-            scaledPixmap = _originalPixmap.scaled(_originalPixmap.width(), height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+            scaledPixmap = _originalPixmap.scaled(_originalPixmap.width(), height(),
+                                                  Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
         } else {
             // When resizing diagonally or no specific direction, maintain aspect ratio
-            scaledPixmap = _originalPixmap.scaled(width(), height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            scaledPixmap = _originalPixmap.scaled(width(), height(), Qt::KeepAspectRatio,
+                                                  Qt::SmoothTransformation);
         }
-        
+
         _imageLabel->setFixedSize(width(), height());
         _imageLabel->setPixmap(scaledPixmap);
         _imageLabel->setAlignment(Qt::AlignCenter);
@@ -96,9 +99,4 @@ void ImageItem::addCustomContextMenuActions(QMenu *contextMenu)
     connect(alignRightAction, &QAction::triggered, this, [this]() {
         _imageLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     });
-
-    QAction *deleteAction = contextMenu->addAction("Удалить элемент");
-    connect(deleteAction, &QAction::triggered, this, &AbstractWorkspaceItem::deleteItem);
-
-    contextMenu->exec(mapToGlobal(pos()));
 }

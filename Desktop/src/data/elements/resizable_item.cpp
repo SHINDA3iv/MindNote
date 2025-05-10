@@ -1,12 +1,27 @@
 #include "resizable_item.h"
 
 #include <QCursor>
+#include <QScrollArea>
+#include <QScrollBar>
+#include <QTimer>
 
 ResizableItem::ResizableItem(Workspace *parent) :
     AbstractWorkspaceItem(parent),
     _resizing(false),
     _resizeDirection(None)
-{}
+{
+    // Создаем таймер для обновления размеров
+    _resizeTimer = new QTimer(this);
+    _resizeTimer->setInterval(16); // ~60 FPS
+    connect(_resizeTimer, &QTimer::timeout, this, [this]() {
+        if (_resizing) {
+            QPoint globalPos = QCursor::pos();
+            QPoint localPos = mapFromGlobal(globalPos);
+            QMouseEvent event(QEvent::MouseMove, localPos, globalPos, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            mouseMoveEvent(&event);
+        }
+    });
+}
 
 bool ResizableItem::eventFilter(QObject *watched, QEvent *event)
 {
@@ -46,6 +61,7 @@ void ResizableItem::mousePressEvent(QMouseEvent *event)
         if (_resizeDirection != None) {
             _resizing = true;
             _lastMousePos = event->pos();
+            _resizeTimer->start();
         }
     }
 }
@@ -146,6 +162,9 @@ void ResizableItem::mouseMoveEvent(QMouseEvent *event)
         setFixedSize(newGeometry.width(), newGeometry.height());
         _lastMousePos = event->pos();
 
+        // Вызываем автоскролл при изменении размеров
+        autoScrollDuringResize(event->globalPos());
+
         emit resized();
     } else {
         updateResizeDirection(event->pos());
@@ -158,6 +177,7 @@ void ResizableItem::mouseReleaseEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton) {
         _resizing = false;
         _resizeDirection = None;
+        _resizeTimer->stop();
     }
 }
 
@@ -208,5 +228,54 @@ void ResizableItem::updateCursor()
     default:
         setCursor(Qt::ArrowCursor);
         break;
+    }
+}
+
+void ResizableItem::autoScrollDuringResize(const QPoint &globalPos)
+{
+    // Находим родительский QScrollArea
+    QWidget *parent = this;
+    QScrollArea *scrollArea = nullptr;
+    
+    while (parent) {
+        parent = parent->parentWidget();
+        if (scrollArea = qobject_cast<QScrollArea*>(parent)) {
+            break;
+        }
+    }
+    
+    if (!scrollArea) {
+        return;
+    }
+
+    // Получаем видимую область скролла
+    QRect viewportRect = scrollArea->viewport()->rect();
+    QPoint viewportPos = scrollArea->viewport()->mapFromGlobal(globalPos);
+    
+    // Определяем, нужно ли скроллить
+    const int scrollMargin = 50; // Отступ от края для начала скролла
+    
+    if (viewportPos.x() < scrollMargin) {
+        // Скролл влево
+        scrollArea->horizontalScrollBar()->setValue(
+            scrollArea->horizontalScrollBar()->value() - (scrollMargin - viewportPos.x())
+        );
+    } else if (viewportPos.x() > viewportRect.width() - scrollMargin) {
+        // Скролл вправо
+        scrollArea->horizontalScrollBar()->setValue(
+            scrollArea->horizontalScrollBar()->value() + (viewportPos.x() - (viewportRect.width() - scrollMargin))
+        );
+    }
+    
+    if (viewportPos.y() < scrollMargin) {
+        // Скролл вверх
+        scrollArea->verticalScrollBar()->setValue(
+            scrollArea->verticalScrollBar()->value() - (scrollMargin - viewportPos.y())
+        );
+    } else if (viewportPos.y() > viewportRect.height() - scrollMargin) {
+        // Скролл вниз
+        scrollArea->verticalScrollBar()->setValue(
+            scrollArea->verticalScrollBar()->value() + (viewportPos.y() - (viewportRect.height() - scrollMargin))
+        );
     }
 }

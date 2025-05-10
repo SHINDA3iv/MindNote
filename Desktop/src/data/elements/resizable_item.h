@@ -5,6 +5,7 @@
 #include "workspace.h"
 
 #include <QMouseEvent>
+#include <QTimer>
 
 class ResizableItem : public AbstractWorkspaceItem
 {
@@ -33,10 +34,12 @@ protected:
     void updateResizeDirection(const QPoint &pos);
     void updateCursor();
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void autoScrollDuringResize(const QPoint &globalPos);
 
     bool _resizing;
     ResizeDirections _resizeDirection;
     QPoint _lastMousePos;
+    QTimer *_resizeTimer;
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(ResizableItem::ResizeDirections)
