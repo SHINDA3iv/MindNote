@@ -276,17 +276,48 @@ void MainWidget::initConnections()
 
 void MainWidget::saveSettings()
 {
-    _settings->beginGroup("MainWidget");
-    _settings->setValue("splitterState", _mainSplitter->saveState());
-    _settings->endGroup();
+    if (!_settings) {
+        return;
+    }
+
+    // Save main window geometry
+    if (QWidget *window = window()) {
+        _settings->setValue("geometry", window->saveGeometry());
+        _settings->setValue("windowState", window->saveState());
+    }
+
+    // Save splitter sizes
+    if (_mainSplitter) {
+        _settings->setValue("splitterSizes", _mainSplitter->saveState());
+    }
+
+    // Save other widget states
+    if (_leftPanel) {
+        _settings->setValue("leftPanel/expanded", _leftPanel->isExpanded());
+    }
+
+    _settings->sync();
 }
 
 void MainWidget::restoreSettings()
 {
-    _settings->beginGroup("MainWidget");
-    QByteArray splitterState = _settings->value("splitterState").toByteArray();
-    if (!splitterState.isEmpty()) {
-        _mainSplitter->restoreState(splitterState);
+    if (!_settings) {
+        return;
     }
-    _settings->endGroup();
+
+    // Restore main window geometry
+    if (QWidget *window = window()) {
+        window->restoreGeometry(_settings->value("geometry").toByteArray());
+        window->restoreState(_settings->value("windowState").toByteArray());
+    }
+
+    // Restore splitter sizes
+    if (_mainSplitter) {
+        _mainSplitter->restoreState(_settings->value("splitterSizes").toByteArray());
+    }
+
+    // Restore other widget states
+    if (_leftPanel) {
+        _leftPanel->setExpanded(_settings->value("leftPanel/expanded", true).toBool());
+    }
 }

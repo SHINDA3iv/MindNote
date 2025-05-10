@@ -13,6 +13,7 @@ void EditorWidget::setCurrentWorkspace(Workspace *workspace)
     if (_currentWorkspace) {
         _layout->removeWidget(_currentWorkspace);
         _currentWorkspace->setParent(nullptr);
+        _currentWorkspace = nullptr;
     }
 
     _currentWorkspace = workspace;

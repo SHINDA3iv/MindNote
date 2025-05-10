@@ -15,13 +15,14 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
         QPixmap pixmap(imagePath);
         _originalPixmap = pixmap;
 
-        int initialWidth = qMin(pixmap.width(), 400);
-        int initialHeight = (initialWidth * pixmap.height()) / pixmap.width();
+        // Calculate initial size while respecting minimum size
+        int initialWidth = qMax(qMin(pixmap.width(), 500), 250);
+        int initialHeight = qMax((initialWidth * pixmap.height()) / pixmap.width(), 250);
 
         setFixedSize(initialWidth, initialHeight);
         updateImageSize();
     } else {
-        setFixedSize(200, 200);
+        setFixedSize(250, 250);
     }
 
     _imageLabel->installEventFilter(this);
