@@ -64,26 +64,60 @@ void ResizableItem::mouseMoveEvent(QMouseEvent *event)
         if (newGeometry.height() <= 50 && deltaY < 0) deltaY = 0;
 
         if (isShiftPressed && (_resizeDirection & (Top | Bottom)) && (_resizeDirection & (Left | Right))) {
-            // При нажатом Shift и перетаскивании за угол, масштабируем пропорционально
-            int maxDelta = qMax(qAbs(deltaX), qAbs(deltaY));
-            if (deltaX < 0) maxDelta = -maxDelta;
+            // При нажатом Shift и перетаскивании за угол, масштабируем только по диагонали
+            double aspectRatio = static_cast<double>(newGeometry.width()) / newGeometry.height();
+            
+            // Определяем направление движения мыши
+            bool movingRight = deltaX > 0;
+            bool movingDown = deltaY > 0;
+            
+            // Определяем, какое изменение больше по модулю
+            if (qAbs(deltaX) > qAbs(deltaY)) {
+                // Если изменение по X больше, используем его как основное
+                deltaY = static_cast<int>(deltaX / aspectRatio);
+            } else {
+                // Если изменение по Y больше, используем его как основное
+                deltaX = static_cast<int>(deltaY * aspectRatio);
+            }
+            
+            // Проверяем, соответствует ли направление движения диагонали
+            bool isValidDiagonal = false;
+            
+            if (_resizeDirection & (Top | Left)) {
+                // Для верхнего левого угла
+                isValidDiagonal = (movingRight && !movingDown) || (!movingRight && movingDown);
+            } else if (_resizeDirection & (Top | Right)) {
+                // Для верхнего правого угла
+                isValidDiagonal = (!movingRight && !movingDown) || (movingRight && movingDown);
+            } else if (_resizeDirection & (Bottom | Left)) {
+                // Для нижнего левого угла
+                isValidDiagonal = (!movingRight && !movingDown) || (movingRight && movingDown);
+            } else if (_resizeDirection & (Bottom | Right)) {
+                // Для нижнего правого угла
+                isValidDiagonal = (movingRight && !movingDown) || (!movingRight && movingDown);
+            }
+            
+            // Если движение не по диагонали, игнорируем изменение
+            if (!isValidDiagonal) {
+                return;
+            }
             
             // Проверяем, не достигнем ли минимального размера
-            if (newGeometry.width() + maxDelta <= 50 || newGeometry.height() + maxDelta <= 50) {
+            if (newGeometry.width() + deltaX <= 50 || newGeometry.height() + deltaY <= 50) {
                 return;
             }
             
             if (_resizeDirection & Top) {
-                newGeometry.setTop(newGeometry.top() + maxDelta);
+                newGeometry.setTop(newGeometry.top() + deltaY);
             }
             if (_resizeDirection & Bottom) {
-                newGeometry.setBottom(newGeometry.bottom() + maxDelta);
+                newGeometry.setBottom(newGeometry.bottom() + deltaY);
             }
             if (_resizeDirection & Left) {
-                newGeometry.setLeft(newGeometry.left() + maxDelta);
+                newGeometry.setLeft(newGeometry.left() + deltaX);
             }
             if (_resizeDirection & Right) {
-                newGeometry.setRight(newGeometry.right() + maxDelta);
+                newGeometry.setRight(newGeometry.right() + deltaX);
             }
         } else {
             // Обычное масштабирование без Shift
