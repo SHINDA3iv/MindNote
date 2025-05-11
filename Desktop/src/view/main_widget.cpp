@@ -5,8 +5,16 @@
 #include <QLayout>
 #include <QCoreApplication>
 #include <QMessageBox>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QFileDialog>
+#include <QApplication>
 
-MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
+MainWidget::MainWidget(QWidget *parent)
+    : QWidget(parent)
+    , _hasUnsavedChanges(false)
+    , _zoomFactor(1.0)
+    , _sidebarVisible(true)
 {
     QString settingsPath = QCoreApplication::applicationDirPath() + "/settings.ini";
     _settings = new QSettings(settingsPath, QSettings::IniFormat, this);
@@ -24,6 +32,19 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
     } else {
         initApplication();
     }
+
+    initUI();
+    createToolbars();
+    createStatusBar();
+    initConnections();
+}
+
+MainWidget::~MainWidget()
+{
+    if (_workspaceController) {
+        _workspaceController->saveWorkspaces();
+    }
+    saveSettings();
 }
 
 void MainWidget::showAuthDialog()
@@ -87,12 +108,6 @@ void MainWidget::initApplication()
     restoreSettings();
 }
 
-MainWidget::~MainWidget()
-{
-    _workspaceController->saveWorkspaces();
-    saveSettings();
-}
-
 void MainWidget::onLoginRequested()
 {
     AuthDialog *authDialog = new AuthDialog(this);
@@ -144,6 +159,201 @@ void MainWidget::onLogout()
         _leftPanel->refreshWorkspaceList();
         _editorWidget->setCurrentWorkspace(nullptr);
     }
+}
+
+void MainWidget::initUI()
+{
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(0);
+
+    // Create toolbars
+    _mainToolBar = new QToolBar(this);
+    _editToolBar = new QToolBar(this);
+    _viewToolBar = new QToolBar(this);
+
+    mainLayout->addWidget(_mainToolBar);
+    mainLayout->addWidget(_editToolBar);
+    mainLayout->addWidget(_viewToolBar);
+
+    // Create main splitter
+    _mainSplitter = new QSplitter(Qt::Horizontal, this);
+    _sidebar = new QWidget(_mainSplitter);
+    _workspaceArea = new QScrollArea(_mainSplitter);
+
+    _mainSplitter->addWidget(_sidebar);
+    _mainSplitter->addWidget(_workspaceArea);
+    _mainSplitter->setStretchFactor(0, 1);
+    _mainSplitter->setStretchFactor(1, 3);
+
+    mainLayout->addWidget(_mainSplitter);
+
+    // Create status bar
+    _statusBar = new QStatusBar(this);
+    mainLayout->addWidget(_statusBar);
+}
+
+void MainWidget::createToolbars()
+{
+    // Main toolbar actions
+    _mainToolBar->addAction(QIcon(":/icons/add.png"), "New", this, &MainWidget::createNewWorkspace);
+    _mainToolBar->addAction(QIcon(":/icons/save.png"), "Save", this, &MainWidget::saveCurrentWorkspace);
+    _mainToolBar->addAction(QIcon(":/icons/save-as.png"), "Save As", this, &MainWidget::saveWorkspaceAs);
+    _mainToolBar->addSeparator();
+    _mainToolBar->addAction(QIcon(":/icons/sync.png"), "Sync", this, &MainWidget::syncWorkspaces);
+
+    // Edit toolbar actions
+    _editToolBar->addAction(QIcon(":/icons/undo.png"), "Undo", this, &MainWidget::undo);
+    _editToolBar->addAction(QIcon(":/icons/redo.png"), "Redo", this, &MainWidget::redo);
+    _editToolBar->addSeparator();
+    _editToolBar->addAction(QIcon(":/icons/cut.png"), "Cut", this, &MainWidget::cut);
+    _editToolBar->addAction(QIcon(":/icons/copy.png"), "Copy", this, &MainWidget::copy);
+    _editToolBar->addAction(QIcon(":/icons/paste.png"), "Paste", this, &MainWidget::paste);
+
+    // View toolbar actions
+    _viewToolBar->addAction(QIcon(":/icons/sidebar.png"), "Toggle Sidebar", this, &MainWidget::toggleSidebar);
+    _viewToolBar->addSeparator();
+    _viewToolBar->addAction("Zoom In", this, &MainWidget::zoomIn);
+    _viewToolBar->addAction("Zoom Out", this, &MainWidget::zoomOut);
+    _viewToolBar->addAction("Reset Zoom", this, &MainWidget::zoomReset);
+}
+
+void MainWidget::createStatusBar()
+{
+    _statusBar->showMessage("Ready");
+}
+
+void MainWidget::initConnections()
+{
+    connect(_leftPanel.get(), &LeftPanel::workspaceSelected, _editorWidget.get(),
+            &EditorWidget::setCurrentWorkspace);
+}
+
+// Workspace operations
+void MainWidget::createNewWorkspace()
+{
+    if (hasUnsavedChanges()) {
+        QMessageBox::StandardButton reply = QMessageBox::question(this, "Unsaved Changes",
+            "Do you want to save your changes before creating a new workspace?",
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+        if (reply == QMessageBox::Save) {
+            if (!saveCurrentWorkspace()) {
+                return;
+            }
+        } else if (reply == QMessageBox::Cancel) {
+            return;
+        }
+    }
+
+    // TODO: Implement new workspace creation
+    _hasUnsavedChanges = false;
+    _statusBar->showMessage("New workspace created");
+}
+
+void MainWidget::openWorkspace()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "Open Workspace",
+        QString(), "Workspace Files (*.workspace);;All Files (*)");
+
+    if (!fileName.isEmpty()) {
+        // TODO: Implement workspace loading
+        _hasUnsavedChanges = false;
+        _statusBar->showMessage("Workspace opened: " + fileName);
+    }
+}
+
+bool MainWidget::saveCurrentWorkspace()
+{
+    // TODO: Implement workspace saving
+    _hasUnsavedChanges = false;
+    _statusBar->showMessage("Workspace saved");
+    return true;
+}
+
+bool MainWidget::saveWorkspaceAs()
+{
+    QString fileName = QFileDialog::getSaveFileName(this, "Save Workspace As",
+        QString(), "Workspace Files (*.workspace);;All Files (*)");
+
+    if (!fileName.isEmpty()) {
+        // TODO: Implement workspace saving
+        _hasUnsavedChanges = false;
+        _statusBar->showMessage("Workspace saved as: " + fileName);
+        return true;
+    }
+    return false;
+}
+
+void MainWidget::syncWorkspaces()
+{
+    // TODO: Implement workspace synchronization
+    _statusBar->showMessage("Workspaces synchronized");
+}
+
+// Edit operations
+void MainWidget::undo()
+{
+    // TODO: Implement undo
+    _statusBar->showMessage("Undo");
+}
+
+void MainWidget::redo()
+{
+    // TODO: Implement redo
+    _statusBar->showMessage("Redo");
+}
+
+void MainWidget::cut()
+{
+    // TODO: Implement cut
+    _statusBar->showMessage("Cut");
+}
+
+void MainWidget::copy()
+{
+    // TODO: Implement copy
+    _statusBar->showMessage("Copy");
+}
+
+void MainWidget::paste()
+{
+    // TODO: Implement paste
+    _statusBar->showMessage("Paste");
+}
+
+// View operations
+void MainWidget::zoomIn()
+{
+    _zoomFactor *= 1.1;
+    // TODO: Implement zoom
+    _statusBar->showMessage(QString("Zoom: %1%").arg(int(_zoomFactor * 100)));
+}
+
+void MainWidget::zoomOut()
+{
+    _zoomFactor /= 1.1;
+    // TODO: Implement zoom
+    _statusBar->showMessage(QString("Zoom: %1%").arg(int(_zoomFactor * 100)));
+}
+
+void MainWidget::zoomReset()
+{
+    _zoomFactor = 1.0;
+    // TODO: Implement zoom reset
+    _statusBar->showMessage("Zoom reset to 100%");
+}
+
+void MainWidget::toggleSidebar()
+{
+    _sidebarVisible = !_sidebarVisible;
+    _sidebar->setVisible(_sidebarVisible);
+    _statusBar->showMessage(_sidebarVisible ? "Sidebar shown" : "Sidebar hidden");
+}
+
+bool MainWidget::hasUnsavedChanges() const
+{
+    return _hasUnsavedChanges;
 }
 
 void MainWidget::initWindow()
@@ -268,56 +478,25 @@ void MainWidget::initWindow()
     _leftPanel->setWorkspaceController(_workspaceController.get());
 }
 
-void MainWidget::initConnections()
+void MainWidget::restoreSettings()
 {
-    connect(_leftPanel.get(), &LeftPanel::workspaceSelected, _editorWidget.get(),
-            &EditorWidget::setCurrentWorkspace);
+    _settings->beginGroup("MainWidget");
+    QByteArray splitterState = _settings->value("splitterState").toByteArray();
+    if (!splitterState.isEmpty()) {
+        _mainSplitter->restoreState(splitterState);
+    }
+    _settings->endGroup();
 }
 
 void MainWidget::saveSettings()
 {
-    if (!_settings) {
-        return;
-    }
-
-    // Save main window geometry
-    if (QWidget *window = window()) {
-        _settings->setValue("geometry", window->saveGeometry());
-        _settings->setValue("windowState", window->saveState());
-    }
-
-    // Save splitter sizes
-    if (_mainSplitter) {
-        _settings->setValue("splitterSizes", _mainSplitter->saveState());
-    }
-
-    // Save other widget states
-    if (_leftPanel) {
-        _settings->setValue("leftPanel/expanded", _leftPanel->isExpanded());
-    }
-
-    _settings->sync();
-}
-
-void MainWidget::restoreSettings()
-{
-    if (!_settings) {
-        return;
-    }
-
-    // Restore main window geometry
-    if (QWidget *window = window()) {
-        window->restoreGeometry(_settings->value("geometry").toByteArray());
-        window->restoreState(_settings->value("windowState").toByteArray());
-    }
-
-    // Restore splitter sizes
-    if (_mainSplitter) {
-        _mainSplitter->restoreState(_settings->value("splitterSizes").toByteArray());
-    }
-
-    // Restore other widget states
-    if (_leftPanel) {
-        _leftPanel->setExpanded(_settings->value("leftPanel/expanded", true).toBool());
+    if (_settings) {
+        _settings->beginGroup("MainWidget");
+        if (_mainSplitter) {
+            _settings->setValue("splitterState", _mainSplitter->saveState());
+        }
+        _settings->setValue("sidebarVisible", _sidebarVisible);
+        _settings->setValue("zoomFactor", _zoomFactor);
+        _settings->endGroup();
     }
 }

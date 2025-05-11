@@ -1,5 +1,5 @@
 #include "sync_manager.h"
-#include "api_client.h"
+#include "api/api_client.h"
 #include "local_storage.h"
 
 #include <QJsonArray>

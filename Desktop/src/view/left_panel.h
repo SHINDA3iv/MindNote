@@ -2,7 +2,7 @@
 #define LEFT_PANEL_H
 
 #include "abstract_workspace_item.h"
-#include "workspace_controller.h"
+#include "logic/workspace_controller.h"
 
 #include <QWidget>
 #include <QListWidget>
