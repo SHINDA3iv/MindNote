@@ -22,15 +22,15 @@ public:
 signals:
     void workspaceSelected(Workspace *workspace);
 
-private slots:
-    void onWorkspaceClicked(QListWidgetItem *item);
+public slots:
     void onCreateWorkspace();
 
+private slots:
+    void onWorkspaceClicked(QListWidgetItem *item);
     void showContextMenu(const QPoint &pos);
 
 private:
     QListWidget *_workspaceList;
-    QToolButton *_createWorkspaceButton;
     WorkspaceController *_workspaceController { nullptr };
 };
 

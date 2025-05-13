@@ -21,21 +21,11 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     this->setStyleSheet(R"(
         Workspace {
             background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            border: 0px;
         }
 
         QLabel {
             margin: 5px;
-        }
-
-        QToolButton {
-            border: none;
-            padding: 4px;
-        }
-
-        QToolButton:hover {
-            background-color: #f0f0f0;
         }
 
         QScrollArea {
@@ -65,7 +55,7 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
 
     QToolButton *menuButton = new QToolButton(this);
     menuButton->setIcon(QIcon::fromTheme("menu"));
-    menuButton->setStyleSheet("border: none;");
+    // menuButton->setStyleSheet("border: none;");
     menuButton->setToolTip("Добавить элемент");
 
     QMenu *toolMenu = new QMenu(this);

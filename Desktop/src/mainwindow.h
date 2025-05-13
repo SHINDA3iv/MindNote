@@ -6,6 +6,8 @@
 
 #include <QMainWindow>
 #include <QCloseEvent>
+#include <QMenu>
+#include <QAction>
 
 class MainWindow : public QMainWindow
 {
@@ -21,6 +23,9 @@ protected:
 private slots:
     void showSettings();
     void showAbout();
+    void updateAuthMenu();
+    void onLoginRequested();
+    void onLogoutRequested();
 
 private:
     void createMenus();
@@ -28,6 +33,12 @@ private:
     void saveWindowState();
 
     std::unique_ptr<MainWidget> _mainWidget;
+    
+    // Auth menu items
+    QMenu* _authMenu;
+    QAction* _loginAction;
+    QAction* _logoutAction;
+    QAction* _userAction;
 };
 
 #endif // MAINWINDOW_H

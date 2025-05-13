@@ -9,22 +9,14 @@
 
 LeftPanel::LeftPanel(QWidget *parent) :
     QWidget(parent),
-    _workspaceList(new QListWidget(this)),
-    _createWorkspaceButton(new QToolButton(this))
+    _workspaceList(new QListWidget(this))
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
 
-    _createWorkspaceButton->setIcon(QIcon::fromTheme("document-new"));
-    _createWorkspaceButton->setIconSize(QSize(16, 16));
-    _createWorkspaceButton->setToolTip(tr("Создать новое пространство"));
-    _createWorkspaceButton->setFixedSize(32, 32);
-
-    layout->addWidget(_createWorkspaceButton);
     layout->addWidget(_workspaceList);
     setLayout(layout);
 
     connect(_workspaceList, &QListWidget::itemClicked, this, &LeftPanel::onWorkspaceClicked);
-    connect(_createWorkspaceButton, &QToolButton::clicked, this, &LeftPanel::onCreateWorkspace);
 
     _workspaceList->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(_workspaceList, &QListWidget::customContextMenuRequested, this,
@@ -133,15 +125,12 @@ void LeftPanel::refreshWorkspaceList()
 
         QListWidget::item {
             padding: 8px;
-            border-bottom: 1px solid #eee;
         }
 
         QListWidget::item:hover {
-            background-color: #f5f5f5;
         }
 
         QListWidget::item:selected {
-            background-color: #e0f0ff;
             color: black;
         }
     )");

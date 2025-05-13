@@ -13,8 +13,6 @@
 #include <QSettings>
 #include <memory>
 #include <QScrollArea>
-#include <QToolBar>
-#include <QStatusBar>
 
 class MainWidget : public QWidget
 {
@@ -47,30 +45,34 @@ public:
     // State
     bool hasUnsavedChanges() const;
 
+    // Auth operations
+    bool isAuthenticated() const;
+    QString getUsername() const;
+    void showAuthDialog();
+    void logout();
+
+signals:
+    void authStateChanged();
+    void statusMessage(const QString &message);
+
 private slots:
     void onLogout();
     void onLoginRequested();
+    void onAuthStateChanged();
+    void updateAuthUI();
 
 private:
     void initWindow();
     void initConnections();
     void restoreSettings();
     void saveSettings();
-    void showAuthDialog();
     void initApplication();
-    void initUI();
-    void createToolbars();
-    void createStatusBar();
 
     bool _isGuestMode = true;
 
     QPointer<QSplitter> _mainSplitter;
-    QScrollArea* _workspaceArea;
-    QWidget* _sidebar;
-    QToolBar* _mainToolBar;
-    QToolBar* _editToolBar;
-    QToolBar* _viewToolBar;
-    QStatusBar* _statusBar;
+    QScrollArea *_workspaceArea;
+    QWidget *_sidebar;
 
     std::unique_ptr<WorkspaceController> _workspaceController { nullptr };
 
@@ -81,10 +83,6 @@ private:
 
     std::unique_ptr<LeftPanel> _leftPanel { nullptr };
     std::unique_ptr<EditorWidget> _editorWidget { nullptr };
-
-    QPointer<QToolButton> _logoutButton { nullptr };
-    QPointer<QToolButton> _loginButton { nullptr };
-    QAction *_syncAction { nullptr };
 
     QPointer<QSettings> _settings;
 

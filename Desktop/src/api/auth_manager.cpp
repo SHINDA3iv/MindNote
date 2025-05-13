@@ -2,20 +2,27 @@
 #include "auth_manager.h"
 #include <QCryptographicHash>
 
-AuthManager::AuthManager(QObject *parent) : QObject(parent), _settings("MyCompany", "Desktop")
+AuthManager::AuthManager(QObject *parent)
+    : QObject(parent)
+    , _settings("StudyProject", "Auth")
+    , _isAuthenticated(false)
 {
-    _authToken = _settings.value("auth/token").toString();
-    _currentUserId = _settings.value("auth/userId").toString();
+    loadAuthState();
+}
+
+AuthManager::~AuthManager()
+{
+    saveAuthState();
 }
 
 bool AuthManager::isAuthenticated() const
 {
-    return !_authToken.isEmpty();
+    return _isAuthenticated;
 }
 
-QString AuthManager::getCurrentUserId() const
+QString AuthManager::getUsername() const
 {
-    return _currentUserId;
+    return _username;
 }
 
 QString AuthManager::getAuthToken() const
@@ -23,21 +30,36 @@ QString AuthManager::getAuthToken() const
     return _authToken;
 }
 
-void AuthManager::login(const QString &email, const QString &password)
+void AuthManager::login(const QString &token, const QString &username)
 {
-    if (email.isEmpty() || password.isEmpty()) {
-        emit loginFailed("Email and password cannot be empty");
-        return;
-    }
+    _authToken = token;
+    _username = username;
+    _isAuthenticated = true;
+    saveAuthState();
+    emit authStateChanged();
+}
 
-    _authToken =
-     QCryptographicHash::hash((email + password).toUtf8(), QCryptographicHash::Sha256).toHex();
-    _currentUserId = "user_" + email.split("@").first();
+void AuthManager::logout()
+{
+    _authToken.clear();
+    _username.clear();
+    _isAuthenticated = false;
+    saveAuthState();
+    emit authStateChanged();
+}
 
-    _settings.setValue("auth/token", _authToken);
-    _settings.setValue("auth/userId", _currentUserId);
+void AuthManager::saveAuthState()
+{
+    _settings.setValue("authToken", _authToken);
+    _settings.setValue("username", _username);
+    _settings.setValue("isAuthenticated", _isAuthenticated);
+}
 
-    emit loginSuccess();
+void AuthManager::loadAuthState()
+{
+    _authToken = _settings.value("authToken").toString();
+    _username = _settings.value("username").toString();
+    _isAuthenticated = _settings.value("isAuthenticated", false).toBool();
 }
 
 void AuthManager::registerUser(const QString &email,
@@ -50,13 +72,4 @@ void AuthManager::registerUser(const QString &email,
     }
 
     emit registrationSuccess();
-}
-
-void AuthManager::logout()
-{
-    _authToken.clear();
-    _currentUserId.clear();
-    _settings.remove("auth/token");
-    _settings.remove("auth/userId");
-    _settings.sync();
 }
