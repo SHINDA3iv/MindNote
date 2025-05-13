@@ -11,6 +11,7 @@
         <file>icons/help.png</file>
         <file>icons/login.png</file>
         <file>icons/logout.png</file>
+        <file>icons/open.png</file>
         <file>icons/paste.png</file>
         <file>icons/redo.png</file>
         <file>icons/restore.png</file>
@@ -20,5 +21,6 @@
         <file>icons/sidebar.png</file>
         <file>icons/sync.png</file>
         <file>icons/undo.png</file>
+        <file>icons/workspace.png</file>
     </qresource>
 </RCC> 
