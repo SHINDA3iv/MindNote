@@ -21,15 +21,27 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     this->setStyleSheet(R"(
         Workspace {
             background-color: white;
-            border: 0px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
         }
 
         QLabel {
             margin: 5px;
         }
 
-        QScrollArea {
+        QToolButton {
             border: none;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        QToolButton:hover {
+            background-color: #f0f0f0;
+        }
+
+        QScrollArea {
+            border: 2px solid #ddd;
             background: transparent;
         }
     )");

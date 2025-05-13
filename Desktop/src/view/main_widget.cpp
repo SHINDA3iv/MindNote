@@ -287,13 +287,13 @@ void MainWidget::initWindow()
 
         /* Разделители */
         QSplitter {
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
         }
 
         QSplitter::handle {
             background-color: #e0e0e0;
-            width: 4px;
+            width: 8px;
         }
     )");
 
