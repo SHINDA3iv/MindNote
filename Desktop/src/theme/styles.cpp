@@ -55,16 +55,19 @@ QString Styles::getButtonStyles() const
         QPushButton:hover, QToolButton:hover {
             background-color: %4;
             border-color: %5;
+            color: %5;
         }
 
         QPushButton:pressed, QToolButton:pressed {
             background-color: %5;
             border-color: %5;
+            color: %2;
         }
 
         QPushButton:disabled, QToolButton:disabled {
             background-color: %6;
             color: %7;
+            border-color: %7;
         }
 
         QMenuBar::item {
@@ -346,16 +349,19 @@ QString Styles::getWorkspaceStyles() const
         QToolButton:hover {
             background-color: %5;
             border-color: %6;
+            color: %6;
         }
 
         QToolButton:pressed {
             background-color: %6;
             border-color: %6;
+            color: %4;
         }
 
         QToolButton:disabled {
             background-color: %7;
             color: %8;
+            border-color: %8;
         }
     )").arg(_surfaceColor.name())
         .arg(_borderColor.name())
