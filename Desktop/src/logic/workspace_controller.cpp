@@ -14,6 +14,9 @@ Workspace *WorkspaceController::createWorkspace(const QString &name, const QStri
     QString workspaceId = id.isEmpty() ? QUuid::createUuid().toString() : id;
     Workspace *workspace = new Workspace(name);
     workspace->setProperty("id", workspaceId);
+    
+    // Set default workspace icon
+    workspace->setIcon(QIcon(":/icons/workspace.png"));
 
     _workspaces.append(workspace);
 

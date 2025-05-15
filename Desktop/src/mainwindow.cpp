@@ -37,11 +37,7 @@ void MainWindow::createMenus()
     // File menu
     QMenu *fileMenu = menuBar()->addMenu("Файл");
 
-    QAction *newAction = fileMenu->addAction("Новый");
-    newAction->setShortcut(QKeySequence::New);
-    connect(newAction, &QAction::triggered, _mainWidget.get(), &MainWidget::createNewWorkspace);
-
-    QAction *createWorkspaceAction = fileMenu->addAction("Создать рабочее пространство");
+    QAction *createWorkspaceAction = fileMenu->addAction(QIcon(":/icons/add.png"), "Создать рабочее пространство");
     connect(createWorkspaceAction, &QAction::triggered, [this]() {
         if (_mainWidget) {
             auto leftPanel = _mainWidget->findChild<LeftPanel *>();
@@ -51,17 +47,17 @@ void MainWindow::createMenus()
         }
     });
 
-    QAction *openAction = fileMenu->addAction("Открыть");
+    QAction *openAction = fileMenu->addAction(QIcon(":/icons/open.png"), "Открыть");
     openAction->setShortcut(QKeySequence::Open);
     connect(openAction, &QAction::triggered, _mainWidget.get(), &MainWidget::openWorkspace);
 
     fileMenu->addSeparator();
 
-    QAction *saveAction = fileMenu->addAction("Сохранить");
+    QAction *saveAction = fileMenu->addAction(QIcon(":/icons/save.png"), "Сохранить");
     saveAction->setShortcut(QKeySequence::Save);
     connect(saveAction, &QAction::triggered, _mainWidget.get(), &MainWidget::saveCurrentWorkspace);
 
-    QAction *saveAsAction = fileMenu->addAction("Сохранить как...");
+    QAction *saveAsAction = fileMenu->addAction(QIcon(":/icons/save-as.png"), "Сохранить как...");
     saveAsAction->setShortcut(QKeySequence::SaveAs);
     connect(saveAsAction, &QAction::triggered, _mainWidget.get(), &MainWidget::saveWorkspaceAs);
 
@@ -74,46 +70,46 @@ void MainWindow::createMenus()
     // Edit menu
     QMenu *editMenu = menuBar()->addMenu("Правка");
 
-    QAction *undoAction = editMenu->addAction("Отменить");
+    QAction *undoAction = editMenu->addAction(QIcon(":/icons/undo.png"), "Отменить");
     undoAction->setShortcut(QKeySequence::Undo);
     connect(undoAction, &QAction::triggered, _mainWidget.get(), &MainWidget::undo);
 
-    QAction *redoAction = editMenu->addAction("Повторить");
+    QAction *redoAction = editMenu->addAction(QIcon(":/icons/redo.png"), "Повторить");
     redoAction->setShortcut(QKeySequence::Redo);
     connect(redoAction, &QAction::triggered, _mainWidget.get(), &MainWidget::redo);
 
     editMenu->addSeparator();
 
-    QAction *cutAction = editMenu->addAction("Вырезать");
+    QAction *cutAction = editMenu->addAction(QIcon(":/icons/cut.png"), "Вырезать");
     cutAction->setShortcut(QKeySequence::Cut);
     connect(cutAction, &QAction::triggered, _mainWidget.get(), &MainWidget::cut);
 
-    QAction *copyAction = editMenu->addAction("Копировать");
+    QAction *copyAction = editMenu->addAction(QIcon(":/icons/copy.png"), "Копировать");
     copyAction->setShortcut(QKeySequence::Copy);
     connect(copyAction, &QAction::triggered, _mainWidget.get(), &MainWidget::copy);
 
-    QAction *pasteAction = editMenu->addAction("Вставить");
+    QAction *pasteAction = editMenu->addAction(QIcon(":/icons/paste.png"), "Вставить");
     pasteAction->setShortcut(QKeySequence::Paste);
     connect(pasteAction, &QAction::triggered, _mainWidget.get(), &MainWidget::paste);
 
     // View menu
     QMenu *viewMenu = menuBar()->addMenu("Вид");
 
-    QAction *zoomInAction = viewMenu->addAction("Увеличить");
+    QAction *zoomInAction = viewMenu->addAction(QIcon(":/icons/edit.png"), "Увеличить");
     zoomInAction->setShortcut(QKeySequence::ZoomIn);
     connect(zoomInAction, &QAction::triggered, _mainWidget.get(), &MainWidget::zoomIn);
 
-    QAction *zoomOutAction = viewMenu->addAction("Уменьшить");
+    QAction *zoomOutAction = viewMenu->addAction(QIcon(":/icons/edit.png"), "Уменьшить");
     zoomOutAction->setShortcut(QKeySequence::ZoomOut);
     connect(zoomOutAction, &QAction::triggered, _mainWidget.get(), &MainWidget::zoomOut);
 
-    QAction *zoomResetAction = viewMenu->addAction("Сбросить масштаб");
+    QAction *zoomResetAction = viewMenu->addAction(QIcon(":/icons/edit.png"), "Сбросить масштаб");
     zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(zoomResetAction, &QAction::triggered, _mainWidget.get(), &MainWidget::zoomReset);
 
     viewMenu->addSeparator();
 
-    QAction *toggleSidebarAction = viewMenu->addAction("Показать/скрыть боковую панель");
+    QAction *toggleSidebarAction = viewMenu->addAction(QIcon(":/icons/edit.png"), "Показать/скрыть боковую панель");
     toggleSidebarAction->setShortcut(QKeySequence("Ctrl+B"));
     connect(toggleSidebarAction, &QAction::triggered, _mainWidget.get(),
             &MainWidget::toggleSidebar);
@@ -121,18 +117,18 @@ void MainWindow::createMenus()
     // Tools menu
     QMenu *toolsMenu = menuBar()->addMenu("Инструменты");
 
-    QAction *syncAction = toolsMenu->addAction("Синхронизировать");
+    QAction *syncAction = toolsMenu->addAction(QIcon(":/icons/sync.png"), "Синхронизировать");
     syncAction->setShortcut(QKeySequence("Ctrl+S"));
     connect(syncAction, &QAction::triggered, _mainWidget.get(), &MainWidget::syncWorkspaces);
 
-    QAction *settingsAction = toolsMenu->addAction("Настройки");
+    QAction *settingsAction = toolsMenu->addAction(QIcon(":/icons/settings.png"), "Настройки");
     settingsAction->setShortcut(QKeySequence("Ctrl+,"));
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
 
     // Help menu
     QMenu *helpMenu = menuBar()->addMenu("Справка");
 
-    QAction *aboutAction = helpMenu->addAction("О программе");
+    QAction *aboutAction = helpMenu->addAction(QIcon(":/icons/about.png"), "О программе");
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
 
     // Auth menu (right-aligned)

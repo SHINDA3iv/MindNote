@@ -1,4 +1,5 @@
 #include "theme_manager.h"
+#include "styles.h"
 #include <QApplication>
 #include <QPalette>
 
@@ -52,240 +53,42 @@ void ThemeManager::updateColors()
         _successColor = QColor("#4CAF50");
         _warningColor = QColor("#FFC107");
     }
+
+    // Update styles with new colors
+    Styles::instance().updateColors(
+        _primaryColor,
+        _secondaryColor,
+        _backgroundColor,
+        _surfaceColor,
+        _textColor,
+        _textSecondaryColor,
+        _borderColor,
+        _hoverColor,
+        _selectionColor
+    );
 }
 
 QString ThemeManager::generateStylesheet() const
 {
-    QString style = QString(R"(
-        /* Global styles */
-        QWidget {
-            background-color: %1;
-            color: %2;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            font-size: 14px;
-        }
-
-        /* Buttons */
-        QPushButton, QToolButton {
-            background-color: %3;
-            color: %4;
-            border: 1px solid %5;
-            border-radius: 4px;
-            padding: 8px 16px;
-            min-width: 80px;
-        }
-
-        QPushButton:hover, QToolButton:hover {
-            background-color: %6;
-        }
-
-        QPushButton:pressed, QToolButton:pressed {
-            background-color: %7;
-        }
-
-        QPushButton:disabled, QToolButton:disabled {
-            background-color: %8;
-            color: %9;
-        }
-
-        /* Line edits */
-        QLineEdit {
-            background-color: %10;
-            border: 1px solid %5;
-            border-radius: 4px;
-            padding: 8px;
-        }
-
-        QLineEdit:focus {
-            border-color: %3;
-        }
-
-        /* Combo boxes */
-        QComboBox {
-            background-color: %10;
-            border: 1px solid %5;
-            border-radius: 4px;
-            padding: 8px;
-            min-width: 6em;
-        }
-
-        QComboBox:hover {
-            border-color: %3;
-        }
-
-        QComboBox::drop-down {
-            border: none;
-            width: 20px;
-        }
-
-        QComboBox::down-arrow {
-            image: url(:/icons/down-arrow.png);
-            width: 12px;
-            height: 12px;
-        }
-
-        /* Checkboxes */
-        QCheckBox {
-            spacing: 8px;
-        }
-
-        QCheckBox::indicator {
-            width: 18px;
-            height: 18px;
-            border: 1px solid %5;
-            border-radius: 3px;
-        }
-
-        QCheckBox::indicator:checked {
-            background-color: %3;
-            border-color: %3;
-        }
-
-        /* Spin boxes */
-        QSpinBox {
-            background-color: %10;
-            border: 1px solid %5;
-            border-radius: 4px;
-            padding: 8px;
-        }
-
-        QSpinBox:focus {
-            border-color: %3;
-        }
-
-        /* Scrollbars */
-        QScrollBar:vertical {
-            border: none;
-            background: %10;
-            width: 10px;
-            margin: 0px;
-        }
-
-        QScrollBar::handle:vertical {
-            background: %11;
-            min-height: 20px;
-            border-radius: 5px;
-        }
-
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-            height: 0px;
-        }
-
-        QScrollBar:horizontal {
-            border: none;
-            background: %10;
-            height: 10px;
-            margin: 0px;
-        }
-
-        QScrollBar::handle:horizontal {
-            background: %11;
-            min-width: 20px;
-            border-radius: 5px;
-        }
-
-        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-            width: 0px;
-        }
-
-        /* Tabs */
-        QTabWidget::pane {
-            border: 1px solid %5;
-            border-radius: 4px;
-        }
-
-        QTabBar::tab {
-            background-color: %10;
-            border: 1px solid %5;
-            border-bottom: none;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            padding: 8px 16px;
-            margin-right: 2px;
-        }
-
-        QTabBar::tab:selected {
-            background-color: %3;
-            color: %4;
-        }
-
-        QTabBar::tab:hover:!selected {
-            background-color: %6;
-        }
-
-        /* Group boxes */
-        QGroupBox {
-            border: 1px solid %5;
-            border-radius: 4px;
-            margin-top: 1em;
-            padding-top: 1em;
-        }
-
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            subcontrol-position: top left;
-            padding: 0 5px;
-        }
-
-        /* Menus */
-        QMenu {
-            background-color: %10;
-            border: 1px solid %5;
-            border-radius: 4px;
-        }
-
-        QMenu::item {
-            padding: 8px 24px;
-        }
-
-        QMenu::item:selected {
-            background-color: %6;
-        }
-
-        /* Tooltips */
-        QToolTip {
-            background-color: %10;
-            color: %2;
-            border: 1px solid %5;
-            border-radius: 4px;
-            padding: 4px;
-        }
-    )")
-        .arg(_backgroundColor.name())
-        .arg(_textColor.name())
-        .arg(_primaryColor.name())
-        .arg(_textColor.name())
-        .arg(_borderColor.name())
-        .arg(_hoverColor.name())
-        .arg(_primaryColor.darker(120).name())
-        .arg(_surfaceColor.name())
-        .arg(_textSecondaryColor.name())
-        .arg(_surfaceColor.name())
-        .arg(_textSecondaryColor.name());
-
-    return style;
+    auto& styles = Styles::instance();
+    return styles.getGlobalStyles() +
+           styles.getButtonStyles() +
+           styles.getLineEditStyles() +
+           styles.getComboBoxStyles() +
+           styles.getCheckBoxStyles() +
+           styles.getSpinBoxStyles() +
+           styles.getScrollBarStyles() +
+           styles.getTabStyles() +
+           styles.getGroupBoxStyles() +
+           styles.getMenuStyles() +
+           styles.getTooltipStyles() +
+           styles.getWorkspaceStyles() +
+           styles.getSplitterStyles();
 }
 
 void ThemeManager::applyTheme()
 {
-    QApplication::setStyle("Fusion");
-    // qApp->setStyleSheet(generateStylesheet());
-
-    QPalette palette;
-    palette.setColor(QPalette::Window, _backgroundColor);
-    palette.setColor(QPalette::WindowText, _textColor);
-    palette.setColor(QPalette::Base, _surfaceColor);
-    palette.setColor(QPalette::AlternateBase, _backgroundColor);
-    palette.setColor(QPalette::ToolTipBase, _surfaceColor);
-    palette.setColor(QPalette::ToolTipText, _textColor);
-    palette.setColor(QPalette::Text, _textColor);
-    palette.setColor(QPalette::Button, _surfaceColor);
-    palette.setColor(QPalette::ButtonText, _textColor);
-    palette.setColor(QPalette::Link, _primaryColor);
-    palette.setColor(QPalette::Highlight, _selectionColor);
-    palette.setColor(QPalette::HighlightedText, _textColor);
-
-    qApp->setPalette(palette);
+    qApp->setStyleSheet(generateStylesheet());
 }
 
 QString ThemeManager::getStylesheet() const
