@@ -89,33 +89,6 @@ QString Styles::getButtonStyles() const
         QMenuBar::item:icon {
             padding-left: 8px;
         }
-
-        /* Стили для меню аутентификации */
-        QMenuBar QMenu {
-            background-color: transparent;
-            border: none;
-        }
-
-        QMenuBar QMenu::item {
-            padding: 4px 8px;
-            background-color: transparent;
-        }
-
-        QMenuBar QMenu::item:selected {
-            background-color: %4;
-            border-radius: 4px;
-        }
-
-        QMenuBar QMenu::item:pressed {
-            background-color: %5;
-            border-radius: 4px;
-        }
-
-        QMenuBar QMenu::separator {
-            height: 1px;
-            background: %3;
-            margin: 4px 0px;
-        }
     )")
      .arg(_surfaceColor.name())
      .arg(_textColor.name())
