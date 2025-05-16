@@ -21,7 +21,6 @@ private slots:
     void onThemeChanged();
     void onEditorSettingsChanged();
     void onSyncSettingsChanged();
-    void onAuthSettingsChanged();
     void onApplyClicked();
     void onResetClicked();
 
@@ -29,7 +28,6 @@ private:
     void initThemeTab();
     void initEditorTab();
     void initSyncTab();
-    void initAuthTab();
     void loadSettings();
     void saveSettings();
 
@@ -53,10 +51,6 @@ private:
     // Sync settings
     QSpinBox* _syncIntervalSpin;
     QCheckBox* _autoSyncCheck;
-
-    // Auth settings
-    QCheckBox* _rememberMeCheck;
-    QLineEdit* _lastEmailEdit;
 };
 
 #endif // SETTINGS_DIALOG_H 

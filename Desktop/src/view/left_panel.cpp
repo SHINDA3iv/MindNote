@@ -6,6 +6,7 @@
 #include <QIcon>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QPainter>
 
 LeftPanel::LeftPanel(QWidget *parent) :
     QWidget(parent),
@@ -136,7 +137,7 @@ void LeftPanel::refreshWorkspaceList()
     )");
 
     // Устанавливаем размер иконок
-    QSize iconSize(28, 20); // Размер иконок 48x48
+    QSize iconSize(32, 32); // Размер иконок 32x32
     _workspaceList->setIconSize(iconSize);
 
     auto workspaces = _workspaceController->getAllWorkspaces();
@@ -145,13 +146,27 @@ void LeftPanel::refreshWorkspaceList()
 
         // Устанавливаем иконку, если она есть
         if (!workspace->getIcon()->pixmap().isNull()) {
-            item->setIcon(workspace->getIcon()->pixmap().scaled(iconSize));
+            QPixmap pixmap = workspace->getIcon()->pixmap();
+            // Создаем пустой pixmap с отступами
+            QPixmap paddedPixmap(iconSize.width() + 8, iconSize.height() + 8);
+            paddedPixmap.fill(Qt::transparent);
+            
+            // Масштабируем оригинальную иконку
+            QPixmap scaledPixmap = pixmap.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            
+            // Рисуем масштабированную иконку по центру с отступами
+            QPainter painter(&paddedPixmap);
+            painter.drawPixmap(4, 4, scaledPixmap);
+            
+            item->setIcon(QIcon(paddedPixmap));
         } else {
-            item->setIcon(QIcon().pixmap(iconSize));
+            QPixmap emptyPixmap(iconSize.width() + 8, iconSize.height() + 8);
+            emptyPixmap.fill(Qt::transparent);
+            item->setIcon(QIcon(emptyPixmap));
         }
 
         // Устанавливаем высоту строки
-        item->setSizeHint(QSize(0, 30));
+        item->setSizeHint(QSize(0, iconSize.height() + 4)); // 8 = padding-top + padding-bottom
 
         item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void *>(workspace)));
     }

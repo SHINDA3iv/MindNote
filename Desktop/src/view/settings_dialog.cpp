@@ -22,7 +22,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     initThemeTab();
     initEditorTab();
     initSyncTab();
-    initAuthTab();
     mainLayout->addWidget(_tabWidget);
 
     // Buttons
@@ -164,82 +163,44 @@ void SettingsDialog::initSyncTab()
     _tabWidget->addTab(syncTab, "Синхронизация");
 }
 
-void SettingsDialog::initAuthTab()
-{
-    QWidget *authTab = new QWidget();
-    QVBoxLayout *layout = new QVBoxLayout(authTab);
-    layout->setContentsMargins(15, 15, 15, 15);
-    layout->setSpacing(15);
-
-    QGroupBox *authGroup = new QGroupBox("Настройки авторизации", authTab);
-    QFormLayout *authLayout = new QFormLayout(authGroup);
-
-    _rememberMeCheck = new QCheckBox("Запомнить меня", authGroup);
-    authLayout->addRow("", _rememberMeCheck);
-
-    _lastEmailEdit = new QLineEdit(authGroup);
-    _lastEmailEdit->setPlaceholderText("Последний использованный email");
-    authLayout->addRow("Последний email:", _lastEmailEdit);
-
-    layout->addWidget(authGroup);
-    layout->addStretch();
-
-    _tabWidget->addTab(authTab, "Авторизация");
-}
-
 void SettingsDialog::loadSettings()
 {
-    auto &settings = SettingsManager::instance();
-
     // Theme settings
-    _themeCombo->setCurrentText(settings.theme());
-    _darkModeCheck->setChecked(settings.darkMode());
-    _primaryColorButton->setStyleSheet(
-     QString("background-color: %1").arg(settings.primaryColor().name()));
-    _secondaryColorButton->setStyleSheet(
-     QString("background-color: %1").arg(settings.secondaryColor().name()));
+    _themeCombo->setCurrentText(SettingsManager::instance().theme());
+    _primaryColorButton->setStyleSheet(QString("background-color: %1").arg(SettingsManager::instance().primaryColor().name()));
+    _secondaryColorButton->setStyleSheet(QString("background-color: %1").arg(SettingsManager::instance().secondaryColor().name()));
+    _darkModeCheck->setChecked(SettingsManager::instance().darkMode());
 
     // Editor settings
-    QFont editorFont = settings.editorFont();
+    QFont editorFont = SettingsManager::instance().editorFont();
     _fontButton->setFont(editorFont);
     _fontButton->setText(editorFont.family() + " " + QString::number(editorFont.pointSize()));
-    _tabSizeSpin->setValue(settings.tabSize());
-    _wordWrapCheck->setChecked(settings.wordWrap());
-    _lineNumbersCheck->setChecked(settings.lineNumbers());
+    _tabSizeSpin->setValue(SettingsManager::instance().tabSize());
+    _wordWrapCheck->setChecked(SettingsManager::instance().wordWrap());
+    _lineNumbersCheck->setChecked(SettingsManager::instance().lineNumbers());
 
     // Sync settings
-    _syncIntervalSpin->setValue(settings.syncInterval());
-    _autoSyncCheck->setChecked(settings.autoSync());
-
-    // Auth settings
-    _rememberMeCheck->setChecked(settings.rememberMe());
-    _lastEmailEdit->setText(settings.lastEmail());
+    _syncIntervalSpin->setValue(SettingsManager::instance().syncInterval());
+    _autoSyncCheck->setChecked(SettingsManager::instance().autoSync());
 }
 
 void SettingsDialog::saveSettings()
 {
-    auto &settings = SettingsManager::instance();
-
     // Theme settings
-    settings.setTheme(_themeCombo->currentText());
-    settings.setDarkMode(_darkModeCheck->isChecked());
-    settings.setPrimaryColor(QColor(_primaryColorButton->styleSheet().split(":").last().trimmed()));
-    settings.setSecondaryColor(
-     QColor(_secondaryColorButton->styleSheet().split(":").last().trimmed()));
+    SettingsManager::instance().setTheme(_themeCombo->currentText());
+    SettingsManager::instance().setPrimaryColor(_primaryColorButton->palette().color(QPalette::Button));
+    SettingsManager::instance().setSecondaryColor(_secondaryColorButton->palette().color(QPalette::Button));
+    SettingsManager::instance().setDarkMode(_darkModeCheck->isChecked());
 
     // Editor settings
-    settings.setEditorFont(_fontButton->font());
-    settings.setTabSize(_tabSizeSpin->value());
-    settings.setWordWrap(_wordWrapCheck->isChecked());
-    settings.setLineNumbers(_lineNumbersCheck->isChecked());
+    SettingsManager::instance().setEditorFont(_fontButton->font());
+    SettingsManager::instance().setTabSize(_tabSizeSpin->value());
+    SettingsManager::instance().setWordWrap(_wordWrapCheck->isChecked());
+    SettingsManager::instance().setLineNumbers(_lineNumbersCheck->isChecked());
 
     // Sync settings
-    settings.setSyncInterval(_syncIntervalSpin->value());
-    settings.setAutoSync(_autoSyncCheck->isChecked());
-
-    // Auth settings
-    settings.setRememberMe(_rememberMeCheck->isChecked());
-    settings.setLastEmail(_lastEmailEdit->text());
+    SettingsManager::instance().setSyncInterval(_syncIntervalSpin->value());
+    SettingsManager::instance().setAutoSync(_autoSyncCheck->isChecked());
 }
 
 void SettingsDialog::onApplyClicked()
@@ -282,11 +243,4 @@ void SettingsDialog::onSyncSettingsChanged()
     // Update sync settings preview
     _syncIntervalSpin->setValue(SettingsManager::instance().syncInterval());
     _autoSyncCheck->setChecked(SettingsManager::instance().autoSync());
-}
-
-void SettingsDialog::onAuthSettingsChanged()
-{
-    // Update auth settings preview
-    _rememberMeCheck->setChecked(SettingsManager::instance().rememberMe());
-    _lastEmailEdit->setText(SettingsManager::instance().lastEmail());
 }
