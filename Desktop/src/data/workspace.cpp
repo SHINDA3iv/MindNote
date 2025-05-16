@@ -19,6 +19,10 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     _iconLabel(new QLabel(this))
 {
     this->setStyleSheet(R"(
+        QWidget {
+            margin:4px;
+        }
+
         Workspace {
             background-color: white;
             border: 2px solid #ddd;
