@@ -72,7 +72,6 @@ private:
 
     QPointer<QSplitter> _mainSplitter;
     QScrollArea *_workspaceArea;
-    QWidget *_sidebar;
 
     std::unique_ptr<WorkspaceController> _workspaceController { nullptr };
 
@@ -89,6 +88,7 @@ private:
     bool _hasUnsavedChanges;
     double _zoomFactor;
     bool _sidebarVisible;
+    int _lastPanelWidth = 200; // Default width for the first time
 };
 
 #endif // MAIN_WIDGET_H
