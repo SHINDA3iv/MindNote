@@ -48,6 +48,7 @@ MainWidget::~MainWidget()
 void MainWidget::showAuthDialog()
 {
     AuthDialog *authDialog = new AuthDialog(this);
+    authDialog->setWindowTitle("Авторизация");
     authDialog->setWindowModality(Qt::ApplicationModal);
 
     connect(authDialog, &AuthDialog::loginRequested, _apiClient.get(), &ApiClient::login);

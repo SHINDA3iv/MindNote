@@ -1,20 +1,20 @@
 #include "styles.h"
 
-Styles& Styles::instance()
+Styles &Styles::instance()
 {
     static Styles instance;
     return instance;
 }
 
-void Styles::updateColors(const QColor& primaryColor,
-                         const QColor& secondaryColor,
-                         const QColor& backgroundColor,
-                         const QColor& surfaceColor,
-                         const QColor& textColor,
-                         const QColor& textSecondaryColor,
-                         const QColor& borderColor,
-                         const QColor& hoverColor,
-                         const QColor& selectionColor)
+void Styles::updateColors(const QColor &primaryColor,
+                          const QColor &secondaryColor,
+                          const QColor &backgroundColor,
+                          const QColor &surfaceColor,
+                          const QColor &textColor,
+                          const QColor &textSecondaryColor,
+                          const QColor &borderColor,
+                          const QColor &hoverColor,
+                          const QColor &selectionColor)
 {
     _primaryColor = primaryColor;
     _secondaryColor = secondaryColor;
@@ -30,14 +30,15 @@ void Styles::updateColors(const QColor& primaryColor,
 QString Styles::getGlobalStyles() const
 {
     return QString(R"(
-        QWidget {
-            background-color: %1;
-            color: %2;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            font-size: 14px;
-        }
-    )").arg(_backgroundColor.name())
-        .arg(_textColor.name());
+         QWidget {
+             background-color: %1;
+             color: %2;
+             font-family: 'Segoe UI', Arial, sans-serif;
+             font-size: 14px;
+         }
+     )")
+     .arg(_backgroundColor.name())
+     .arg(_textColor.name());
 }
 
 QString Styles::getButtonStyles() const
@@ -84,13 +85,45 @@ QString Styles::getButtonStyles() const
             background-color: %5;
             border-radius: 4px;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_textColor.name())
-        .arg(_borderColor.name())
-        .arg(_hoverColor.name())
-        .arg(_primaryColor.name())
-        .arg(_backgroundColor.name())
-        .arg(_textSecondaryColor.name());
+
+        QMenuBar::item:icon {
+            padding-left: 8px;
+        }
+
+        /* Стили для меню аутентификации */
+        QMenuBar QMenu {
+            background-color: transparent;
+            border: none;
+        }
+
+        QMenuBar QMenu::item {
+            padding: 4px 8px;
+            background-color: transparent;
+        }
+
+        QMenuBar QMenu::item:selected {
+            background-color: %4;
+            border-radius: 4px;
+        }
+
+        QMenuBar QMenu::item:pressed {
+            background-color: %5;
+            border-radius: 4px;
+        }
+
+        QMenuBar QMenu::separator {
+            height: 1px;
+            background: %3;
+            margin: 4px 0px;
+        }
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_textColor.name())
+     .arg(_borderColor.name())
+     .arg(_hoverColor.name())
+     .arg(_primaryColor.name())
+     .arg(_backgroundColor.name())
+     .arg(_textSecondaryColor.name());
 }
 
 QString Styles::getLineEditStyles() const
@@ -106,9 +139,10 @@ QString Styles::getLineEditStyles() const
         QLineEdit:focus {
             border-color: %3;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_borderColor.name())
-        .arg(_primaryColor.name());
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_borderColor.name())
+     .arg(_primaryColor.name());
 }
 
 QString Styles::getComboBoxStyles() const
@@ -137,9 +171,10 @@ QString Styles::getComboBoxStyles() const
             background: %3;
             border-radius: 2px;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_borderColor.name())
-        .arg(_primaryColor.name());
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_borderColor.name())
+     .arg(_primaryColor.name());
 }
 
 QString Styles::getCheckBoxStyles() const
@@ -160,8 +195,9 @@ QString Styles::getCheckBoxStyles() const
             background-color: %2;
             border-color: %2;
         }
-    )").arg(_borderColor.name())
-        .arg(_primaryColor.name());
+    )")
+     .arg(_borderColor.name())
+     .arg(_primaryColor.name());
 }
 
 QString Styles::getSpinBoxStyles() const
@@ -177,9 +213,10 @@ QString Styles::getSpinBoxStyles() const
         QSpinBox:focus {
             border-color: %3;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_borderColor.name())
-        .arg(_primaryColor.name());
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_borderColor.name())
+     .arg(_primaryColor.name());
 }
 
 QString Styles::getScrollBarStyles() const
@@ -218,8 +255,9 @@ QString Styles::getScrollBarStyles() const
         QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
             width: 0px;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_borderColor.name());
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_borderColor.name());
 }
 
 QString Styles::getTabStyles() const
@@ -248,11 +286,12 @@ QString Styles::getTabStyles() const
         QTabBar::tab:hover:!selected {
             background-color: %5;
         }
-    )").arg(_borderColor.name())
-        .arg(_surfaceColor.name())
-        .arg(_primaryColor.name())
-        .arg(_textColor.name())
-        .arg(_hoverColor.name());
+    )")
+     .arg(_borderColor.name())
+     .arg(_surfaceColor.name())
+     .arg(_primaryColor.name())
+     .arg(_textColor.name())
+     .arg(_hoverColor.name());
 }
 
 QString Styles::getGroupBoxStyles() const
@@ -270,7 +309,8 @@ QString Styles::getGroupBoxStyles() const
             subcontrol-position: top left;
             padding: 0 5px;
         }
-    )").arg(_borderColor.name());
+    )")
+     .arg(_borderColor.name());
 }
 
 QString Styles::getMenuStyles() const
@@ -283,7 +323,7 @@ QString Styles::getMenuStyles() const
         }
 
         QMenu::item {
-            padding: 8px 24px;
+            padding: 8px 24px 8px 24px;
             background-color: transparent;
         }
 
@@ -296,10 +336,15 @@ QString Styles::getMenuStyles() const
             background-color: %4;
             border-radius: 4px;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_borderColor.name())
-        .arg(_hoverColor.name())
-        .arg(_primaryColor.name());
+
+        QMenu::icon {
+            padding-left: 24px;
+        }
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_borderColor.name())
+     .arg(_hoverColor.name())
+     .arg(_primaryColor.name());
 }
 
 QString Styles::getTooltipStyles() const
@@ -311,9 +356,10 @@ QString Styles::getTooltipStyles() const
             border: 1px solid %3;
             border-radius: 4px;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_textColor.name())
-        .arg(_borderColor.name());
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_textColor.name())
+     .arg(_borderColor.name());
 }
 
 QString Styles::getWorkspaceStyles() const
@@ -363,14 +409,15 @@ QString Styles::getWorkspaceStyles() const
             color: %8;
             border-color: %8;
         }
-    )").arg(_surfaceColor.name())
-        .arg(_borderColor.name())
-        .arg(_selectionColor.name())
-        .arg(_textColor.name())
-        .arg(_hoverColor.name())
-        .arg(_primaryColor.name())
-        .arg(_backgroundColor.name())
-        .arg(_textSecondaryColor.name());
+    )")
+     .arg(_surfaceColor.name())
+     .arg(_borderColor.name())
+     .arg(_selectionColor.name())
+     .arg(_textColor.name())
+     .arg(_hoverColor.name())
+     .arg(_primaryColor.name())
+     .arg(_backgroundColor.name())
+     .arg(_textSecondaryColor.name());
 }
 
 QString Styles::getSplitterStyles() const
@@ -384,6 +431,7 @@ QString Styles::getSplitterStyles() const
         QSplitter::handle:hover {
             background-color: %2;
         }
-    )").arg(_borderColor.name())
-        .arg(_primaryColor.name());
-} 
+    )")
+     .arg(_borderColor.name())
+     .arg(_primaryColor.name());
+}

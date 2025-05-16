@@ -22,10 +22,10 @@ void SettingsManager::loadDefaults()
         setTheme("light");
     }
     if (!_settings.contains("theme/primaryColor")) {
-        setPrimaryColor(QColor("#2196F3"));
+        setPrimaryColor(QColor("#1976D2"));
     }
     if (!_settings.contains("theme/secondaryColor")) {
-        setSecondaryColor(QColor("#FFC107"));
+        setSecondaryColor(QColor("#FFA000"));
     }
     if (!_settings.contains("theme/darkMode")) {
         setDarkMode(false);

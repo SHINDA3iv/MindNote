@@ -8,6 +8,8 @@
 #include <QCloseEvent>
 #include <QMenu>
 #include <QAction>
+#include <QLabel>
+#include <QPushButton>
 
 class MainWindow : public QMainWindow
 {
@@ -34,11 +36,10 @@ private:
 
     std::unique_ptr<MainWidget> _mainWidget;
     
-    // Auth menu items
-    QMenu* _authMenu;
-    QAction* _loginAction;
-    QAction* _logoutAction;
-    QAction* _userAction;
+    // Auth elements
+    QLabel* _userLabel;
+    QPushButton* _loginButton;
+    QPushButton* _logoutButton;
 };
 
 #endif // MAINWINDOW_H

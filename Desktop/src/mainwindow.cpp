@@ -8,6 +8,10 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QStatusBar>
+#include <QSizePolicy>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
@@ -63,7 +67,7 @@ void MainWindow::createMenus()
 
     fileMenu->addSeparator();
 
-    QAction *exitAction = fileMenu->addAction("Выход");
+    QAction *exitAction = fileMenu->addAction(QIcon(":/icons/shutdown.png"), "Выход");
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, this, &MainWindow::close);
 
@@ -131,27 +135,37 @@ void MainWindow::createMenus()
     QAction *aboutAction = helpMenu->addAction(QIcon(":/icons/about.png"), "О программе");
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
 
-    // Auth menu (right-aligned)
-    // _authMenu = menuBar()->addMenu("Аутентификация");
-    // menuBar()->setCornerWidget(_authMenu, Qt::TopRightCorner);
+    // Auth elements (right-aligned)
+    QWidget* authWidget = new QWidget(this);
+    QHBoxLayout* authLayout = new QHBoxLayout(authWidget);
+    authLayout->setContentsMargins(8, 0, 8, 0);
+    authLayout->setSpacing(8);
 
-    // _userAction = new QAction("Гость", this);
-    // _userAction->setEnabled(false);
-    // _authMenu->addAction(_userAction);
+    _userLabel = new QLabel("Гость", this);
+    _userLabel->setStyleSheet("padding: 4px 8px;");
+    authLayout->addWidget(_userLabel);
 
-    // _loginAction = new QAction("Войти", this);
-    // _loginAction->setIcon(QIcon(":/icons/login.png"));
-    // connect(_loginAction, &QAction::triggered, this, &MainWindow::onLoginRequested);
-    // _authMenu->addAction(_loginAction);
+    _loginButton = new QPushButton("Войти", this);
+    _loginButton->setIcon(QIcon(":/icons/login.png"));
+    _loginButton->setStyleSheet("padding: 4px 8px;");
+    connect(_loginButton, &QPushButton::clicked, this, &MainWindow::onLoginRequested);
+    authLayout->addWidget(_loginButton);
 
-    // _logoutAction = new QAction("Выйти", this);
-    // _logoutAction->setIcon(QIcon(":/icons/logout.png"));
-    // _logoutAction->setVisible(false);
-    // connect(_logoutAction, &QAction::triggered, this, &MainWindow::onLogoutRequested);
-    // _authMenu->addAction(_logoutAction);
+    _logoutButton = new QPushButton("Выйти", this);
+    _logoutButton->setIcon(QIcon(":/icons/logout.png"));
+    _logoutButton->setStyleSheet("padding: 4px 8px;");
+    _logoutButton->setVisible(false);
+    connect(_logoutButton, &QPushButton::clicked, this, &MainWindow::onLogoutRequested);
+    authLayout->addWidget(_logoutButton);
 
-    // // Connect to MainWidget's auth state changes
-    // connect(_mainWidget.get(), &MainWidget::authStateChanged, this, &MainWindow::updateAuthMenu);
+    // Добавляем виджет аутентификации в правый угол
+    QWidget* spacer = new QWidget();
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    menuBar()->setCornerWidget(spacer, Qt::TopLeftCorner);
+    menuBar()->setCornerWidget(authWidget, Qt::TopRightCorner);
+
+    // Подключаем к изменениям состояния аутентификации
+    connect(_mainWidget.get(), &MainWidget::authStateChanged, this, &MainWindow::updateAuthMenu);
 }
 
 void MainWindow::updateAuthMenu()
@@ -159,9 +173,9 @@ void MainWindow::updateAuthMenu()
     bool isAuthenticated = _mainWidget->isAuthenticated();
     QString username = _mainWidget->getUsername();
 
-    _userAction->setText(isAuthenticated ? username : "Гость");
-    _loginAction->setVisible(!isAuthenticated);
-    _logoutAction->setVisible(isAuthenticated);
+    _userLabel->setText(isAuthenticated ? username : "Гость");
+    _loginButton->setVisible(!isAuthenticated);
+    _logoutButton->setVisible(isAuthenticated);
 }
 
 void MainWindow::onLoginRequested()
