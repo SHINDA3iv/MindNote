@@ -1,8 +1,22 @@
-<!-- res/menu/menu_main.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_add"
-        android:title="Добавить"
-        app:showAsAction="ifRoom" />
-</menu>
+        android:id="@+id/popup_option1"
+        android:title="Текстовый блок" />
+    <item
+        android:id="@+id/popup_option2"
+        android:title="Чекбокс" />
+    <item
+        android:id="@+id/popup_option3"
+        android:title="Изображение" />
+    <item
+        android:id="@+id/popup_option4"
+        android:title="Файл" />
+    <item
+        android:id="@+id/popup_option5"
+        android:title="Нумерованный список" />
+    <item
+        android:id="@+id/popup_option6"
+        android:title="Маркированный список" />
+</menu> 

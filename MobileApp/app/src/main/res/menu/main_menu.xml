@@ -1,13 +1,9 @@
-<!-- res/menu/menu_main.xml -->
-<!-- res/menu/popup_menu.xml -->
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/popup_option1"
-        android:title="Добавить поле ввода" />
-    <item
-        android:id="@+id/popup_option2"
-        android:title="Добавить чекбокс" />
-    <item
-        android:id="@+id/popup_option3"
-        android:title="Добавить изображение" />
-</menu>
+        android:id="@+id/action_add"
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="Добавить"
+        app:showAsAction="always" />
+</menu> 

@@ -9,6 +9,15 @@
         android:id="@+id/editTextMenuItem"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Введите имя нового пространства"
-        android:minHeight="48dp" />
+        android:hint="Название пространства"
+        android:inputType="text"
+        android:maxLines="1" />
+
+    <Button
+        android:id="@+id/buttonSelectIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Выбрать иконку" />
+
 </LinearLayout>

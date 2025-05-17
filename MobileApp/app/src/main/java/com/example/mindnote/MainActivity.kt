@@ -27,14 +27,19 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.ViewModelProvider
 import com.example.mindnote.R.id.nav_header_add_button
 import com.example.mindnote.R.id.ws_group
+import com.example.mindnote.data.ContentItem
+import com.example.mindnote.data.Workspace
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navigationView: NavigationView
     private lateinit var viewModel: MainViewModel
     private val PICK_IMAGE_REQUEST = 1
+    private val PICK_FILE_REQUEST = 2
+    private val PICK_ICON_REQUEST = 3
     private var imageUri: Uri? = null
     private lateinit var toolbarAddButton: MenuItem
 
@@ -44,6 +49,7 @@ class MainActivity : AppCompatActivity() {
 
         drawerLayout = findViewById(R.id.drawer_layout)
         navigationView = findViewById(R.id.nav_view)
+        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
 
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -74,11 +80,19 @@ class MainActivity : AppCompatActivity() {
                 false
             }
         }
+
+        // Load saved workspaces
+        viewModel.loadWorkspaces(this)
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        toolbarAddButton = menu?.findItem(R.id.action_add)?: return false
+        toolbarAddButton = menu?.findItem(R.id.action_add) ?: return false
+
+        toolbarAddButton.setOnMenuItemClickListener {
+            showPopupMenu()
+            true
+        }
 
         return true
     }
@@ -94,7 +108,12 @@ class MainActivity : AppCompatActivity() {
             R.id.popup_option2 -> {
                 // Добавляем чекбокс
                 val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                fragment.addCheckboxItem("")
+                val checkboxItem = ContentItem.CheckboxItem(
+                    text = "",
+                    isChecked = false,
+                    id = java.util.UUID.randomUUID().toString()
+                )
+                fragment.addCheckboxItem(checkboxItem)
                 true
             }
             R.id.popup_option3 -> {
@@ -104,26 +123,113 @@ class MainActivity : AppCompatActivity() {
                 startActivityForResult(intent, PICK_IMAGE_REQUEST)
                 true
             }
-
             else -> super.onOptionsItemSelected(item)
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK && data != null) {
-            imageUri = data.data // Получаем URI выбранного изображения
-            val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-            fragment.addImageView(imageUri) // Передаем URI во фрагмент
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            when (requestCode) {
+                PICK_IMAGE_REQUEST -> {
+                    imageUri = data.data
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
+                    fragment.addImageView(ContentItem.ImageItem(imageUri!!))
+                }
+                PICK_FILE_REQUEST -> {
+                    data.data?.let { uri ->
+                        val fileName = getFileName(uri)
+                        val fileSize = getFileSize(uri)
+                        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
+                        fragment.addFileItem(ContentItem.FileItem(fileName, uri, fileSize))
+                    }
+                }
+                PICK_ICON_REQUEST -> {
+                    data.data?.let { uri ->
+                        val workspaceName = data.getStringExtra("workspace_name")
+                        workspaceName?.let { name ->
+                            val workspace = viewModel.workspaces.value?.find { it.name == name }
+                            workspace?.let {
+                                it.iconUri = uri
+                                viewModel.updateWorkspace(it)
+                                updateWorkspaceMenuItem(name, uri)
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    private fun getFileName(uri: Uri): String {
+        val cursor = contentResolver.query(uri, null, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIndex != -1) {
+                    return it.getString(nameIndex)
+                }
+            }
+        }
+        return "Unknown file"
+    }
+
+    private fun getFileSize(uri: Uri): Long {
+        val cursor = contentResolver.query(uri, null, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val sizeIndex = it.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIndex != -1) {
+                    return it.getLong(sizeIndex)
+                }
+            }
+        }
+        return 0L
     }
 
     private fun showPopupMenu() {
         val popupMenu = PopupMenu(this, findViewById(R.id.action_add))
-        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu) // Создайте этот файл меню, если нужно
+        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu)
         popupMenu.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
-
+                R.id.popup_option1 -> {
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
+                    fragment.addTextField()
+                    true
+                }
+                R.id.popup_option2 -> {
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
+                    val checkboxItem = ContentItem.CheckboxItem(
+                        text = "",
+                        isChecked = false,
+                        id = java.util.UUID.randomUUID().toString()
+                    )
+                    fragment.addCheckboxItem(checkboxItem)
+                    true
+                }
+                R.id.popup_option3 -> {
+                    val intent = Intent(Intent.ACTION_PICK)
+                    intent.type = "image/*"
+                    startActivityForResult(intent, PICK_IMAGE_REQUEST)
+                    true
+                }
+                R.id.popup_option4 -> {
+                    val intent = Intent(Intent.ACTION_GET_CONTENT)
+                    intent.type = "*/*"
+                    intent.addCategory(Intent.CATEGORY_OPENABLE)
+                    startActivityForResult(intent, PICK_FILE_REQUEST)
+                    true
+                }
+                R.id.popup_option5 -> {
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
+                    fragment.addNumberedListItem(null)
+                    true
+                }
+                R.id.popup_option6 -> {
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
+                    fragment.addBulletListItem(null)
+                    true
+                }
                 else -> false
             }
         }
@@ -138,18 +244,29 @@ class MainActivity : AppCompatActivity() {
             .commit()
     }
 
-        private fun showAddMenuItemDialog() {
+    private fun showAddMenuItemDialog() {
         val builder = AlertDialog.Builder(this)
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_menu_item, null)
         val editText = dialogView.findViewById<EditText>(R.id.editTextMenuItem)
+        val iconButton = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
+
+        var selectedIconUri: Uri? = null
+
+        iconButton.setOnClickListener {
+            val intent = Intent(Intent.ACTION_PICK)
+            intent.type = "image/*"
+            intent.putExtra("workspace_name", editText.text.toString())
+            startActivityForResult(intent, PICK_ICON_REQUEST)
+        }
 
         builder.setTitle("Создание нового пространства")
             .setView(dialogView)
             .setPositiveButton("Создать пространство") { dialog, which ->
-                val newItemName = editText.text.toString().trim() // Удаляем пробелы
+                val newItemName = editText.text.toString().trim()
                 if (newItemName.isNotEmpty()) {
-                    addMenuItem(newItemName)
-                    editText.text.clear() // Очищаем поле ввода
+                    val workspace = viewModel.createWorkspace(newItemName, selectedIconUri)
+                    addMenuItem(newItemName, workspace)
+                    editText.text.clear()
                 } else {
                     Toast.makeText(this, "Имя пункта не может быть пустым", Toast.LENGTH_SHORT).show()
                 }
@@ -159,21 +276,43 @@ class MainActivity : AppCompatActivity() {
         builder.show()
     }
 
-    private fun addMenuItem(itemName: String) {
-        // Получаем ссылку на меню
+    private fun addMenuItem(itemName: String, workspace: Workspace) {
         val menu = navigationView.menu
-
-        // Генерируем уникальный ID для нового пункта
         val itemId = generateUniqueMenuItemId(menu)
+        val menuItem = menu.add(ws_group, itemId, Menu.NONE, itemName)
+        
+        workspace.iconUri?.let { uri ->
+            val icon = contentResolver.openInputStream(uri)?.use { 
+                android.graphics.BitmapFactory.decodeStream(it)
+            }
+            icon?.let {
+                val scaledIcon = android.graphics.Bitmap.createScaledBitmap(it, 48, 48, true)
+                menuItem.icon = android.graphics.drawable.BitmapDrawable(resources, scaledIcon)
+            }
+        }
+    }
 
-        // Добавляем новый пункт в меню с уникальным id
-        menu.add(ws_group, itemId, Menu.NONE, itemName) // Menu.NONE для позиции
+    private fun updateWorkspaceMenuItem(workspaceName: String, iconUri: Uri) {
+        val menu = navigationView.menu
+        for (i in 0 until menu.size()) {
+            val menuItem = menu.getItem(i)
+            if (menuItem.title.toString() == workspaceName) {
+                val icon = contentResolver.openInputStream(iconUri)?.use { 
+                    android.graphics.BitmapFactory.decodeStream(it)
+                }
+                icon?.let {
+                    val scaledIcon = android.graphics.Bitmap.createScaledBitmap(it, 48, 48, true)
+                    menuItem.icon = android.graphics.drawable.BitmapDrawable(resources, scaledIcon)
+                }
+                break
+            }
+        }
     }
 
     private fun generateUniqueMenuItemId(menu: Menu): Int {
-        var newId = 1 // Начинаем с 1
+        var newId = 1
         while (menu.findItem(newId) != null) {
-            newId++ // Ищем следующий доступный ID
+            newId++
         }
         return newId
     }
@@ -190,5 +329,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
+    override fun onPause() {
+        super.onPause()
+        viewModel.saveWorkspaces(this)
+    }
 }
