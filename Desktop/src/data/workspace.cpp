@@ -3,7 +3,6 @@
 #include "file_item.h"
 #include "image_item.h"
 #include "list_item.h"
-#include "nested_workspace_item.h"
 #include "text_item.h"
 #include "title_item.h"
 
@@ -244,8 +243,6 @@ void Workspace::deserialize(const QJsonObject &json)
                 item = new ImageItem();
             } else if (type == "FileItem") {
                 item = new FileItem();
-            } else if (type == "NestedWorkspaceItem") {
-                item = new NestedWorkspaceItem();
             }
 
             if (item) {
@@ -277,8 +274,6 @@ void Workspace::deserializeItems(const QJsonArray &itemsArray)
             item = new ImageItem();
         } else if (type == "FileItem") {
             item = new FileItem();
-        } else if (type == "NestedWorkspaceItem") {
-            item = new NestedWorkspaceItem();
         }
 
         if (item) {
