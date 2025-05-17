@@ -4,33 +4,29 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.EditText
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.PopupMenu
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.widget.Toolbar
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.example.mindnote.R.id.nav_header_add_button
 import com.example.mindnote.R.id.ws_group
 import com.example.mindnote.data.ContentItem
 import com.example.mindnote.data.Workspace
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -46,15 +42,14 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        enableEdgeToEdge()
         drawerLayout = findViewById(R.id.drawer_layout)
         navigationView = findViewById(R.id.nav_view)
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
-
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-        // Добавление кнопки для открытия бокового меню
+        // Навигация
         ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close).also { toggle ->
             drawerLayout.addDrawerListener(toggle)
             toggle.syncState()
@@ -66,65 +61,131 @@ class MainActivity : AppCompatActivity() {
             showAddMenuItemDialog()
         }
 
-        // Обработка нажатий на элементы меню
         navigationView.setNavigationItemSelectedListener { menuItem ->
-            // Получаем имя рабочего пространства из заголовка пункта меню
             val workspaceName = menuItem.title.toString()
-
-            // Обрабатываем нажатие на любой элемент
-            if (menuItem.itemId != -1) { // Проверяем, что itemId валиден
-                openWorkspace(workspaceName) // Открываем рабочее пространство
-                drawerLayout.closeDrawer(GravityCompat.START) // Закрываем навигационное меню
+            if (menuItem.itemId != -1) {
+                openWorkspace(workspaceName)
+                drawerLayout.closeDrawer(GravityCompat.START)
                 true
             } else {
                 false
             }
         }
 
-        // Load saved workspaces
+        // Загрузка рабочих пространств
         viewModel.loadWorkspaces(this)
+
+        // Восстановление фрагмента если есть
+        if (savedInstanceState != null) {
+            val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+            if (currentFragment is WorkspaceFragment) {
+                Log.d("MindNote", "Fragment restored after configuration change")
+            } else {
+                // Если фрагмент не найден и есть текущее рабочее пространство, откроем его
+                viewModel.currentWorkspace.value?.let { workspace ->
+                    Log.d("MindNote", "Reopening current workspace after configuration change")
+                    openWorkspace(workspace.name)
+                }
+            }
+        }
+
+        // Подписываемся на обновления
+        viewModel.workspaces.observe(this) { workspaces ->
+            Log.d("MindNote", "MainActivity: Observed ${workspaces.size} workspaces")
+            val menu = navigationView.menu
+            menu.removeGroup(ws_group)
+            workspaces.forEach { workspace ->
+                addMenuItem(workspace.name, workspace)
+                Log.d("MindNote", "MainActivity: Added menu item for '${workspace.name}' with ${workspace.items.size} items")
+            }
+        }
+
+        // Если список рабочих пространств пуст — инициализируем
+        if (viewModel.workspaces.value.isNullOrEmpty()) {
+            viewModel.initWorkspaces(emptyList())
+        }
+        
+        // Настраиваем периодическое автосохранение
+        lifecycleScope.launch {
+            while (true) {
+                delay(30000) // автосохранение каждые 30 секунд
+                launch(Dispatchers.IO) {
+                    viewModel.saveWorkspaces(this@MainActivity)
+                    Log.d("MindNote", "MainActivity: Auto-saved workspaces")
+                }
+            }
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         toolbarAddButton = menu?.findItem(R.id.action_add) ?: return false
-
         toolbarAddButton.setOnMenuItemClickListener {
             showPopupMenu()
             true
         }
-
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.popup_option1 -> {
-                // Добавляем поле для ввода текста
-                val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                fragment.addTextField()
-                true
+    private fun showPopupMenu() {
+        val popupMenu = PopupMenu(this, findViewById(R.id.action_add))
+        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu)
+        popupMenu.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.popup_option1 -> {
+                    Log.d("MindNote", "MainActivity: Add text field selected")
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                    fragment?.addTextField()
+                    viewModel.saveWorkspaces(this)
+                    true
+                }
+                R.id.popup_option2 -> {
+                    Log.d("MindNote", "MainActivity: Add checkbox selected")
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                    fragment?.let {
+                        val checkboxItem = ContentItem.CheckboxItem(
+                            text = "",
+                            isChecked = false,
+                            id = java.util.UUID.randomUUID().toString()
+                        )
+                        it.addCheckboxItem(checkboxItem)
+                        viewModel.saveWorkspaces(this)
+                    }
+                    true
+                }
+                R.id.popup_option3 -> {
+                    Log.d("MindNote", "MainActivity: Add image selected")
+                    val intent = Intent(Intent.ACTION_PICK)
+                    intent.type = "image/*"
+                    startActivityForResult(intent, PICK_IMAGE_REQUEST)
+                    true
+                }
+                R.id.popup_option4 -> {
+                    Log.d("MindNote", "MainActivity: Add file selected")
+                    val intent = Intent(Intent.ACTION_GET_CONTENT)
+                    intent.type = "*/*"
+                    intent.addCategory(Intent.CATEGORY_OPENABLE)
+                    startActivityForResult(intent, PICK_FILE_REQUEST)
+                    true
+                }
+                R.id.popup_option5 -> {
+                    Log.d("MindNote", "MainActivity: Add numbered list selected")
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                    fragment?.addNumberedListItem(null)
+                    viewModel.saveWorkspaces(this)
+                    true
+                }
+                R.id.popup_option6 -> {
+                    Log.d("MindNote", "MainActivity: Add bullet list selected")
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                    fragment?.addBulletListItem(null)
+                    viewModel.saveWorkspaces(this)
+                    true
+                }
+                else -> false
             }
-            R.id.popup_option2 -> {
-                // Добавляем чекбокс
-                val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                val checkboxItem = ContentItem.CheckboxItem(
-                    text = "",
-                    isChecked = false,
-                    id = java.util.UUID.randomUUID().toString()
-                )
-                fragment.addCheckboxItem(checkboxItem)
-                true
-            }
-            R.id.popup_option3 -> {
-                // Открываем галерею для выбора изображения
-                val intent = Intent(Intent.ACTION_PICK)
-                intent.type = "image/*"
-                startActivityForResult(intent, PICK_IMAGE_REQUEST)
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
         }
+        popupMenu.show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -132,33 +193,77 @@ class MainActivity : AppCompatActivity() {
         if (resultCode == Activity.RESULT_OK && data != null) {
             when (requestCode) {
                 PICK_IMAGE_REQUEST -> {
-                    imageUri = data.data
-                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                    fragment.addImageView(ContentItem.ImageItem(imageUri!!))
+                    data.data?.let { uri ->
+                        Log.d("MindNote", "MainActivity: Image picked: $uri")
+                        // Копируем изображение в приватное хранилище приложения
+                        val persistentUri = copyFileToInternalStorage(uri, "images")
+                        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                        fragment?.addImageView(ContentItem.ImageItem(persistentUri))
+                        viewModel.saveWorkspaces(this)
+                    }
                 }
                 PICK_FILE_REQUEST -> {
                     data.data?.let { uri ->
                         val fileName = getFileName(uri)
                         val fileSize = getFileSize(uri)
-                        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                        fragment.addFileItem(ContentItem.FileItem(fileName, uri, fileSize))
+                        Log.d("MindNote", "MainActivity: File picked: $fileName, size: $fileSize")
+                        // Копируем файл в приватное хранилище приложения
+                        val persistentUri = copyFileToInternalStorage(uri, "files", fileName)
+                        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                        fragment?.addFileItem(ContentItem.FileItem(fileName, persistentUri, fileSize))
+                        viewModel.saveWorkspaces(this)
                     }
                 }
                 PICK_ICON_REQUEST -> {
                     data.data?.let { uri ->
                         val workspaceName = data.getStringExtra("workspace_name")
                         workspaceName?.let { name ->
+                            Log.d("MindNote", "MainActivity: Icon picked for workspace '$name': $uri")
+                            // Копируем иконку в приватное хранилище приложения
+                            val persistentUri = copyFileToInternalStorage(uri, "icons", "${name}_icon")
                             val workspace = viewModel.workspaces.value?.find { it.name == name }
                             workspace?.let {
-                                it.iconUri = uri
+                                it.iconUri = persistentUri
                                 viewModel.updateWorkspace(it)
-                                updateWorkspaceMenuItem(name, uri)
+                                viewModel.saveWorkspaces(this)
+                                updateWorkspaceMenuItem(name, persistentUri)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // Копирует файл из внешнего URI в приватное хранилище приложения
+    private fun copyFileToInternalStorage(sourceUri: Uri, dirName: String, customFileName: String? = null): Uri {
+        val inputStream = contentResolver.openInputStream(sourceUri)
+        val fileName = customFileName ?: getFileName(sourceUri)
+        val timeStamp = System.currentTimeMillis()
+        val safeFileName = "$timeStamp-${fileName.replace("[^a-zA-Z0-9.-]".toRegex(), "_")}"
+        
+        // Создаем директорию если её нет
+        val directory = File(filesDir, dirName)
+        if (!directory.exists()) {
+            directory.mkdirs()
+        }
+        
+        // Создаем файл
+        val file = File(directory, safeFileName)
+        
+        // Копируем данные
+        inputStream?.use { input ->
+            file.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        
+        // Возвращаем URI для сохраненного файла через FileProvider
+        return androidx.core.content.FileProvider.getUriForFile(
+            this,
+            "${packageName}.fileprovider",
+            file
+        )
     }
 
     private fun getFileName(uri: Uri): String {
@@ -187,61 +292,17 @@ class MainActivity : AppCompatActivity() {
         return 0L
     }
 
-    private fun showPopupMenu() {
-        val popupMenu = PopupMenu(this, findViewById(R.id.action_add))
-        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu)
-        popupMenu.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.popup_option1 -> {
-                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                    fragment.addTextField()
-                    true
-                }
-                R.id.popup_option2 -> {
-                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                    val checkboxItem = ContentItem.CheckboxItem(
-                        text = "",
-                        isChecked = false,
-                        id = java.util.UUID.randomUUID().toString()
-                    )
-                    fragment.addCheckboxItem(checkboxItem)
-                    true
-                }
-                R.id.popup_option3 -> {
-                    val intent = Intent(Intent.ACTION_PICK)
-                    intent.type = "image/*"
-                    startActivityForResult(intent, PICK_IMAGE_REQUEST)
-                    true
-                }
-                R.id.popup_option4 -> {
-                    val intent = Intent(Intent.ACTION_GET_CONTENT)
-                    intent.type = "*/*"
-                    intent.addCategory(Intent.CATEGORY_OPENABLE)
-                    startActivityForResult(intent, PICK_FILE_REQUEST)
-                    true
-                }
-                R.id.popup_option5 -> {
-                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                    fragment.addNumberedListItem(null)
-                    true
-                }
-                R.id.popup_option6 -> {
-                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as WorkspaceFragment
-                    fragment.addBulletListItem(null)
-                    true
-                }
-                else -> false
-            }
-        }
-        popupMenu.show()
-    }
-
     private fun openWorkspace(workspaceName: String) {
-        val fragment = WorkspaceFragment.newInstance(workspaceName)
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
-            .addToBackStack(null)
-            .commit()
+        val workspace = viewModel.workspaces.value?.find { it.name == workspaceName }
+        workspace?.let {
+            Log.d("MindNote", "MainActivity: Opening workspace '${workspace.name}' with ${workspace.items.size} items")
+            viewModel.setCurrentWorkspace(it)
+            val fragment = WorkspaceFragment.newInstance(workspaceName)
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit()
+        }
     }
 
     private fun showAddMenuItemDialog() {
@@ -249,7 +310,6 @@ class MainActivity : AppCompatActivity() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_menu_item, null)
         val editText = dialogView.findViewById<EditText>(R.id.editTextMenuItem)
         val iconButton = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
-
         var selectedIconUri: Uri? = null
 
         iconButton.setOnClickListener {
@@ -264,15 +324,16 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Создать пространство") { dialog, which ->
                 val newItemName = editText.text.toString().trim()
                 if (newItemName.isNotEmpty()) {
+                    Log.d("MindNote", "MainActivity: Creating new workspace '$newItemName'")
                     val workspace = viewModel.createWorkspace(newItemName, selectedIconUri)
                     addMenuItem(newItemName, workspace)
                     editText.text.clear()
+                    viewModel.saveWorkspaces(this)
                 } else {
                     Toast.makeText(this, "Имя пункта не может быть пустым", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Отмена") { dialog, which -> dialog.cancel() }
-
         builder.show()
     }
 
@@ -280,9 +341,8 @@ class MainActivity : AppCompatActivity() {
         val menu = navigationView.menu
         val itemId = generateUniqueMenuItemId(menu)
         val menuItem = menu.add(ws_group, itemId, Menu.NONE, itemName)
-        
         workspace.iconUri?.let { uri ->
-            val icon = contentResolver.openInputStream(uri)?.use { 
+            val icon = contentResolver.openInputStream(uri)?.use {
                 android.graphics.BitmapFactory.decodeStream(it)
             }
             icon?.let {
@@ -297,7 +357,7 @@ class MainActivity : AppCompatActivity() {
         for (i in 0 until menu.size()) {
             val menuItem = menu.getItem(i)
             if (menuItem.title.toString() == workspaceName) {
-                val icon = contentResolver.openInputStream(iconUri)?.use { 
+                val icon = contentResolver.openInputStream(iconUri)?.use {
                     android.graphics.BitmapFactory.decodeStream(it)
                 }
                 icon?.let {
@@ -329,8 +389,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.loadWorkspaces(this)
+    }
+
     override fun onPause() {
         super.onPause()
         viewModel.saveWorkspaces(this)
+        Log.d("MindNote", "MainActivity: Saved workspaces in onPause")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        viewModel.saveWorkspaces(this)
+        Log.d("MindNote", "MainActivity: Saved workspaces in onStop")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        viewModel.saveWorkspaces(this)
+        Log.d("MindNote", "MainActivity: Saved workspaces in onDestroy")
     }
 }

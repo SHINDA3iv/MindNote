@@ -3,6 +3,7 @@ package com.example.mindnote
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
@@ -38,10 +39,29 @@ class WorkspaceFragment : Fragment() {
             loadWorkspaceContent(workspace)
         }
 
+        // Observe current workspace changes
+        viewModel.currentWorkspace.observe(viewLifecycleOwner) { workspace ->
+            if (workspace.name == workspaceName) {
+                currentWorkspace = workspace
+                loadWorkspaceContent(workspace)
+                Log.d("MindNote", "WorkspaceFragment: Observed workspace '${workspace.name}' with ${workspace.items.size} items")
+            }
+        }
+
+        viewModel.workspaces.observe(viewLifecycleOwner) { workspaces ->
+            val updatedWorkspace = workspaces.find { it.name == workspaceName }
+            if (updatedWorkspace != null && (currentWorkspace == null || updatedWorkspace.items.size != currentWorkspace?.items?.size)) {
+                currentWorkspace = updatedWorkspace
+                loadWorkspaceContent(updatedWorkspace)
+                Log.d("MindNote", "WorkspaceFragment: Observed workspaces update, '${updatedWorkspace.name}' now has ${updatedWorkspace.items.size} items")
+            }
+        }
+
         return view
     }
 
     private fun loadWorkspaceContent(workspace: Workspace) {
+        Log.d("MindNote", "WorkspaceFragment: Loading content for '${workspace.name}', ${workspace.items.size} items")
         container.removeAllViews()
         workspace.items.forEach { item ->
             when (item) {
@@ -68,10 +88,16 @@ class WorkspaceFragment : Fragment() {
                 val text = editText.text.toString()
                 if (item != null) {
                     item.text = text
-                    currentWorkspace?.let { viewModel.updateContentItem(it, item) }
+                    currentWorkspace?.let { 
+                        viewModel.updateContentItem(it, item)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 } else {
                     val newItem = ContentItem.TextItem(text)
-                    currentWorkspace?.let { viewModel.addContentItem(it, newItem) }
+                    currentWorkspace?.let { 
+                        viewModel.addContentItem(it, newItem)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 }
             }
         }
@@ -92,7 +118,10 @@ class WorkspaceFragment : Fragment() {
         checkbox.setOnCheckedChangeListener { _, isChecked ->
             if (item != null) {
                 item.isChecked = isChecked
-                currentWorkspace?.let { viewModel.updateContentItem(it, item) }
+                currentWorkspace?.let { 
+                    viewModel.updateContentItem(it, item)
+                    viewModel.saveWorkspaces(requireContext())
+                }
             }
         }
 
@@ -101,10 +130,16 @@ class WorkspaceFragment : Fragment() {
                 val text = editText.text.toString()
                 if (item != null) {
                     item.text = text
-                    currentWorkspace?.let { viewModel.updateContentItem(it, item) }
+                    currentWorkspace?.let { 
+                        viewModel.updateContentItem(it, item)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 } else {
                     val newItem = ContentItem.CheckboxItem(text, checkbox.isChecked)
-                    currentWorkspace?.let { viewModel.addContentItem(it, newItem) }
+                    currentWorkspace?.let { 
+                        viewModel.addContentItem(it, newItem)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 }
             }
         }
@@ -134,10 +169,16 @@ class WorkspaceFragment : Fragment() {
                 val text = editText.text.toString()
                 if (item != null) {
                     item.text = text
-                    currentWorkspace?.let { viewModel.updateContentItem(it, item) }
+                    currentWorkspace?.let { 
+                        viewModel.updateContentItem(it, item)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 } else {
                     val newItem = ContentItem.NumberedListItem(text, number.toInt())
-                    currentWorkspace?.let { viewModel.addContentItem(it, newItem) }
+                    currentWorkspace?.let { 
+                        viewModel.addContentItem(it, newItem)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 }
             }
         }
@@ -163,10 +204,16 @@ class WorkspaceFragment : Fragment() {
                 val text = editText.text.toString()
                 if (item != null) {
                     item.text = text
-                    currentWorkspace?.let { viewModel.updateContentItem(it, item) }
+                    currentWorkspace?.let { 
+                        viewModel.updateContentItem(it, item)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 } else {
                     val newItem = ContentItem.BulletListItem(text)
-                    currentWorkspace?.let { viewModel.addContentItem(it, newItem) }
+                    currentWorkspace?.let { 
+                        viewModel.addContentItem(it, newItem)
+                        viewModel.saveWorkspaces(requireContext())
+                    }
                 }
             }
         }
@@ -185,9 +232,22 @@ class WorkspaceFragment : Fragment() {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
+        imageView.adjustViewBounds = true
+        imageView.scaleType = ImageView.ScaleType.FIT_CENTER
 
         item?.let {
-            imageView.setImageURI(it.imageUri)
+            try {
+                imageView.setImageURI(it.imageUri)
+                Log.d("MindNote", "Set image URI: ${it.imageUri}")
+            } catch (e: Exception) {
+                Log.e("MindNote", "Failed to set image URI: ${it.imageUri}", e)
+                // Если не удалось загрузить изображение, устанавливаем placeholder
+                imageView.setImageResource(android.R.drawable.ic_menu_report_image)
+            }
+
+            if (currentWorkspace != null && item.id.isNotEmpty()) {
+                viewModel.updateContentItem(currentWorkspace!!, item)
+            }
         }
 
         imageView.setOnLongClickListener {
@@ -206,15 +266,24 @@ class WorkspaceFragment : Fragment() {
         item?.let {
             fileNameText.text = it.fileName
             fileSizeText.text = formatFileSize(it.fileSize)
+
+            if (currentWorkspace != null && item.id.isNotEmpty()) {
+                viewModel.updateContentItem(currentWorkspace!!, item)
+            }
         }
 
         fileItemView.setOnClickListener {
             item?.let { fileItem ->
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(fileItem.fileUri, getMimeType(fileItem.fileName))
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(fileItem.fileUri, getMimeType(fileItem.fileName))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Failed to open file: ${fileItem.fileUri}", e)
+                    Toast.makeText(context, "Не удалось открыть файл", Toast.LENGTH_SHORT).show()
                 }
-                startActivity(intent)
             }
         }
 
@@ -227,8 +296,8 @@ class WorkspaceFragment : Fragment() {
     }
 
     private fun showPopupMenuForItem(view: View, item: ContentItem?) {
-        val popupMenu = PopupMenu(requireContext(), view)
-        popupMenu.menuInflater.inflate(R.menu.popup_menu_item, popupMenu.menu)
+        val popupMenu = PopupMenu(context, view)
+        popupMenu.menuInflater.inflate(R.menu.item_popup_menu, popupMenu.menu)
 
         popupMenu.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
@@ -244,6 +313,7 @@ class WorkspaceFragment : Fragment() {
                                 is ContentItem.FileItem -> it.id
                             }
                             viewModel.removeContentItem(workspace, itemId)
+                            viewModel.saveWorkspaces(requireContext())
                             container.removeView(view)
                         }
                     }
@@ -257,14 +327,12 @@ class WorkspaceFragment : Fragment() {
     }
 
     private fun formatFileSize(size: Long): String {
-        val units = arrayOf("B", "KB", "MB", "GB")
-        var value = size.toDouble()
-        var unitIndex = 0
-        while (value >= 1024 && unitIndex < units.size - 1) {
-            value /= 1024
-            unitIndex++
+        return when {
+            size < 1024 -> "$size B"
+            size < 1024 * 1024 -> "${size / 1024} KB"
+            size < 1024 * 1024 * 1024 -> "${size / (1024 * 1024)} MB"
+            else -> "${size / (1024 * 1024 * 1024)} GB"
         }
-        return String.format("%.1f %s", value, units[unitIndex])
     }
 
     private fun getMimeType(fileName: String): String {
