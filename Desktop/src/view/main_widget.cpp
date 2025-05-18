@@ -122,6 +122,8 @@ void MainWidget::initConnections()
 {
     connect(_leftPanel.get(), &LeftPanel::workspaceSelected, _editorWidget.get(),
             &EditorWidget::setCurrentWorkspace);
+    connect(_leftPanel.get(), &LeftPanel::subWorkspaceSelected, _editorWidget.get(),
+            &EditorWidget::setCurrentWorkspace);
 
     // Auth connections
     connect(_authManager.get(), &AuthManager::authStateChanged, this,

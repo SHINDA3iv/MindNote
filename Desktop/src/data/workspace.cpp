@@ -5,12 +5,14 @@
 #include "list_item.h"
 #include "text_item.h"
 #include "title_item.h"
+#include "elements/SubspaceLinkItem.h"
 
 #include <QScrollArea>
 #include <QMenu>
 #include <QToolButton>
 #include <QIcon>
 #include <QFileDialog>
+#include <QPushButton>
 
 Workspace::Workspace(const QString &name, QWidget *parent) :
     QWidget(parent),
@@ -97,6 +99,22 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     menuButton->setPopupMode(QToolButton::InstantPopup);
 
     headerLayout->addWidget(menuButton);
+
+    // --- Кнопки-ссылки на подпространства ---
+    if (!_subWorkspaces.isEmpty()) {
+        QHBoxLayout *subLinksLayout = new QHBoxLayout();
+        for (Workspace *sub : _subWorkspaces) {
+            QPushButton *subBtn = new QPushButton(sub->getName(), this);
+            subBtn->setFlat(true);
+            subBtn->setStyleSheet(
+             "color: #0078d7; text-decoration: underline; background: transparent; border: none;");
+            connect(subBtn, &QPushButton::clicked, this, [this, sub]() {
+                emit subWorkspaceClicked(sub);
+            });
+            subLinksLayout->addWidget(subBtn);
+        }
+        headerLayout->addLayout(subLinksLayout);
+    }
 
     contentLayout->addLayout(headerLayout);
 
@@ -206,45 +224,44 @@ QJsonObject Workspace::serialize() const
 {
     QJsonObject json;
     json["name"] = _workspaceName;
-
+    json["id"] = _id;
+    json["parentId"] = _parentWorkspace ? _parentWorkspace->getId() : "";
+    QJsonArray subArray;
+    for (const Workspace *sub : _subWorkspaces) subArray.append(sub->getId());
+    json["subWorkspaces"] = subArray;
     QJsonArray itemArray;
-    for (const AbstractWorkspaceItem *item : _items) {
-        itemArray.append(item->serialize());
-    }
+    for (const AbstractWorkspaceItem *item : _items) itemArray.append(item->serialize());
     json["items"] = itemArray;
-
     return json;
 }
 
 void Workspace::deserialize(const QJsonObject &json)
 {
-    if (json.contains("name")) {
+    if (json.contains("name"))
         setName(json["name"].toString());
-    }
-
+    if (json.contains("id"))
+        setId(json["id"].toString());
+    // parentId и subWorkspaces обрабатываются в контроллере
     if (json.contains("items")) {
         QJsonArray itemArray = json["items"].toArray();
         for (const QJsonValue &itemVal : itemArray) {
             QJsonObject itemObj = itemVal.toObject();
             QString type = itemObj["type"].toString();
             AbstractWorkspaceItem *item = nullptr;
-
-            if (type == "TitleItem") {
+            if (type == "TitleItem")
                 item = new TitleItem();
-            } else if (type == "TextItem") {
+            else if (type == "TextItem")
                 item = new TextItem();
-            } else if (type == "OrderedListItem") {
+            else if (type == "OrderedListItem")
                 item = new ListItem(ListItem::Ordered);
-            } else if (type == "UnorderedListItem") {
+            else if (type == "UnorderedListItem")
                 item = new ListItem(ListItem::Unordered);
-            } else if (type == "CheckboxItem") {
+            else if (type == "CheckboxItem")
                 item = new CheckboxItem();
-            } else if (type == "ImageItem") {
+            else if (type == "ImageItem")
                 item = new ImageItem();
-            } else if (type == "FileItem") {
+            else if (type == "FileItem")
                 item = new FileItem();
-            }
-
             if (item) {
                 item->deserialize(itemObj);
                 addItem(item);
@@ -307,4 +324,78 @@ void Workspace::updateContentSize()
 QList<AbstractWorkspaceItem *> Workspace::getItems() const
 {
     return _items;
+}
+
+Workspace *Workspace::getParentWorkspace() const
+{
+    return _parentWorkspace;
+}
+void Workspace::setParentWorkspace(Workspace *parent)
+{
+    _parentWorkspace = parent;
+}
+QList<Workspace *> Workspace::getSubWorkspaces() const
+{
+    return _subWorkspaces;
+}
+void Workspace::addSubWorkspace(Workspace *sub)
+{
+    if (!_subWorkspaces.contains(sub)) {
+        _subWorkspaces.append(sub);
+        sub->setParentWorkspace(this);
+        // Добавляем ссылку-элемент, если его нет
+        bool hasLink = false;
+        for (auto *item : _items) {
+            if (item->type() == "SubspaceLinkItem") {
+                auto *link = static_cast<SubspaceLinkItem *>(item);
+                if (link->getLinkedWorkspace() == sub) {
+                    hasLink = true;
+                    break;
+                }
+            }
+        }
+        if (!hasLink) {
+            auto *linkItem = new SubspaceLinkItem(sub, this);
+            connect(linkItem, &SubspaceLinkItem::subspaceLinkClicked, this, &Workspace::subWorkspaceClicked);
+            addItem(linkItem);
+        }
+    }
+}
+void Workspace::removeSubWorkspace(Workspace *sub)
+{
+    _subWorkspaces.removeOne(sub);
+    if (sub->getParentWorkspace() == this)
+        sub->setParentWorkspace(nullptr);
+}
+bool Workspace::hasSubWorkspaceWithName(const QString &name) const
+{
+    for (auto *ws : _subWorkspaces)
+        if (ws->getName() == name)
+            return true;
+    return false;
+}
+QString Workspace::getId() const
+{
+    return _id;
+}
+void Workspace::setId(const QString &id)
+{
+    _id = id;
+}
+QList<Workspace *> Workspace::getPathChain() const
+{
+    QList<Workspace *> chain;
+    const Workspace *ws = this;
+    while (ws) {
+        chain.prepend(const_cast<Workspace *>(ws));
+        ws = ws->getParentWorkspace();
+    }
+    return chain;
+}
+QString Workspace::getFullPathName() const
+{
+    auto chain = getPathChain();
+    QStringList names;
+    for (auto *ws : chain) names << ws->getName();
+    return names.join("/");
 }

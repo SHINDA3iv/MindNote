@@ -7,6 +7,8 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QMenu>
+#include <QHBoxLayout>
+#include <QLabel>
 
 class EditorWidget : public QWidget
 {
@@ -21,6 +23,12 @@ public:
 private:
     Workspace *_currentWorkspace { nullptr };
     QVBoxLayout *_layout;
+    QHBoxLayout *_breadcrumbLayout { nullptr };
+    QLabel *_breadcrumbLabel { nullptr };
+    void updateBreadcrumb();
+
+private slots:
+    void onBreadcrumbClicked(int index);
 };
 
 #endif // EDITOR_WIDGET_H

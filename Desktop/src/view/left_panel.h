@@ -5,7 +5,7 @@
 #include "logic/workspace_controller.h"
 
 #include <QWidget>
-#include <QListWidget>
+#include <QTreeWidget>
 #include <QToolButton>
 
 class LeftPanel : public QWidget
@@ -21,16 +21,18 @@ public:
 
 signals:
     void workspaceSelected(Workspace *workspace);
+    void subWorkspaceSelected(Workspace *workspace);
 
 public slots:
     void onCreateWorkspace();
+    void onCreateSubWorkspace();
 
 private slots:
-    void onWorkspaceClicked(QListWidgetItem *item);
+    void onWorkspaceClicked(QTreeWidgetItem *item);
     void showContextMenu(const QPoint &pos);
 
 private:
-    QListWidget *_workspaceList;
+    QTreeWidget *_workspaceTree;
     WorkspaceController *_workspaceController { nullptr };
 };
 

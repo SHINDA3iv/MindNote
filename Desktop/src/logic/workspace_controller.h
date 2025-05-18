@@ -46,6 +46,11 @@ public:
     // Загрузка рабочих пространств
     void loadWorkspaces();
 
+    // --- ВЛОЖЕННОСТЬ ---
+    Workspace* createSubWorkspace(Workspace* parent, const QString& name, const QString& id = QString());
+    QList<Workspace*> getRootWorkspaces() const;
+    Workspace* findWorkspaceById(const QString& id) const;
+
 private:
     QList<Workspace *> _workspaces;
     std::shared_ptr<LocalStorage> _localStorage;

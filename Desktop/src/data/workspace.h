@@ -37,6 +37,21 @@ public:
     void setIcon(const QIcon &icon);
     QLabel *getIcon();
 
+    // --- ВЛОЖЕННОСТЬ ---
+    Workspace *getParentWorkspace() const;
+    void setParentWorkspace(Workspace *parent);
+    QList<Workspace *> getSubWorkspaces() const;
+    void addSubWorkspace(Workspace *sub);
+    void removeSubWorkspace(Workspace *sub);
+    bool hasSubWorkspaceWithName(const QString &name) const;
+    QString getId() const;
+    void setId(const QString &id);
+    QString getFullPathName() const;
+    QList<Workspace *> getPathChain() const;
+
+signals:
+    void subWorkspaceClicked(Workspace *sub);
+
 private:
     void updateContentSize();
 
@@ -50,6 +65,10 @@ private:
 
     QList<AbstractWorkspaceItem *> _items;
     QSpacerItem *_spacerItem { nullptr };
+
+    QString _id;
+    Workspace *_parentWorkspace { nullptr };
+    QList<Workspace *> _subWorkspaces;
 };
 
 #endif // WORKSPACE_H

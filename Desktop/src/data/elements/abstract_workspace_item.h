@@ -6,6 +6,8 @@
 #include <QString>
 #include <QJsonObject>
 
+class Workspace;
+
 class AbstractWorkspaceItem : public QWidget
 {
     Q_OBJECT
