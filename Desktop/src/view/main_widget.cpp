@@ -38,6 +38,14 @@ MainWidget::MainWidget(QWidget *parent) :
             this, &MainWidget::workspaceAdded);
     connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved, 
             this, &MainWidget::workspaceRemoved);
+    connect(_workspaceController.get(), &WorkspaceController::pathUpdated,
+            this, [this](Workspace* workspace) {
+                if (_editorWidget) {
+                    _editorWidget->setCurrentWorkspace(workspace);
+                }
+            });
+    connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved,
+            _editorWidget.get(), &EditorWidget::onWorkspaceRemoved);
 
     // initUI();
     // initConnections();

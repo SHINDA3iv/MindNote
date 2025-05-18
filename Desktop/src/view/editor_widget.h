@@ -20,6 +20,9 @@ public:
 
     void setCurrentWorkspace(Workspace *workspace);
 
+public slots:
+    void onWorkspaceRemoved(Workspace* workspace);
+
 private:
     Workspace *_currentWorkspace { nullptr };
     QVBoxLayout *_layout;

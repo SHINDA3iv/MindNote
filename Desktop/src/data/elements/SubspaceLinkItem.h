@@ -17,6 +17,7 @@ public:
     void deserialize(const QJsonObject& json) override;
     Workspace* getLinkedWorkspace() const;
     void setLinkedWorkspace(Workspace* newLinkedWorkspace);
+    void deleteItem() override;
 
 signals:
     void subspaceLinkClicked(Workspace* subspace);

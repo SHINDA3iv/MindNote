@@ -37,6 +37,7 @@ private:
     
     QTreeWidget *_workspaceTree;
     WorkspaceController *_workspaceController { nullptr };
+    void logItemPositions(QTreeWidgetItem *parent, int level);
 };
 
 #endif // LEFT_PANEL_H

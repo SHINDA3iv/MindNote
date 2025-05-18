@@ -9,7 +9,12 @@
 EditorWidget::EditorWidget(QWidget *parent) : QWidget(parent), _layout(new QVBoxLayout(this))
 {
     setLayout(_layout);
+    _layout->setContentsMargins(0, 0, 0, 0);
+    _layout->setSpacing(0);
+    
     _breadcrumbLayout = new QHBoxLayout();
+    _breadcrumbLayout->setContentsMargins(8, 2, 8, 2);
+    _breadcrumbLayout->setSpacing(0);
     _layout->addLayout(_breadcrumbLayout);
 }
 
@@ -44,11 +49,26 @@ void EditorWidget::updateBreadcrumb()
         Workspace* ws = chain[i];
         QPushButton* btn = new QPushButton(ws->getName(), this);
         btn->setFlat(true);
-        btn->setStyleSheet("color: #0078d7; text-decoration: underline; background: transparent; border: none;");
+        btn->setFixedHeight(24);
+        btn->setStyleSheet(R"(
+            QPushButton {
+                color: #0078d7;
+                text-decoration: underline;
+                background: transparent;
+                border: none;
+                padding: 2px 4px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background: #f0f0f0;
+            }
+        )");
         connect(btn, &QPushButton::clicked, this, [this, i, chain]() { onBreadcrumbClicked(i); });
         _breadcrumbLayout->addWidget(btn);
         if (i < n - 1) {
             QLabel* sep = new QLabel("/", this);
+            sep->setFixedHeight(24);
+            sep->setStyleSheet("color: #666; font-size: 12px; padding: 2px 4px;");
             _breadcrumbLayout->addWidget(sep);
         }
     }
@@ -61,5 +81,14 @@ void EditorWidget::onBreadcrumbClicked(int index)
     QList<Workspace*> chain = _currentWorkspace->getPathChain();
     if (index >= 0 && index < chain.size()) {
         setCurrentWorkspace(chain[index]);
+    }
+}
+
+void EditorWidget::onWorkspaceRemoved(Workspace* workspace)
+{
+    if (_currentWorkspace == workspace) {
+        // If the current workspace is being deleted, switch to its parent
+        Workspace* parent = workspace->getParentWorkspace();
+        setCurrentWorkspace(parent);
     }
 }

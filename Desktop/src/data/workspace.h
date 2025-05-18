@@ -32,7 +32,7 @@ public:
 
     QList<AbstractWorkspaceItem *> getItems() const;
 
-    // void addItemByType(const QString &type);
+    void addItemByType(const QString &type);
 
     void setIcon(const QIcon &icon);
     QLabel *getIcon();
@@ -50,7 +50,6 @@ public:
     QList<Workspace *> getPathChain() const;
 
 signals:
-    void addItemByType(const QString &type);
     void subWorkspaceClicked(Workspace *subspace);
     void addSubspaceRequested();
 

@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QTreeWidget>
 #include <QListWidgetItem>
+#include <QDebug>
 
 LeftPanel::LeftPanel(QWidget *parent) :
     QWidget(parent),
@@ -253,31 +254,79 @@ void LeftPanel::updateWorkspaceList()
     _workspaceTree->clear();
     QSize iconSize(32, 32);
     _workspaceTree->setIconSize(iconSize);
+    _workspaceTree->setIndentation(20);
+    
+    qDebug() << "\n=== Tree Settings ===";
+    qDebug() << "Tree indentation:" << _workspaceTree->indentation();
+    qDebug() << "Tree icon size:" << _workspaceTree->iconSize();
+    
+    // Check if default icon exists
+    QString defaultIconPath = ":/icons/workspace.png";
+    QFile iconFile(defaultIconPath);
+    qDebug() << "\n=== Default Icon Check ===";
+    qDebug() << "Default icon path:" << defaultIconPath;
+    qDebug() << "Icon file exists:" << iconFile.exists();
     
     // Add root workspaces
+    qDebug() << "\n=== Root Workspaces ===";
     for (Workspace *ws : _workspaceController->getRootWorkspaces()) {
         QTreeWidgetItem *item = new QTreeWidgetItem(_workspaceTree);
         item->setText(0, ws->getName());
         item->setData(0, Qt::UserRole, QVariant::fromValue(ws));
         
-        // Set icon
+        // Set icon with increased padding
+        QPixmap paddedPixmap(iconSize.width() + 32, iconSize.height() + 16); // Увеличили отступ слева
+        paddedPixmap.fill(Qt::transparent);
+        
         if (!ws->getIcon()->pixmap().isNull()) {
             QPixmap pixmap = ws->getIcon()->pixmap();
-            QPixmap paddedPixmap(iconSize.width() + 8, iconSize.height() + 8);
-            paddedPixmap.fill(Qt::transparent);
             QPixmap scaledPixmap = pixmap.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
             QPainter painter(&paddedPixmap);
-            painter.drawPixmap(4, 4, scaledPixmap);
+            painter.drawPixmap(24, 8, scaledPixmap); // Сдвинули иконку вправо
             item->setIcon(0, QIcon(paddedPixmap));
+            qDebug() << "Workspace" << ws->getName() << "has custom icon, size:" << pixmap.size();
         } else {
-            // Set default icon
-            item->setIcon(0, QIcon(":/icons/workspace.png"));
+            // Set default icon with padding
+            QIcon defaultIcon(defaultIconPath);
+            QPixmap defaultPixmap = defaultIcon.pixmap(iconSize);
+            if (defaultPixmap.isNull()) {
+                qDebug() << "ERROR: Failed to load default icon for workspace" << ws->getName();
+                qDebug() << "Icon path:" << defaultIconPath;
+                qDebug() << "Icon is null:" << defaultIcon.isNull();
+                qDebug() << "Available icon sizes:" << defaultIcon.availableSizes();
+            } else {
+                QPainter painter(&paddedPixmap);
+                painter.drawPixmap(24, 8, defaultPixmap); // Сдвинули иконку вправо
+                item->setIcon(0, QIcon(paddedPixmap));
+                qDebug() << "Workspace" << ws->getName() << "has default icon, size:" << defaultPixmap.size();
+            }
         }
         
         // Add subworkspaces recursively
         addSubWorkspacesToTree(item, ws);
     }
     _workspaceTree->expandAll();
+    
+    // Log item positions after expansion
+    qDebug() << "\n=== Item Positions ===";
+    for (int i = 0; i < _workspaceTree->topLevelItemCount(); ++i) {
+        QTreeWidgetItem* item = _workspaceTree->topLevelItem(i);
+        QRect itemRect = _workspaceTree->visualItemRect(item);
+        qDebug() << "Item" << item->text(0) << "position:" << itemRect;
+        qDebug() << "Item" << item->text(0) << "icon size:" << item->icon(0).actualSize(iconSize);
+        logItemPositions(item, 1);
+    }
+}
+
+void LeftPanel::logItemPositions(QTreeWidgetItem* parent, int level)
+{
+    for (int i = 0; i < parent->childCount(); ++i) {
+        QTreeWidgetItem* item = parent->child(i);
+        QRect itemRect = _workspaceTree->visualItemRect(item);
+        QString indent = QString(level * 2, ' ');
+        qDebug() << indent << "Child" << item->text(0) << "position:" << itemRect;
+        logItemPositions(item, level + 1);
+    }
 }
 
 void LeftPanel::addSubWorkspacesToTree(QTreeWidgetItem *parentItem, Workspace *parentWorkspace)
@@ -287,19 +336,33 @@ void LeftPanel::addSubWorkspacesToTree(QTreeWidgetItem *parentItem, Workspace *p
         item->setText(0, sub->getName());
         item->setData(0, Qt::UserRole, QVariant::fromValue(sub));
         
-        // Set icon
+        // Set icon with increased padding
+        QSize iconSize = _workspaceTree->iconSize();
+        QPixmap paddedPixmap(iconSize.width() + 32, iconSize.height() + 16); // Увеличили отступ слева
+        paddedPixmap.fill(Qt::transparent);
+        
         if (!sub->getIcon()->pixmap().isNull()) {
             QPixmap pixmap = sub->getIcon()->pixmap();
-            QSize iconSize = _workspaceTree->iconSize();
-            QPixmap paddedPixmap(iconSize.width() + 8, iconSize.height() + 8);
-            paddedPixmap.fill(Qt::transparent);
             QPixmap scaledPixmap = pixmap.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
             QPainter painter(&paddedPixmap);
-            painter.drawPixmap(4, 4, scaledPixmap);
+            painter.drawPixmap(24, 8, scaledPixmap); // Сдвинули иконку вправо
             item->setIcon(0, QIcon(paddedPixmap));
+            qDebug() << "Subworkspace" << sub->getName() << "has custom icon, size:" << pixmap.size();
         } else {
-            // Set default icon
-            item->setIcon(0, QIcon(":/icons/workspace.png"));
+            // Set default icon with padding
+            QIcon defaultIcon(":/icons/workspace.png");
+            QPixmap defaultPixmap = defaultIcon.pixmap(iconSize);
+            if (defaultPixmap.isNull()) {
+                qDebug() << "ERROR: Failed to load default icon for subworkspace" << sub->getName();
+                qDebug() << "Icon path: :/icons/workspace.png";
+                qDebug() << "Icon is null:" << defaultIcon.isNull();
+                qDebug() << "Available icon sizes:" << defaultIcon.availableSizes();
+            } else {
+                QPainter painter(&paddedPixmap);
+                painter.drawPixmap(24, 8, defaultPixmap); // Сдвинули иконку вправо
+                item->setIcon(0, QIcon(paddedPixmap));
+                qDebug() << "Subworkspace" << sub->getName() << "has default icon, size:" << defaultPixmap.size();
+            }
         }
         
         // Recursively add subworkspaces

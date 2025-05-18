@@ -57,6 +57,31 @@ void WorkspaceController::removeWorkspace(Workspace *workspace)
         return;
 
     QString workspaceId = workspace->property("id").toString();
+    Workspace* parent = workspace->getParentWorkspace();
+
+    // Удаляем все подпространства
+    QList<Workspace*> subspaces = workspace->getSubWorkspaces();
+    for (Workspace* sub : subspaces) {
+        removeWorkspace(sub);
+    }
+
+    // Удаляем ссылки на это пространство из родительского пространства
+    if (parent) {
+        parent->removeSubWorkspace(workspace);
+        
+        // Удаляем ссылки-элементы из родительского пространства
+        QList<AbstractWorkspaceItem*> items = parent->getItems();
+        for (AbstractWorkspaceItem* item : items) {
+            if (item->type() == "SubspaceLinkItem") {
+                auto* link = static_cast<SubspaceLinkItem*>(item);
+                if (link->getLinkedWorkspace() == workspace) {
+                    parent->removeItem(item);
+                }
+            }
+        }
+    }
+
+    // Удаляем из списка и освобождаем память
     _workspaces.removeOne(workspace);
     emit workspaceRemoved(workspace);
     delete workspace;
@@ -66,6 +91,12 @@ void WorkspaceController::removeWorkspace(Workspace *workspace)
 
     // Сохраняем изменения
     saveWorkspaces();
+
+    // Открываем родительское пространство и обновляем путь
+    if (parent) {
+        emit workspaceAdded(parent);
+        emit pathUpdated(parent);
+    }
 }
 
 Workspace *WorkspaceController::getWorkspace(int index) const
@@ -99,11 +130,6 @@ WorkspaceController::createSubWorkspace(Workspace *parent, const QString &name, 
     parent->addSubWorkspace(sub);
     _workspaces.append(sub);
     emit workspaceAdded(sub);
-    // Добавляем ссылку-элемент в список элементов родителя
-    auto *linkItem = new SubspaceLinkItem(sub, parent);
-    QObject::connect(linkItem, &SubspaceLinkItem::subspaceLinkClicked, parent,
-                     &Workspace::subWorkspaceClicked);
-    parent->addItem(linkItem);
     saveWorkspaces();
     return sub;
 }

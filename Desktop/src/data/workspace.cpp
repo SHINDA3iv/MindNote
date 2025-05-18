@@ -146,38 +146,40 @@ void Workspace::setIcon(const QIcon &icon)
     _iconLabel->setPixmap(icon.pixmap(32, 32));
 }
 
-// void Workspace::addItemByType(const QString &type)
-// {
-//     AbstractWorkspaceItem *item = nullptr;
+void Workspace::addItemByType(const QString &type)
+{
+    AbstractWorkspaceItem *item = nullptr;
 
-//     if (type == "TextItem") {
-//         item = new TextItem("Текст", this);
-//     } else if (type == "CheckboxItem") {
-//         item = new CheckboxItem("Задача", this);
-//     } else if (type == "OrderedListItem") {
-//         ListItem *list = new ListItem(ListItem::Ordered, this);
-//         item = list;
-//     } else if (type == "UnorderedListItem") {
-//         ListItem *list = new ListItem(ListItem::Unordered, this);
-//         item = list;
-//     } else if (type == "ImageItem") {
-//         QString imagePath = QFileDialog::getOpenFileName(this, "Выберите изображение", "",
-//                                                          "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
-//         if (!imagePath.isEmpty()) {
-//             item = new ImageItem(imagePath, this);
-//         }
-//     } else if (type == "FileItem") {
-//         QString filePath =
-//          QFileDialog::getOpenFileName(this, "Выберите файл", "", "All Files (*.*)");
-//         if (!filePath.isEmpty()) {
-//             item = new FileItem(filePath, this);
-//         }
-//     }
+    if (type == "TextItem") {
+        item = new TextItem("Текст", this);
+    } else if (type == "CheckboxItem") {
+        item = new CheckboxItem("Задача", this);
+    } else if (type == "OrderedListItem") {
+        ListItem *list = new ListItem(ListItem::Ordered, this);
+        item = list;
+    } else if (type == "UnorderedListItem") {
+        ListItem *list = new ListItem(ListItem::Unordered, this);
+        item = list;
+    } else if (type == "ImageItem") {
+        QString imagePath = QFileDialog::getOpenFileName(this, "Выберите изображение", "",
+                                                         "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
+        if (!imagePath.isEmpty()) {
+            item = new ImageItem(imagePath, this);
+        }
+    } else if (type == "FileItem") {
+        QString filePath =
+         QFileDialog::getOpenFileName(this, "Выберите файл", "", "All Files (*.*)");
+        if (!filePath.isEmpty()) {
+            item = new FileItem(filePath, this);
+        }
+    } else if (type == "TitleItem") {
+        item = new TitleItem("Заголовок", this);
+    }
 
-//     if (item) {
-//         addItem(item);
-//     }
-// }
+    if (item) {
+        addItem(item);
+    }
+}
 
 QString Workspace::getName() const
 {

@@ -22,6 +22,7 @@ public:
     signals:
     void workspaceAdded(Workspace *workspace);
     void workspaceRemoved(Workspace *workspace);
+    void pathUpdated(Workspace *workspace);
 
 public:
     // Создание нового рабочего пространства
