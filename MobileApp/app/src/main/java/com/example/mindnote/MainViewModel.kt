@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.example.mindnote.data.ContentItem
 import com.example.mindnote.data.Workspace
+import com.example.mindnote.data.WorkspaceRepository
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonDeserializationContext
@@ -22,212 +23,100 @@ import java.io.File
 import java.lang.reflect.Type
 
 class MainViewModel : ViewModel() {
-    private val _workspaces = MutableLiveData<List<Workspace>>()
-    val workspaces: LiveData<List<Workspace>> = _workspaces
-    
+    private lateinit var repository: WorkspaceRepository
     private val _currentWorkspace = MutableLiveData<Workspace>()
+    
+    // Текущее открытое рабочее пространство
     val currentWorkspace: LiveData<Workspace> = _currentWorkspace
-
-    private val gson: Gson = GsonBuilder()
-        .registerTypeAdapter(Uri::class.java, UriTypeAdapter())
-        .registerTypeAdapter(ContentItem::class.java, ContentItemTypeAdapter())
-        .setPrettyPrinting()
-        .create()
-
-    init {
-        _workspaces.value = emptyList()
+    
+    // Инициализация репозитория, должна быть вызвана перед использованием
+    fun init(context: Context) {
+        repository = WorkspaceRepository.getInstance(context)
     }
     
-    fun initWorkspaces(initialWorkspaces: List<Workspace>) {
-        _workspaces.value = initialWorkspaces
+    // LiveData со списком всех рабочих пространств
+    val workspaces: LiveData<List<Workspace>> 
+        get() = repository.workspaces
+    
+    // Сохранение всех рабочих пространств
+    fun saveWorkspaces() {
+        repository.saveWorkspaces()
     }
-
-    fun loadWorkspaces(context: Context) {
-        try {
-            val file = File(context.filesDir, "workspaces.json")
-            if (file.exists()) {
-                val json = file.readText()
-                Log.d("MindNote", "Loading workspaces: $json")
-                val type = object : TypeToken<List<Workspace>>() {}.type
-                val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type) ?: emptyList()
-                _workspaces.value = loadedWorkspaces
-                Log.d("MindNote", "Loaded ${loadedWorkspaces.size} workspaces")
-                loadedWorkspaces.forEach { workspace ->
-                    Log.d("MindNote", "Workspace '${workspace.name}' has ${workspace.items.size} items")
-                }
-            } else {
-                _workspaces.value = emptyList()
-                Log.d("MindNote", "No workspaces file found")
-            }
-        } catch (e: Exception) {
-            Log.e("MindNote", "Error loading workspaces", e)
-            e.printStackTrace()
-            _workspaces.value = emptyList()
-        }
+    
+    // Обновление рабочих пространств из хранилища
+    fun loadWorkspaces() {
+        Log.d("Repository", "LOADWWORK")
+        repository.loadWorkspaces()
     }
-
-    fun saveWorkspaces(context: Context) {
-        try {
-            val file = File(context.filesDir, "workspaces.json")
-            val currentWorkspaces = _workspaces.value ?: emptyList()
-            Log.d("MindNote", "Saving ${currentWorkspaces.size} workspaces")
-            currentWorkspaces.forEach { workspace ->
-                Log.d("MindNote", "Workspace '${workspace.name}' has ${workspace.items.size} items")
-            }
-            val json = gson.toJson(currentWorkspaces)
-            Log.d("MindNote", "Saving workspaces JSON: $json")
-            file.writeText(json)
-            Log.d("MindNote", "Workspaces saved successfully")
-        } catch (e: Exception) {
-            Log.e("MindNote", "Error saving workspaces", e)
-            e.printStackTrace()
-        }
-    }
-
+    
+    // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
-        val workspace = Workspace(name, iconUri)
-        val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
-        currentList.add(workspace)
-        _workspaces.value = currentList
-        return workspace
+        return repository.createWorkspace(name, iconUri)
     }
-
+    
+    // Обновление существующего рабочего пространства
     fun updateWorkspace(workspace: Workspace) {
-        val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
-        val index = currentList.indexOfFirst { it.id == workspace.id }
-        if (index != -1) {
-            currentList[index] = workspace
-            _workspaces.value = currentList
+        repository.updateWorkspace(workspace)
+    }
+    
+    // Установка текущего рабочего пространства
+    fun setCurrentWorkspace(workspace: Workspace) {
+        // Обновляем время последнего доступа
+        workspace.lastAccessed = System.currentTimeMillis()
+        repository.updateWorkspace(workspace)
+        
+        // Устанавливаем как текущее рабочее пространство
+        _currentWorkspace.value = workspace
+        
+        Log.d("MainViewModel", "Current workspace set to '${workspace.name}' with ${workspace.items.size} items")
+    }
+    
+    // Получение рабочего пространства по имени
+    fun getWorkspaceByName(name: String): Workspace? {
+        return repository.getWorkspaceByName(name)
+    }
+    
+    // Добавление нового элемента содержимого в рабочее пространство
+    fun addContentItem(workspace: Workspace, item: ContentItem) {
+        repository.addContentItem(workspace, item)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
         }
     }
-
-    fun setCurrentWorkspace(workspace: Workspace) {
-        workspace.lastAccessed = System.currentTimeMillis()
-        
-        // Убедимся, что у нас самая актуальная версия workspace из списка
-        val currentWorkspaces = _workspaces.value ?: emptyList()
-        val updatedWorkspace = currentWorkspaces.find { it.id == workspace.id } ?: workspace
-        
-        // Обновим lastAccessed
-        updatedWorkspace.lastAccessed = System.currentTimeMillis()
-        
-        // Обновим в списке
-        updateWorkspace(updatedWorkspace)
-        
-        // Установим как текущее
-        _currentWorkspace.value = updatedWorkspace
-        
-        Log.d("MindNote", "Set current workspace: ${updatedWorkspace.name} with ${updatedWorkspace.items.size} items")
+    
+    // Удаление элемента содержимого из рабочего пространства
+    fun removeContentItem(workspace: Workspace, itemId: String) {
+        repository.removeContentItem(workspace, itemId)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+        }
     }
-
+    
+    // Обновление элемента содержимого в рабочем пространстве
+    fun updateContentItem(workspace: Workspace, item: ContentItem) {
+        repository.updateContentItem(workspace, item)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+        }
+    }
+    
+    // Получение списка избранных рабочих пространств
+    fun getFavorites(): List<Workspace> {
+        return workspaces.value?.filter { it.isFavorite } ?: emptyList()
+    }
+    
+    // Переключение статуса "избранное" для рабочего пространства
     fun toggleFavorite(workspace: Workspace) {
         workspace.isFavorite = !workspace.isFavorite
-        updateWorkspace(workspace)
+        repository.updateWorkspace(workspace)
     }
-
-    fun getFavorites(): List<Workspace> {
-        return _workspaces.value?.filter { it.isFavorite } ?: emptyList()
-    }
-
+    
+    // Получение недавно использовавшихся рабочих пространств
     fun getRecentlyAccessed(limit: Int = 5): List<Workspace> {
-        return _workspaces.value?.sortedByDescending { it.lastAccessed }?.take(limit) ?: emptyList()
-    }
-
-    fun addContentItem(workspace: Workspace, item: ContentItem) {
-        Log.d("MindNote", "Adding ${item.javaClass.simpleName} to workspace '${workspace.name}'")
-        
-        // Получим актуальную версию workspace из списка
-        val currentWorkspaces = _workspaces.value ?: emptyList()
-        val workspaceToUpdate = currentWorkspaces.find { it.id == workspace.id } ?: workspace
-        
-        // Обновим список элементов
-        workspaceToUpdate.items.add(item)
-        
-        // Обновим в список рабочих пространств
-        updateWorkspace(workspaceToUpdate)
-        
-        // Если это текущее рабочее пространство, обновим и его
-        if (_currentWorkspace.value?.id == workspaceToUpdate.id) {
-            _currentWorkspace.value = workspaceToUpdate
-        }
-        
-        Log.d("MindNote", "Workspace '${workspaceToUpdate.name}' now has ${workspaceToUpdate.items.size} items")
-    }
-
-    fun removeContentItem(workspace: Workspace, itemId: String) {
-        Log.d("MindNote", "Removing item $itemId from workspace '${workspace.name}'")
-        
-        // Получим актуальную версию workspace из списка
-        val currentWorkspaces = _workspaces.value ?: emptyList()
-        val workspaceToUpdate = currentWorkspaces.find { it.id == workspace.id } ?: workspace
-        
-        // Найдем индекс элемента для удаления
-        val itemToRemove = workspaceToUpdate.items.find { item ->
-            when (item) {
-                is ContentItem.TextItem -> item.id == itemId
-                is ContentItem.CheckboxItem -> item.id == itemId
-                is ContentItem.NumberedListItem -> item.id == itemId
-                is ContentItem.BulletListItem -> item.id == itemId
-                is ContentItem.ImageItem -> item.id == itemId
-                is ContentItem.FileItem -> item.id == itemId
-            }
-        }
-        
-        // Удалим элемент
-        if (itemToRemove != null) {
-            workspaceToUpdate.items.remove(itemToRemove)
-        }
-        
-        // Обновим в список рабочих пространств
-        updateWorkspace(workspaceToUpdate)
-        
-        // Если это текущее рабочее пространство, обновим и его
-        if (_currentWorkspace.value?.id == workspaceToUpdate.id) {
-            _currentWorkspace.value = workspaceToUpdate
-        }
-        
-        Log.d("MindNote", "Workspace '${workspaceToUpdate.name}' now has ${workspaceToUpdate.items.size} items")
-    }
-
-    fun updateContentItem(workspace: Workspace, updatedItem: ContentItem) {
-        Log.d("MindNote", "Updating item in workspace '${workspace.name}'")
-        
-        // Получим актуальную версию workspace из списка
-        val currentWorkspaces = _workspaces.value ?: emptyList()
-        val workspaceToUpdate = currentWorkspaces.find { it.id == workspace.id } ?: workspace
-        
-        // Найдем индекс элемента для обновления
-        val itemIndex = workspaceToUpdate.items.indexOfFirst { item ->
-            when (item) {
-                is ContentItem.TextItem -> 
-                    item.id == (updatedItem as? ContentItem.TextItem)?.id
-                is ContentItem.CheckboxItem -> 
-                    item.id == (updatedItem as? ContentItem.CheckboxItem)?.id
-                is ContentItem.NumberedListItem -> 
-                    item.id == (updatedItem as? ContentItem.NumberedListItem)?.id
-                is ContentItem.BulletListItem -> 
-                    item.id == (updatedItem as? ContentItem.BulletListItem)?.id
-                is ContentItem.ImageItem -> 
-                    item.id == (updatedItem as? ContentItem.ImageItem)?.id
-                is ContentItem.FileItem -> 
-                    item.id == (updatedItem as? ContentItem.FileItem)?.id
-            }
-        }
-        
-        // Обновим элемент
-        if (itemIndex != -1) {
-            workspaceToUpdate.items[itemIndex] = updatedItem
-        }
-        
-        // Обновим в список рабочих пространств
-        updateWorkspace(workspaceToUpdate)
-        
-        // Если это текущее рабочее пространство, обновим и его
-        if (_currentWorkspace.value?.id == workspaceToUpdate.id) {
-            _currentWorkspace.value = workspaceToUpdate
-        }
-        
-        Log.d("MindNote", "Updated item in workspace '${workspaceToUpdate.name}'")
+        return workspaces.value?.sortedByDescending { it.lastAccessed }?.take(limit) ?: emptyList()
     }
 }
 

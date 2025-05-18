@@ -3,6 +3,7 @@ package com.example.mindnote
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -33,7 +34,7 @@ class WorkspaceFragment : Fragment() {
         this.container = view.findViewById(R.id.container)
 
         // Find the current workspace
-        currentWorkspace = viewModel.workspaces.value?.find { it.name == workspaceName }
+        currentWorkspace = viewModel.getWorkspaceByName(workspaceName)
         currentWorkspace?.let { workspace ->
             viewModel.setCurrentWorkspace(workspace)
             loadWorkspaceContent(workspace)
@@ -58,6 +59,18 @@ class WorkspaceFragment : Fragment() {
         }
 
         return view
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d("MindNote", "WorkspaceFragment: onResume for workspace '${currentWorkspace?.name}'")
+        // Обновляем текущее рабочее пространство из хранилища
+        currentWorkspace?.let { workspace ->
+            currentWorkspace = viewModel.getWorkspaceByName(workspace.name)
+            currentWorkspace?.let { 
+                loadWorkspaceContent(it)
+            }
+        }
     }
 
     private fun loadWorkspaceContent(workspace: Workspace) {
@@ -90,17 +103,36 @@ class WorkspaceFragment : Fragment() {
                     item.text = text
                     currentWorkspace?.let { 
                         viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
+                        Log.d("MindNote", "Обновлен текстовый элемент в '${it.name}'")
                     }
                 } else {
                     val newItem = ContentItem.TextItem(text)
                     currentWorkspace?.let { 
                         viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
+                        Log.d("MindNote", "Добавлен новый текстовый элемент в '${it.name}'")
                     }
                 }
             }
         }
+        
+        // Добавляем дополнительное событие для сохранения при вводе текста
+        editText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                s?.toString()?.let { text ->
+                    if (item != null) {
+                        item.text = text
+                        // Обновляем, но не сохраняем при каждом изменении текста
+                        currentWorkspace?.let { 
+                            viewModel.updateContentItem(it, item)
+                        }
+                    }
+                }
+            }
+        })
         
         container.addView(editText)
     }
@@ -120,7 +152,7 @@ class WorkspaceFragment : Fragment() {
                 item.isChecked = isChecked
                 currentWorkspace?.let { 
                     viewModel.updateContentItem(it, item)
-                    viewModel.saveWorkspaces(requireContext())
+                    viewModel.saveWorkspaces()
                 }
             }
         }
@@ -132,13 +164,13 @@ class WorkspaceFragment : Fragment() {
                     item.text = text
                     currentWorkspace?.let { 
                         viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
                     }
                 } else {
                     val newItem = ContentItem.CheckboxItem(text, checkbox.isChecked)
                     currentWorkspace?.let { 
                         viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
                     }
                 }
             }
@@ -171,13 +203,13 @@ class WorkspaceFragment : Fragment() {
                     item.text = text
                     currentWorkspace?.let { 
                         viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
                     }
                 } else {
                     val newItem = ContentItem.NumberedListItem(text, number.toInt())
                     currentWorkspace?.let { 
                         viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
                     }
                 }
             }
@@ -206,13 +238,13 @@ class WorkspaceFragment : Fragment() {
                     item.text = text
                     currentWorkspace?.let { 
                         viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
                     }
                 } else {
                     val newItem = ContentItem.BulletListItem(text)
                     currentWorkspace?.let { 
                         viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces(requireContext())
+                        viewModel.saveWorkspaces()
                     }
                 }
             }
@@ -247,6 +279,8 @@ class WorkspaceFragment : Fragment() {
 
             if (currentWorkspace != null && item.id.isNotEmpty()) {
                 viewModel.updateContentItem(currentWorkspace!!, item)
+                viewModel.saveWorkspaces()
+                Log.d("MindNote", "Добавлено изображение в '${currentWorkspace!!.name}'")
             }
         }
 
@@ -313,7 +347,7 @@ class WorkspaceFragment : Fragment() {
                                 is ContentItem.FileItem -> it.id
                             }
                             viewModel.removeContentItem(workspace, itemId)
-                            viewModel.saveWorkspaces(requireContext())
+                            viewModel.saveWorkspaces()
                             container.removeView(view)
                         }
                     }
@@ -343,6 +377,55 @@ class WorkspaceFragment : Fragment() {
             fileName.endsWith(".ppt") || fileName.endsWith(".pptx") -> "application/vnd.ms-powerpoint"
             fileName.endsWith(".txt") -> "text/plain"
             else -> "application/octet-stream"
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.d("MindNote", "WorkspaceFragment: onPause for workspace '${currentWorkspace?.name}'")
+        // Сохраняем состояние текущего рабочего пространства
+        currentWorkspace?.let { workspace ->
+            viewModel.saveWorkspaces()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d("MindNote", "WorkspaceFragment: onStop for workspace '${currentWorkspace?.name}'")
+        // Сохраняем состояние текущего рабочего пространства
+        currentWorkspace?.let { workspace ->
+            viewModel.saveWorkspaces()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d("MindNote", "WorkspaceFragment: onDestroy for workspace '${currentWorkspace?.name}'")
+        // Сохраняем состояние текущего рабочего пространства
+        currentWorkspace?.let { workspace ->
+            viewModel.saveWorkspaces()
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        
+        // Настраиваем таймер автосохранения
+        val handler = Handler(android.os.Looper.getMainLooper())
+        val runnable = object : Runnable {
+            override fun run() {
+                forceContentSave()
+                handler.postDelayed(this, 10000) // автосохранение каждые 10 секунд
+            }
+        }
+        handler.postDelayed(runnable, 10000)
+    }
+
+    // Общий метод для принудительного сохранения содержимого
+    private fun forceContentSave() {
+        currentWorkspace?.let { workspace ->
+            viewModel.saveWorkspaces()
+            Log.d("MindNote", "Принудительное сохранение рабочего пространства '${workspace.name}'")
         }
     }
 

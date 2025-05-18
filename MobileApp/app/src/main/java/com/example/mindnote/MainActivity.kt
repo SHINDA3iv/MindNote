@@ -46,6 +46,10 @@ class MainActivity : AppCompatActivity() {
         drawerLayout = findViewById(R.id.drawer_layout)
         navigationView = findViewById(R.id.nav_view)
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
+        
+        // Инициализируем ViewModel
+        viewModel.init(applicationContext)
+        
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
@@ -64,6 +68,12 @@ class MainActivity : AppCompatActivity() {
         navigationView.setNavigationItemSelectedListener { menuItem ->
             val workspaceName = menuItem.title.toString()
             if (menuItem.itemId != -1) {
+                // Сохраняем текущее рабочее пространство перед переходом
+                viewModel.currentWorkspace.value?.let { currentWorkspace ->
+                    Log.d("MindNote", "Сохраняем текущее рабочее пространство '${currentWorkspace.name}' перед переходом из меню")
+                    viewModel.saveWorkspaces()
+                }
+                
                 openWorkspace(workspaceName)
                 drawerLayout.closeDrawer(GravityCompat.START)
                 true
@@ -73,7 +83,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Загрузка рабочих пространств
-        viewModel.loadWorkspaces(this)
+        // viewModel.loadWorkspaces(this) (теперь loadWorkspaces вызывается при инициализации репозитория)
 
         // Восстановление фрагмента если есть
         if (savedInstanceState != null) {
@@ -99,18 +109,13 @@ class MainActivity : AppCompatActivity() {
                 Log.d("MindNote", "MainActivity: Added menu item for '${workspace.name}' with ${workspace.items.size} items")
             }
         }
-
-        // Если список рабочих пространств пуст — инициализируем
-        if (viewModel.workspaces.value.isNullOrEmpty()) {
-            viewModel.initWorkspaces(emptyList())
-        }
         
         // Настраиваем периодическое автосохранение
         lifecycleScope.launch {
             while (true) {
                 delay(30000) // автосохранение каждые 30 секунд
                 launch(Dispatchers.IO) {
-                    viewModel.saveWorkspaces(this@MainActivity)
+                    viewModel.saveWorkspaces()
                     Log.d("MindNote", "MainActivity: Auto-saved workspaces")
                 }
             }
@@ -136,7 +141,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("MindNote", "MainActivity: Add text field selected")
                     val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                     fragment?.addTextField()
-                    viewModel.saveWorkspaces(this)
+                    viewModel.saveWorkspaces()
                     true
                 }
                 R.id.popup_option2 -> {
@@ -149,7 +154,7 @@ class MainActivity : AppCompatActivity() {
                             id = java.util.UUID.randomUUID().toString()
                         )
                         it.addCheckboxItem(checkboxItem)
-                        viewModel.saveWorkspaces(this)
+                        viewModel.saveWorkspaces()
                     }
                     true
                 }
@@ -172,14 +177,14 @@ class MainActivity : AppCompatActivity() {
                     Log.d("MindNote", "MainActivity: Add numbered list selected")
                     val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                     fragment?.addNumberedListItem(null)
-                    viewModel.saveWorkspaces(this)
+                    viewModel.saveWorkspaces()
                     true
                 }
                 R.id.popup_option6 -> {
                     Log.d("MindNote", "MainActivity: Add bullet list selected")
                     val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                     fragment?.addBulletListItem(null)
-                    viewModel.saveWorkspaces(this)
+                    viewModel.saveWorkspaces()
                     true
                 }
                 else -> false
@@ -199,7 +204,7 @@ class MainActivity : AppCompatActivity() {
                         val persistentUri = copyFileToInternalStorage(uri, "images")
                         val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                         fragment?.addImageView(ContentItem.ImageItem(persistentUri))
-                        viewModel.saveWorkspaces(this)
+                        viewModel.saveWorkspaces()
                     }
                 }
                 PICK_FILE_REQUEST -> {
@@ -211,7 +216,7 @@ class MainActivity : AppCompatActivity() {
                         val persistentUri = copyFileToInternalStorage(uri, "files", fileName)
                         val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                         fragment?.addFileItem(ContentItem.FileItem(fileName, persistentUri, fileSize))
-                        viewModel.saveWorkspaces(this)
+                        viewModel.saveWorkspaces()
                     }
                 }
                 PICK_ICON_REQUEST -> {
@@ -225,7 +230,7 @@ class MainActivity : AppCompatActivity() {
                             workspace?.let {
                                 it.iconUri = persistentUri
                                 viewModel.updateWorkspace(it)
-                                viewModel.saveWorkspaces(this)
+                                viewModel.saveWorkspaces()
                                 updateWorkspaceMenuItem(name, persistentUri)
                             }
                         }
@@ -328,7 +333,7 @@ class MainActivity : AppCompatActivity() {
                     val workspace = viewModel.createWorkspace(newItemName, selectedIconUri)
                     addMenuItem(newItemName, workspace)
                     editText.text.clear()
-                    viewModel.saveWorkspaces(this)
+                    viewModel.saveWorkspaces()
                 } else {
                     Toast.makeText(this, "Имя пункта не может быть пустым", Toast.LENGTH_SHORT).show()
                 }
@@ -391,24 +396,24 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.loadWorkspaces(this)
+        viewModel.loadWorkspaces()
     }
 
     override fun onPause() {
         super.onPause()
-        viewModel.saveWorkspaces(this)
+        viewModel.saveWorkspaces()
         Log.d("MindNote", "MainActivity: Saved workspaces in onPause")
     }
 
     override fun onStop() {
         super.onStop()
-        viewModel.saveWorkspaces(this)
+        viewModel.saveWorkspaces()
         Log.d("MindNote", "MainActivity: Saved workspaces in onStop")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        viewModel.saveWorkspaces(this)
+        viewModel.saveWorkspaces()
         Log.d("MindNote", "MainActivity: Saved workspaces in onDestroy")
     }
 }
