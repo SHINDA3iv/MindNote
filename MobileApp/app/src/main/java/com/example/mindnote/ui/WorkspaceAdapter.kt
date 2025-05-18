@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.mindnote.R
 import com.example.mindnote.data.Workspace
+import com.example.mindnote.data.ContentItem
 
 class WorkspaceAdapter(
     private var workspaces: List<Workspace>,
@@ -31,18 +32,18 @@ class WorkspaceAdapter(
     inner class WorkspaceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val nameTextView: TextView = itemView.findViewById(R.id.workspace_name)
         private val iconImageView: ImageView = itemView.findViewById(R.id.workspace_icon)
-        private val expandImageView: ImageView = itemView.findViewById(R.id.expand_icon)
+        private val expandImageView: ImageView = itemView.findViewById(R.id.workspace_expand_icon)
 
         fun bind(workspace: Workspace) {
             nameTextView.text = workspace.name
             workspace.iconUri?.let { uri ->
-                iconImageView.setImageURI(android.net.Uri.parse(uri))
+                iconImageView.setImageURI(uri)
             } ?: run {
                 iconImageView.setImageResource(R.drawable.ic_workspace_default)
             }
 
             // Show expand icon only if workspace has subworkspaces
-            expandImageView.visibility = if (workspace.subworkspaces.isNotEmpty()) View.VISIBLE else View.GONE
+            expandImageView.visibility = if (workspace.items.any { it is ContentItem.SubWorkspaceLink }) View.VISIBLE else View.GONE
 
             // Set click listeners
             itemView.setOnClickListener { onWorkspaceClick(workspace) }

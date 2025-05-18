@@ -25,21 +25,22 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.popupmenu.PopupMenu
 import com.google.android.material.textfield.TextInputEditText
+import androidx.appcompat.widget.PopupMenu
 
 class WorkspaceDetailFragment : Fragment() {
     private lateinit var viewModel: MainViewModel
     private lateinit var workspaceRepository: WorkspaceRepository
     private lateinit var itemsAdapter: ContentItemsAdapter
     private var currentWorkspace: Workspace? = null
-    private val args: WorkspaceDetailFragmentArgs by navArgs()
+    private val args: Bundle? by lazy { arguments }
+    private val workspaceId: String by lazy { args?.getString("workspaceId") ?: "" }
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.data?.let { uri ->
             val imageItem = ContentItem.ImageItem(uri)
             currentWorkspace?.let { workspace ->
-                viewModel.addContentItem(workspace, imageItem)
+                workspaceRepository.addContentItem(workspace, imageItem)
             }
         }
     }
@@ -50,7 +51,7 @@ class WorkspaceDetailFragment : Fragment() {
             val fileSize = getFileSize(uri)
             val fileItem = ContentItem.FileItem(fileName, uri, fileSize)
             currentWorkspace?.let { workspace ->
-                viewModel.addContentItem(workspace, fileItem)
+                workspaceRepository.addContentItem(workspace, fileItem)
             }
         }
     }
@@ -82,6 +83,9 @@ class WorkspaceDetailFragment : Fragment() {
                         // Обработка клика по другим типам элементов
                     }
                 }
+            },
+            onItemLongClick = { _, _ ->
+                // Handle long click
             }
         )
         recyclerView.apply {
@@ -99,12 +103,15 @@ class WorkspaceDetailFragment : Fragment() {
 
         // Observe workspace changes
         viewModel.workspaces.observe(viewLifecycleOwner) { workspaces ->
-            currentWorkspace = workspaces.find { it.id == args.workspaceId }
+            currentWorkspace = workspaces.find { it.id == workspaceId }
+            currentWorkspace?.let { workspace ->
+                itemsAdapter.submitList(workspace.items)
+            }
         }
     }
 
     private fun loadWorkspace() {
-        currentWorkspace = workspaceRepository.getWorkspaceById(args.workspaceId)
+        currentWorkspace = workspaceRepository.getWorkspaceById(workspaceId)
         currentWorkspace?.let { workspace ->
             // Обновляем заголовок
             view?.findViewById<ImageView>(R.id.workspace_icon)?.setImageURI(workspace.iconUri)
@@ -192,58 +199,55 @@ class WorkspaceDetailFragment : Fragment() {
     private fun addTextItem() {
         currentWorkspace?.let { workspace ->
             val textItem = ContentItem.TextItem("")
-            viewModel.addContentItem(workspace, textItem)
+            workspaceRepository.addContentItem(workspace, textItem)
         }
     }
 
     private fun addCheckboxItem() {
         currentWorkspace?.let { workspace ->
             val checkboxItem = ContentItem.CheckboxItem("", false)
-            viewModel.addContentItem(workspace, checkboxItem)
+            workspaceRepository.addContentItem(workspace, checkboxItem)
         }
     }
 
     private fun addNumberedListItem() {
         currentWorkspace?.let { workspace ->
             val numberedListItem = ContentItem.NumberedListItem("", workspace.items.size + 1)
-            viewModel.addContentItem(workspace, numberedListItem)
+            workspaceRepository.addContentItem(workspace, numberedListItem)
         }
     }
 
     private fun addBulletListItem() {
         currentWorkspace?.let { workspace ->
             val bulletListItem = ContentItem.BulletListItem("")
-            viewModel.addContentItem(workspace, bulletListItem)
+            workspaceRepository.addContentItem(workspace, bulletListItem)
         }
     }
 
     private fun addSubWorkspaceLink() {
         currentWorkspace?.let { workspace ->
             val subWorkspaceLink = ContentItem.SubWorkspaceLink("", "")
-            viewModel.addContentItem(workspace, subWorkspaceLink)
+            workspaceRepository.addContentItem(workspace, subWorkspaceLink)
         }
     }
 
     private fun navigateToWorkspace(workspaceId: String) {
-        val action = WorkspaceDetailFragmentDirections
-            .actionWorkspaceDetailSelf(workspaceId)
-        findNavController().navigate(action)
+        val bundle = Bundle().apply {
+            putString("workspaceId", workspaceId)
+        }
+        findNavController().navigate(R.id.workspaceDetailFragment, bundle)
     }
 
     private fun getFileName(uri: Uri): String {
-        return requireContext().contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-            cursor.moveToFirst()
-            cursor.getString(nameIndex)
-        } ?: "Unknown file"
+        return uri.lastPathSegment ?: "Unknown file"
     }
 
     private fun getFileSize(uri: Uri): Long {
-        return requireContext().contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
-            cursor.moveToFirst()
-            cursor.getLong(sizeIndex)
-        } ?: 0L
+        return try {
+            requireContext().contentResolver.openFileDescriptor(uri, "r")?.statSize ?: 0L
+        } catch (e: Exception) {
+            0L
+        }
     }
 
     private fun saveWorkspaceChanges() {

@@ -55,7 +55,7 @@ class NavigationDrawerFragment : Fragment() {
         workspaceRepository = WorkspaceRepository.getInstance(requireContext())
 
         // Инициализация RecyclerView
-        val recyclerView = view.findViewById<RecyclerView>(R.id.workspaces_list)
+        val recyclerView = view.findViewById<RecyclerView>(R.id.workspace_list)
         workspaceAdapter = WorkspaceAdapter(
             workspaces = emptyList(),
             onExpandClick = { workspace, isExpanded ->

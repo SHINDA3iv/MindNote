@@ -6,6 +6,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.mindnote.data.Workspace
 import com.example.mindnote.data.WorkspaceRepository
+import android.net.Uri
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = WorkspaceRepository.getInstance(application)
@@ -19,7 +20,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createWorkspace(name: String, iconUri: String? = null) {
+    fun createWorkspace(name: String, iconUri: Uri? = null) {
         repository.createWorkspace(name, iconUri)
     }
 

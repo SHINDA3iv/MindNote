@@ -104,7 +104,7 @@ class WorkspaceRepository private constructor(private val context: Context) {
     
     // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
-        val workspace = Workspace(name, iconUri?.toString())
+        val workspace = Workspace(name, iconUri?.toString() ?: "")
         val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
         currentList.add(workspace)
         _workspaces.postValue(currentList)
