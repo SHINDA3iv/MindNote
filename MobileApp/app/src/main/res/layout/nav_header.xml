@@ -1,21 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="16dp">
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="?attr/colorPrimary">
 
     <TextView
-        android:id="@+id/nav_header_title"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Пространства"
-        android:layout_weight="1"
-        android:textAppearance="?android:textAppearanceLarge" />
-    <Button
-        android:id="@+id/nav_header_add_button"
-        android:layout_width="wrap_content"
+        android:text="MindNote"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        android:textColor="@android:color/white"
+        android:textSize="20sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/button_create_workspace"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="+"
-        android:textAppearance="?android:textAppearanceLarge"/>
+        android:layout_marginTop="16dp"
+        android:text="Создать пространство"
+        android:textColor="@android:color/white"
+        app:icon="@drawable/ic_add"
+        app:iconTint="@android:color/white"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
 </LinearLayout>

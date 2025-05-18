@@ -104,7 +104,7 @@ class WorkspaceRepository private constructor(private val context: Context) {
     
     // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
-        val workspace = Workspace(name, iconUri)
+        val workspace = Workspace(name, iconUri?.toString())
         val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
         currentList.add(workspace)
         _workspaces.postValue(currentList)
@@ -161,6 +161,7 @@ class WorkspaceRepository private constructor(private val context: Context) {
                 is ContentItem.BulletListItem -> item.id == itemId
                 is ContentItem.ImageItem -> item.id == itemId
                 is ContentItem.FileItem -> item.id == itemId
+                is ContentItem.SubWorkspaceLink -> item.id == itemId
             }
         }
         
@@ -192,6 +193,8 @@ class WorkspaceRepository private constructor(private val context: Context) {
                     item.id == (updatedItem as? ContentItem.ImageItem)?.id
                 is ContentItem.FileItem -> 
                     item.id == (updatedItem as? ContentItem.FileItem)?.id
+                is ContentItem.SubWorkspaceLink -> 
+                    item.id == (updatedItem as? ContentItem.SubWorkspaceLink)?.id
             }
         }
         
@@ -274,6 +277,12 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("fileSize", src.fileSize)
                 jsonObject.addProperty("id", src.id)
             }
+            is ContentItem.SubWorkspaceLink -> {
+                jsonObject.addProperty("type", "SubWorkspaceLink")
+                jsonObject.addProperty("workspaceId", src.workspaceId)
+                jsonObject.addProperty("displayName", src.displayName)
+                jsonObject.addProperty("id", src.id)
+            }
             null -> return JsonObject()
         }
         return jsonObject
@@ -303,13 +312,18 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             "ImageItem" -> ContentItem.ImageItem(
-                imageUri = Uri.parse(jsonObject.get("imageUri")?.asString),
+                imageUri = jsonObject.get("imageUri")?.asString?.let { Uri.parse(it) } ?: Uri.EMPTY,
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             "FileItem" -> ContentItem.FileItem(
                 fileName = jsonObject.get("fileName")?.asString ?: "",
-                fileUri = Uri.parse(jsonObject.get("fileUri")?.asString),
+                fileUri = jsonObject.get("fileUri")?.asString?.let { Uri.parse(it) } ?: Uri.EMPTY,
                 fileSize = jsonObject.get("fileSize")?.asLong ?: 0L,
+                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
+            )
+            "SubWorkspaceLink" -> ContentItem.SubWorkspaceLink(
+                workspaceId = jsonObject.get("workspaceId")?.asString ?: "",
+                displayName = jsonObject.get("displayName")?.asString ?: "",
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             else -> ContentItem.TextItem("")

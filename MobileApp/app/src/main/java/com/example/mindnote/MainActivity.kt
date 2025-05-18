@@ -18,10 +18,18 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.example.mindnote.R.id.nav_header_add_button
+import androidx.navigation.NavController
+import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.AppBarConfiguration
+import androidx.navigation.ui.navigateUp
+import androidx.navigation.ui.setupActionBarWithNavController
+import androidx.navigation.ui.setupWithNavController
 import com.example.mindnote.R.id.ws_group
 import com.example.mindnote.data.ContentItem
 import com.example.mindnote.data.Workspace
+import com.example.mindnote.data.WorkspaceRepository
+import com.example.mindnote.databinding.ActivityMainBinding
+import com.example.mindnote.ui.NavigationDrawerFragment
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +38,11 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var appBarConfiguration: AppBarConfiguration
+    private lateinit var navController: NavController
+    private lateinit var workspaceRepository: WorkspaceRepository
+    private lateinit var navigationDrawerFragment: NavigationDrawerFragment
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navigationView: NavigationView
     private lateinit var viewModel: MainViewModel
@@ -41,28 +54,49 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         enableEdgeToEdge()
-        drawerLayout = findViewById(R.id.drawer_layout)
-        navigationView = findViewById(R.id.nav_view)
+        drawerLayout = binding.drawerLayout
+        navigationView = binding.navView
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
         
         // Инициализируем ViewModel
         viewModel.init(applicationContext)
         
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
+        // Настройка Toolbar
+        setSupportActionBar(binding.toolbar)
 
-        // Навигация
-        ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close).also { toggle ->
-            drawerLayout.addDrawerListener(toggle)
-            toggle.syncState()
-        }
+        // Настройка навигации
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+        navController = navHostFragment.navController
 
-        val headerView = navigationView.getHeaderView(0)
-        val addButton = headerView.findViewById<Button>(R.id.nav_header_add_button)
-        addButton.setOnClickListener {
-            showAddMenuItemDialog()
+        // Настройка боковой панели
+        appBarConfiguration = AppBarConfiguration(
+            setOf(R.id.workspaceDetailFragment),
+            binding.drawerLayout
+        )
+
+        setupActionBarWithNavController(navController, appBarConfiguration)
+        binding.navView.setupWithNavController(navController)
+
+        // Инициализация фрагмента боковой панели
+        navigationDrawerFragment = NavigationDrawerFragment()
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.nav_view, navigationDrawerFragment)
+            .commit()
+
+        // Настройка кнопки создания пространства
+        binding.navView.getHeaderView(0)
+            .findViewById<com.google.android.material.button.MaterialButton>(R.id.button_create_workspace)
+            .setOnClickListener {
+                navigationDrawerFragment.showCreateWorkspaceDialog()
+            }
+
+        // Наблюдение за изменениями в списке пространств
+        workspaceRepository.workspaces.observe(this) { workspaces ->
+            navigationDrawerFragment.updateWorkspaceList(workspaces)
         }
 
         navigationView.setNavigationItemSelectedListener { menuItem ->
@@ -99,17 +133,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Подписываемся на обновления
-        viewModel.workspaces.observe(this) { workspaces ->
-            Log.d("MindNote", "MainActivity: Observed ${workspaces.size} workspaces")
-            val menu = navigationView.menu
-            menu.removeGroup(ws_group)
-            workspaces.forEach { workspace ->
-                addMenuItem(workspace.name, workspace)
-                Log.d("MindNote", "MainActivity: Added menu item for '${workspace.name}' with ${workspace.items.size} items")
-            }
-        }
-        
         // Настраиваем периодическое автосохранение
         lifecycleScope.launch {
             while (true) {
@@ -380,6 +403,28 @@ class MainActivity : AppCompatActivity() {
             newId++
         }
         return newId
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+    }
+
+    fun createWorkspace(name: String, iconUri: Uri?) {
+        workspaceRepository.createWorkspace(name, iconUri)
+    }
+
+    fun openWorkspace(workspace: Workspace) {
+        // Закрываем боковую панель
+        drawerLayout.closeDrawers()
+
+        // Обновляем заголовок
+        supportActionBar?.title = workspace.name
+
+        // Открываем пространство через навигацию
+        val bundle = Bundle().apply {
+            putString("workspaceId", workspace.id)
+        }
+        navController.navigate(R.id.workspaceDetailFragment, bundle)
     }
 
     override fun onBackPressed() {

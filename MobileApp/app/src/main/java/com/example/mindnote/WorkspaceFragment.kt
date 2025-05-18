@@ -13,6 +13,7 @@ import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.findNavController
 import com.example.mindnote.data.*
 import java.io.File
 
@@ -21,6 +22,19 @@ class WorkspaceFragment : Fragment() {
     private lateinit var container: LinearLayout
     private lateinit var viewModel: MainViewModel
     private var currentWorkspace: Workspace? = null
+
+    companion object {
+        private const val PICK_IMAGE_REQUEST = 1
+        private const val PICK_FILE_REQUEST = 2
+        
+        fun newInstance(workspaceName: String): WorkspaceFragment {
+            val fragment = WorkspaceFragment()
+            val args = Bundle()
+            args.putString("WORKSPACE_NAME", workspaceName)
+            fragment.arguments = args
+            return fragment
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -84,6 +98,7 @@ class WorkspaceFragment : Fragment() {
                 is ContentItem.BulletListItem -> addBulletListItem(item)
                 is ContentItem.ImageItem -> addImageView(item)
                 is ContentItem.FileItem -> addFileItem(item)
+                is ContentItem.SubWorkspaceLink -> addSubWorkspaceLink(item)
             }
         }
     }
@@ -331,33 +346,105 @@ class WorkspaceFragment : Fragment() {
 
     private fun showPopupMenuForItem(view: View, item: ContentItem?) {
         val popupMenu = PopupMenu(context, view)
-        popupMenu.menuInflater.inflate(R.menu.item_popup_menu, popupMenu.menu)
-
+        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu)
+        
         popupMenu.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.menu_delete -> {
-                    item?.let {
-                        currentWorkspace?.let { workspace ->
-                            val itemId = when (it) {
-                                is ContentItem.TextItem -> it.id
-                                is ContentItem.CheckboxItem -> it.id
-                                is ContentItem.NumberedListItem -> it.id
-                                is ContentItem.BulletListItem -> it.id
-                                is ContentItem.ImageItem -> it.id
-                                is ContentItem.FileItem -> it.id
-                            }
-                            viewModel.removeContentItem(workspace, itemId)
-                            viewModel.saveWorkspaces()
-                            container.removeView(view)
-                        }
-                    }
+                R.id.popup_option1 -> {
+                    // Добавить текстовое поле
+                    addTextField()
+                    true
+                }
+                R.id.popup_option2 -> {
+                    // Добавить чекбокс
+                    addCheckboxItem()
+                    true
+                }
+                R.id.popup_option3 -> {
+                    // Добавить изображение
+                    val intent = Intent(Intent.ACTION_PICK)
+                    intent.type = "image/*"
+                    startActivityForResult(intent, PICK_IMAGE_REQUEST)
+                    true
+                }
+                R.id.popup_option4 -> {
+                    // Добавить файл
+                    val intent = Intent(Intent.ACTION_GET_CONTENT)
+                    intent.type = "*/*"
+                    intent.addCategory(Intent.CATEGORY_OPENABLE)
+                    startActivityForResult(intent, PICK_FILE_REQUEST)
+                    true
+                }
+                R.id.popup_option5 -> {
+                    // Добавить нумерованный список
+                    addNumberedListItem()
+                    true
+                }
+                R.id.popup_option6 -> {
+                    // Добавить маркированный список
+                    addBulletListItem()
+                    true
+                }
+                R.id.popup_option7 -> {
+                    // Добавить ссылку на подпространство
+                    addSubWorkspaceLink()
                     true
                 }
                 else -> false
             }
         }
-
         popupMenu.show()
+    }
+
+    private fun addSubWorkspaceLink(item: ContentItem.SubWorkspaceLink? = null) {
+        val linkView = layoutInflater.inflate(R.layout.subworkspace_link_item, null)
+        val editText = linkView.findViewById<EditText>(R.id.editTextLink)
+        val workspaceId = item?.workspaceId ?: ""
+        val displayName = item?.displayName ?: ""
+
+        editText.setText(displayName)
+
+        editText.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val text = editText.text.toString()
+                if (item != null) {
+                    // Create a new item with updated display name
+                    val updatedItem = ContentItem.SubWorkspaceLink(
+                        workspaceId = item.workspaceId,
+                        displayName = text,
+                        id = item.id
+                    )
+                    currentWorkspace?.let { workspace -> 
+                        viewModel.updateContentItem(workspace, updatedItem)
+                        viewModel.saveWorkspaces()
+                    }
+                } else {
+                    val newItem = ContentItem.SubWorkspaceLink(workspaceId, text)
+                    currentWorkspace?.let { workspace -> 
+                        viewModel.addContentItem(workspace, newItem)
+                        viewModel.saveWorkspaces()
+                    }
+                }
+            }
+        }
+
+        linkView.setOnClickListener {
+            // Navigate to the linked workspace
+            val workspace = viewModel.getWorkspaceByName(workspaceId)
+            workspace?.let { ws ->
+                val bundle = Bundle().apply {
+                    putString("workspaceId", ws.id)
+                }
+                findNavController().navigate(R.id.workspaceDetailFragment, bundle)
+            }
+        }
+
+        linkView.setOnLongClickListener {
+            showPopupMenuForItem(linkView, item)
+            true
+        }
+
+        container.addView(linkView)
     }
 
     private fun formatFileSize(size: Long): String {
@@ -426,16 +513,6 @@ class WorkspaceFragment : Fragment() {
         currentWorkspace?.let { workspace ->
             viewModel.saveWorkspaces()
             Log.d("MindNote", "Принудительное сохранение рабочего пространства '${workspace.name}'")
-        }
-    }
-
-    companion object {
-        fun newInstance(workspaceName: String): WorkspaceFragment {
-            val fragment = WorkspaceFragment()
-            val args = Bundle()
-            args.putString("WORKSPACE_NAME", workspaceName)
-            fragment.arguments = args
-            return fragment
         }
     }
 }

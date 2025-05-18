@@ -109,9 +109,10 @@ class MainViewModel : ViewModel() {
     }
     
     // Переключение статуса "избранное" для рабочего пространства
-    fun toggleFavorite(workspace: Workspace) {
+    fun toggleFavorite(workspace: Workspace): Boolean {
         workspace.isFavorite = !workspace.isFavorite
         repository.updateWorkspace(workspace)
+        return workspace.isFavorite
     }
     
     // Получение недавно использовавшихся рабочих пространств
@@ -178,6 +179,12 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("fileSize", src.fileSize)
                 jsonObject.addProperty("id", src.id)
             }
+            is ContentItem.SubWorkspaceLink -> {
+                jsonObject.addProperty("type", "SubWorkspaceLink")
+                jsonObject.addProperty("workspaceId", src.workspaceId)
+                jsonObject.addProperty("displayName", src.displayName)
+                jsonObject.addProperty("id", src.id)
+            }
             null -> return JsonObject()
         }
         return jsonObject
@@ -214,6 +221,11 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 fileName = jsonObject.get("fileName")?.asString ?: "",
                 fileUri = Uri.parse(jsonObject.get("fileUri")?.asString),
                 fileSize = jsonObject.get("fileSize")?.asLong ?: 0L,
+                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
+            )
+            "SubWorkspaceLink" -> ContentItem.SubWorkspaceLink(
+                workspaceId = jsonObject.get("workspaceId")?.asString ?: "",
+                displayName = jsonObject.get("displayName")?.asString ?: "",
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             else -> ContentItem.TextItem("")

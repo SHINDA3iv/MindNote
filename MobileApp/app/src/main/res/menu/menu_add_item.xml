@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_add_text"
+        android:title="Текст"
+        android:icon="@drawable/ic_text" />
+    <item
+        android:id="@+id/menu_add_checkbox"
+        android:title="Чекбокс"
+        android:icon="@drawable/ic_checkbox" />
+    <item
+        android:id="@+id/menu_add_image"
+        android:title="Изображение"
+        android:icon="@drawable/ic_image" />
+    <item
+        android:id="@+id/menu_add_file"
+        android:title="Файл"
+        android:icon="@drawable/ic_file" />
+    <item
+        android:id="@+id/menu_add_numbered_list"
+        android:title="Нумерованный список"
+        android:icon="@drawable/ic_numbered_list" />
+    <item
+        android:id="@+id/menu_add_bullet_list"
+        android:title="Маркированный список"
+        android:icon="@drawable/ic_bullet_list" />
+    <item
+        android:id="@+id/menu_add_subworkspace"
+        android:title="Вложенное пространство"
+        android:icon="@drawable/ic_workspace" />
+</menu> 
