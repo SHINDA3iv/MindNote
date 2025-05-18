@@ -33,6 +33,12 @@ MainWidget::MainWidget(QWidget *parent) :
         initApplication();
     }
 
+    // Connect workspace controller signals
+    connect(_workspaceController.get(), &WorkspaceController::workspaceAdded, 
+            this, &MainWidget::workspaceAdded);
+    connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved, 
+            this, &MainWidget::workspaceRemoved);
+
     // initUI();
     // initConnections();
 }
@@ -271,17 +277,18 @@ void MainWidget::toggleSidebar()
 {
     _sidebarVisible = !_sidebarVisible;
     _leftPanel->setVisible(_sidebarVisible);
-    
+
     // Set the left panel size to zero when hiding the sidebar
     if (!_sidebarVisible) {
         // Save current width before hiding
         _lastPanelWidth = _mainSplitter->sizes().first();
-        _mainSplitter->setSizes(QList<int>{0, _mainSplitter->width()});
+        _mainSplitter->setSizes(QList<int> { 0, _mainSplitter->width() });
     } else {
         // Restore last known width when showing
-        _mainSplitter->setSizes(QList<int>{_lastPanelWidth, _mainSplitter->width() - _lastPanelWidth});
+        _mainSplitter->setSizes(
+         QList<int> { _lastPanelWidth, _mainSplitter->width() - _lastPanelWidth });
     }
-    
+
     emit statusMessage(_sidebarVisible ? "Sidebar shown" : "Sidebar hidden");
 }
 
@@ -368,4 +375,11 @@ void MainWidget::logout()
 {
     _authManager->logout();
     updateAuthUI();
+}
+
+void MainWidget::updateWorkspaceList()
+{
+    if (auto leftPanel = findChild<LeftPanel *>()) {
+        leftPanel->updateWorkspaceList();
+    }
 }

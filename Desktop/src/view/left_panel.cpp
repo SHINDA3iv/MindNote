@@ -8,6 +8,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QTreeWidget>
+#include <QListWidgetItem>
 
 LeftPanel::LeftPanel(QWidget *parent) :
     QWidget(parent),
@@ -136,40 +137,56 @@ void LeftPanel::onCreateSubWorkspace()
     if (!item || !_workspaceController) return;
     Workspace* parent = static_cast<Workspace*>(item->data(0, Qt::UserRole).value<void*>());
     if (!parent) return;
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("Создать подпространство"));
-    QVBoxLayout layout(&dialog);
-    QLineEdit nameEdit;
-    nameEdit.setPlaceholderText(tr("Имя подпространства"));
-    layout.addWidget(&nameEdit);
-    QPushButton chooseIconButton(tr("Выбрать иконку"));
-    layout.addWidget(&chooseIconButton);
-    QLabel iconLabel;
-    iconLabel.setPixmap(QPixmap());
-    iconLabel.setAlignment(Qt::AlignCenter);
-    layout.addWidget(&iconLabel);
+
+    QDialog *dialog = new QDialog(this);
+    dialog->setWindowTitle(tr("Создание нового подпространства"));
+
+    QVBoxLayout *dialogLayout = new QVBoxLayout(dialog);
+
+    QLineEdit *nameEdit = new QLineEdit(dialog);
+    nameEdit->setPlaceholderText(tr("Введите имя нового подпространства"));
+    dialogLayout->addWidget(nameEdit);
+
+    QPushButton *chooseIconButton = new QPushButton(tr("Выбрать иконку"), dialog);
+    dialogLayout->addWidget(chooseIconButton);
+
+    QLabel *iconLabel = new QLabel(dialog);
+    iconLabel->setPixmap(QPixmap());
+    iconLabel->setAlignment(Qt::AlignCenter);
+    dialogLayout->addWidget(iconLabel);
+
     QIcon selectedIcon;
-    QObject::connect(&chooseIconButton, &QPushButton::clicked, [&]() {
-        QString iconPath = QFileDialog::getOpenFileName(this, tr("Выберите иконку"), QString(), tr("Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"));
+
+    connect(chooseIconButton, &QPushButton::clicked, [this, iconLabel, &selectedIcon]() {
+        QString iconPath = QFileDialog::getOpenFileName(this, tr("Выберите иконку"), QString(),
+                                                      tr("Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"));
         if (!iconPath.isEmpty()) {
             selectedIcon = QIcon(iconPath);
-            iconLabel.setPixmap(selectedIcon.pixmap(64, 64));
+            iconLabel->setPixmap(selectedIcon.pixmap(64, 64));
         }
     });
-    QPushButton createButton(tr("Создать"));
-    layout.addWidget(&createButton);
-    QObject::connect(&createButton, &QPushButton::clicked, [&]() {
-        QString subName = nameEdit.text();
+
+    QPushButton *createButton = new QPushButton(tr("Создать подпространство"), dialog);
+    dialogLayout->addWidget(createButton);
+
+    connect(createButton, &QPushButton::clicked, [this, dialog, nameEdit, &selectedIcon, parent]() {
+        QString subName = nameEdit->text();
         if (subName.isEmpty() || parent->hasSubWorkspaceWithName(subName)) {
-            QMessageBox::warning(&dialog, tr("Ошибка"), tr("Подпространство с таким именем уже есть."));
+            QMessageBox::warning(dialog, tr("Ошибка"), tr("Подпространство с таким именем уже существует."));
             return;
         }
-        Workspace* sub = _workspaceController->createSubWorkspace(parent, subName);
-        if (sub && !selectedIcon.isNull()) sub->setIcon(selectedIcon);
+
+        Workspace *sub = _workspaceController->createSubWorkspace(parent, subName);
+        if (sub && !selectedIcon.isNull()) {
+            sub->setIcon(selectedIcon);
+        }
+
         refreshWorkspaceList();
-        dialog.accept();
+        dialog->accept();
     });
-    dialog.exec();
+
+    dialog->exec();
+    dialog->deleteLater();
 }
 
 void LeftPanel::showContextMenu(const QPoint &pos)
@@ -178,24 +195,29 @@ void LeftPanel::showContextMenu(const QPoint &pos)
     if (!item || !_workspaceController) return;
     Workspace* workspace = static_cast<Workspace*>(item->data(0, Qt::UserRole).value<void*>());
     if (!workspace) return;
+
     QMenu contextMenu(this);
-    QAction* addSubAction = contextMenu.addAction("Добавить страницу");
+    
+    QAction* addSubAction = contextMenu.addAction(tr("Добавить подпространство"));
+    addSubAction->setIcon(QIcon::fromTheme("folder-new"));
     connect(addSubAction, &QAction::triggered, this, &LeftPanel::onCreateSubWorkspace);
-    QAction *renameAction = contextMenu.addAction("Переименовать");
+
+    QAction *renameAction = contextMenu.addAction(tr("Переименовать"));
     renameAction->setIcon(QIcon::fromTheme("edit-rename"));
 
-    QAction *changeIconAction = contextMenu.addAction("Изменить иконку");
+    QAction *changeIconAction = contextMenu.addAction(tr("Изменить иконку"));
     changeIconAction->setIcon(QIcon::fromTheme("image-x-generic"));
 
-    QAction *deleteAction = contextMenu.addAction("Удалить");
-    deleteAction->setIcon(QIcon::fromTheme("edit-delete"));
+    QAction *deleteAction = contextMenu.addAction(tr("Удалить"));
     deleteAction->setIcon(QIcon::fromTheme("edit-delete"));
 
-    // Соединяем действия
     connect(renameAction, &QAction::triggered, [this, workspace, item]() {
         bool ok;
-        QString newName = QInputDialog::getText(
-         this, "Переименовать", "Новое название:", QLineEdit::Normal, workspace->getName(), &ok);
+        QString newName = QInputDialog::getText(this, tr("Переименовать"), 
+                                              tr("Новое название:"), 
+                                              QLineEdit::Normal, 
+                                              workspace->getName(), 
+                                              &ok);
         if (ok && !newName.isEmpty()) {
             workspace->setName(newName);
             item->setText(0, newName);
@@ -203,8 +225,8 @@ void LeftPanel::showContextMenu(const QPoint &pos)
     });
 
     connect(changeIconAction, &QAction::triggered, [this, workspace]() {
-        QString iconPath = QFileDialog::getOpenFileName(this, "Выберите иконку", "",
-                                                        "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
+        QString iconPath = QFileDialog::getOpenFileName(this, tr("Выберите иконку"), "",
+                                                      tr("Images (*.png *.jpg *.jpeg *.bmp *.gif)"));
         if (!iconPath.isEmpty()) {
             workspace->setIcon(QIcon(iconPath));
             refreshWorkspaceList();
@@ -212,9 +234,9 @@ void LeftPanel::showContextMenu(const QPoint &pos)
     });
 
     connect(deleteAction, &QAction::triggered, [this, workspace]() {
-        if (QMessageBox::question(this, "Подтверждение",
-                                  "Вы уверены, что хотите удалить это пространство?",
-                                  QMessageBox::Yes | QMessageBox::No)
+        if (QMessageBox::question(this, tr("Подтверждение"),
+                                tr("Вы уверены, что хотите удалить это пространство?"),
+                                QMessageBox::Yes | QMessageBox::No)
             == QMessageBox::Yes) {
             _workspaceController->removeWorkspace(workspace);
             refreshWorkspaceList();
@@ -222,4 +244,65 @@ void LeftPanel::showContextMenu(const QPoint &pos)
     });
 
     contextMenu.exec(_workspaceTree->viewport()->mapToGlobal(pos));
+}
+
+void LeftPanel::updateWorkspaceList()
+{
+    if (!_workspaceController) return;
+    
+    _workspaceTree->clear();
+    QSize iconSize(32, 32);
+    _workspaceTree->setIconSize(iconSize);
+    
+    // Add root workspaces
+    for (Workspace *ws : _workspaceController->getRootWorkspaces()) {
+        QTreeWidgetItem *item = new QTreeWidgetItem(_workspaceTree);
+        item->setText(0, ws->getName());
+        item->setData(0, Qt::UserRole, QVariant::fromValue(ws));
+        
+        // Set icon
+        if (!ws->getIcon()->pixmap().isNull()) {
+            QPixmap pixmap = ws->getIcon()->pixmap();
+            QPixmap paddedPixmap(iconSize.width() + 8, iconSize.height() + 8);
+            paddedPixmap.fill(Qt::transparent);
+            QPixmap scaledPixmap = pixmap.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            QPainter painter(&paddedPixmap);
+            painter.drawPixmap(4, 4, scaledPixmap);
+            item->setIcon(0, QIcon(paddedPixmap));
+        } else {
+            // Set default icon
+            item->setIcon(0, QIcon(":/icons/workspace.png"));
+        }
+        
+        // Add subworkspaces recursively
+        addSubWorkspacesToTree(item, ws);
+    }
+    _workspaceTree->expandAll();
+}
+
+void LeftPanel::addSubWorkspacesToTree(QTreeWidgetItem *parentItem, Workspace *parentWorkspace)
+{
+    for (Workspace *sub : parentWorkspace->getSubWorkspaces()) {
+        QTreeWidgetItem *item = new QTreeWidgetItem(parentItem);
+        item->setText(0, sub->getName());
+        item->setData(0, Qt::UserRole, QVariant::fromValue(sub));
+        
+        // Set icon
+        if (!sub->getIcon()->pixmap().isNull()) {
+            QPixmap pixmap = sub->getIcon()->pixmap();
+            QSize iconSize = _workspaceTree->iconSize();
+            QPixmap paddedPixmap(iconSize.width() + 8, iconSize.height() + 8);
+            paddedPixmap.fill(Qt::transparent);
+            QPixmap scaledPixmap = pixmap.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            QPainter painter(&paddedPixmap);
+            painter.drawPixmap(4, 4, scaledPixmap);
+            item->setIcon(0, QIcon(paddedPixmap));
+        } else {
+            // Set default icon
+            item->setIcon(0, QIcon(":/icons/workspace.png"));
+        }
+        
+        // Recursively add subworkspaces
+        addSubWorkspacesToTree(item, sub);
+    }
 }

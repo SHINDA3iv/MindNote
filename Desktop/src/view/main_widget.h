@@ -52,8 +52,13 @@ public:
     void logout();
 
 signals:
-    void authStateChanged();
     void statusMessage(const QString &message);
+    void authStateChanged();
+    void workspaceAdded(Workspace *workspace);
+    void workspaceRemoved(Workspace *workspace);
+
+public slots:
+    void updateWorkspaceList();
 
 private slots:
     void onLogout();

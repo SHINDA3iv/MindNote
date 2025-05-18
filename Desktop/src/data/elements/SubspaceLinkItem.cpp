@@ -21,13 +21,16 @@ SubspaceLinkItem::SubspaceLinkItem(Workspace* subspace, Workspace* parent)
 QJsonObject SubspaceLinkItem::serialize() const {
     QJsonObject json;
     json["type"] = type();
-    json["subspaceId"] = _subspaceId;
+    json["subspaceId"] = _linkedWorkspace ? _linkedWorkspace->getId() : _subspaceId;
+    json["subspaceName"] = _linkedWorkspace ? _linkedWorkspace->getName() : "[Подпространство]";
     return json;
 }
 
 void SubspaceLinkItem::deserialize(const QJsonObject& json) {
     if (json.contains("subspaceId")) {
         _subspaceId = json["subspaceId"].toString();
+        QString name = json.contains("subspaceName") ? json["subspaceName"].toString() : "[Подпространство]";
+        _linkButton->setText(name);
         // _linkedWorkspace будет установлен в контроллере после загрузки всех пространств
     }
 }
@@ -35,7 +38,12 @@ void SubspaceLinkItem::deserialize(const QJsonObject& json) {
 Workspace* SubspaceLinkItem::getLinkedWorkspace() const {
     return _linkedWorkspace;
 }
+
 void SubspaceLinkItem::setLinkedWorkspace(Workspace* newLinkedWorkspace)
 {
     _linkedWorkspace = newLinkedWorkspace;
+    if (_linkedWorkspace) {
+        _subspaceId = _linkedWorkspace->getId();
+        _linkButton->setText(_linkedWorkspace->getName());
+    }
 }

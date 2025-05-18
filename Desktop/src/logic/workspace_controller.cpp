@@ -1,6 +1,9 @@
 #include "workspace_controller.h"
 #include <QUuid>
 #include "../data/elements/SubspaceLinkItem.h"
+#include <QDebug>
+#include <QInputDialog>
+#include <QLineEdit>
 
 WorkspaceController::WorkspaceController(std::shared_ptr<LocalStorage> localStorage,
                                          QObject *parent) :
@@ -8,6 +11,26 @@ WorkspaceController::WorkspaceController(std::shared_ptr<LocalStorage> localStor
     _localStorage(localStorage)
 {
     loadWorkspaces();
+    
+    // Connect signals from loaded workspaces
+    for (Workspace *ws : _workspaces) {
+        connect(ws, &Workspace::addSubspaceRequested, this, [this, ws]() {
+            handleAddSubspaceRequest(ws);
+        });
+    }
+}
+
+void WorkspaceController::handleAddSubspaceRequest(Workspace *parent)
+{
+    if (!parent) return;
+    
+    bool ok;
+    QString name = QInputDialog::getText(nullptr, "Новое подпространство",
+                                       "Введите название подпространства:",
+                                       QLineEdit::Normal, "", &ok);
+    if (ok && !name.isEmpty()) {
+        createSubWorkspace(parent, name);
+    }
 }
 
 Workspace *WorkspaceController::createWorkspace(const QString &name, const QString &id)
@@ -20,6 +43,7 @@ Workspace *WorkspaceController::createWorkspace(const QString &name, const QStri
     workspace->setIcon(QIcon(":/icons/workspace.png"));
 
     _workspaces.append(workspace);
+    emit workspaceAdded(workspace);
 
     // Сохраняем изменения
     saveWorkspaces();
@@ -34,6 +58,7 @@ void WorkspaceController::removeWorkspace(Workspace *workspace)
 
     QString workspaceId = workspace->property("id").toString();
     _workspaces.removeOne(workspace);
+    emit workspaceRemoved(workspace);
     delete workspace;
 
     // Удаляем связанные элементы
@@ -73,6 +98,7 @@ WorkspaceController::createSubWorkspace(Workspace *parent, const QString &name, 
     sub->setId(subId);
     parent->addSubWorkspace(sub);
     _workspaces.append(sub);
+    emit workspaceAdded(sub);
     // Добавляем ссылку-элемент в список элементов родителя
     auto *linkItem = new SubspaceLinkItem(sub, parent);
     QObject::connect(linkItem, &SubspaceLinkItem::subspaceLinkClicked, parent,
@@ -105,9 +131,10 @@ QJsonObject WorkspaceController::serialize() const
 {
     QJsonObject json;
     QJsonArray workspacesArray;
+    
+    // Save all workspaces
     for (const Workspace *ws : _workspaces) {
-        if (!ws->getParentWorkspace())
-            workspacesArray.append(ws->serialize());
+        workspacesArray.append(ws->serialize());
     }
     json["workspaces"] = workspacesArray;
     return json;
@@ -119,58 +146,60 @@ void WorkspaceController::deserialize(const QJsonObject &json)
     _workspaces.clear();
     QMap<QString, Workspace *> idMap;
     QList<QPair<SubspaceLinkItem *, QString>> linkItemsToFix;
+
     if (json.contains("workspaces")) {
         QJsonArray arr = json["workspaces"].toArray();
-        std::function<Workspace *(const QJsonObject &, Workspace *)> loadTree =
-         [&](const QJsonObject &obj, Workspace *parent) -> Workspace * {
+        
+        // First pass: Create all workspaces
+        for (const QJsonValue &val : arr) {
+            QJsonObject obj = val.toObject();
             QString name = obj["name"].toString();
             QString id = obj["id"].toString();
+            
             Workspace *ws = new Workspace(name);
             ws->setId(id);
-            ws->setParentWorkspace(parent);
-            ws->deserialize(obj);
             idMap[id] = ws;
             _workspaces.append(ws);
-            // Восстанавливаем SubspaceLinkItem
-            if (parent) {
-                for (const AbstractWorkspaceItem *item : ws->getItems()) {
-                    if (item->type() == "SubspaceLinkItem") {
-                        auto *link =
-                         static_cast<SubspaceLinkItem *>(const_cast<AbstractWorkspaceItem *>(item));
-                        linkItemsToFix.append({ link, link->serialize()["subspaceId"].toString() });
-                        QObject::connect(link, &SubspaceLinkItem::subspaceLinkClicked, parent,
-                                         &Workspace::subWorkspaceClicked);
+            
+            qDebug() << "Created workspace:" << name << "ID:" << id;
+        }
+        
+        // Second pass: Set up parent-child relationships and deserialize content
+        for (const QJsonValue &val : arr) {
+            QJsonObject obj = val.toObject();
+            QString id = obj["id"].toString();
+            QString parentId = obj["parentId"].toString();
+            
+            Workspace *ws = idMap[id];
+            if (!parentId.isEmpty() && idMap.contains(parentId)) {
+                Workspace *parent = idMap[parentId];
+                ws->setParentWorkspace(parent);
+                parent->addSubWorkspace(ws);
+                
+                qDebug() << "Setting up relationship:" 
+                         << "Child:" << ws->getName() 
+                         << "Parent:" << parent->getName();
+            }
+            
+            // Deserialize workspace content
+            ws->deserialize(obj);
+            
+            // Handle SubspaceLinkItem connections
+            for (const AbstractWorkspaceItem *item : ws->getItems()) {
+                if (item->type() == "SubspaceLinkItem") {
+                    auto *link = static_cast<SubspaceLinkItem *>(const_cast<AbstractWorkspaceItem *>(item));
+                    QString subspaceId = link->serialize()["subspaceId"].toString();
+                    if (idMap.contains(subspaceId)) {
+                        link->setLinkedWorkspace(idMap[subspaceId]);
+                        QObject::connect(link, &SubspaceLinkItem::subspaceLinkClicked, 
+                                       ws, &Workspace::subWorkspaceClicked);
+                        
+                        qDebug() << "Setting up link:" 
+                                << "From:" << ws->getName()
+                                << "To:" << idMap[subspaceId]->getName();
                     }
                 }
             }
-            if (obj.contains("subWorkspaces")) {
-                QJsonArray subArr = obj["subWorkspaces"].toArray();
-                for (const QJsonValue &subVal : subArr) {
-                    QString subId = subVal.toString();
-                    // subWorkspaces будут добавлены после обхода всех
-                }
-            }
-            return ws;
-        };
-        for (const QJsonValue &val : arr) {
-            loadTree(val.toObject(), nullptr);
-        }
-        // Второй проход: связываем subWorkspaces
-        for (Workspace *ws : _workspaces) {
-            QJsonObject obj = ws->serialize();
-            if (obj.contains("subWorkspaces")) {
-                QJsonArray subArr = obj["subWorkspaces"].toArray();
-                for (const QJsonValue &subVal : subArr) {
-                    QString subId = subVal.toString();
-                    if (idMap.contains(subId))
-                        ws->addSubWorkspace(idMap[subId]);
-                }
-            }
-        }
-        // Связываем SubspaceLinkItem с Workspace
-        for (auto &pair : linkItemsToFix) {
-            if (idMap.contains(pair.second))
-                pair.first->setLinkedWorkspace(idMap[pair.second]);
         }
     }
 }
@@ -202,15 +231,12 @@ void WorkspaceController::saveWorkspaces()
 
     for (Workspace *workspace : _workspaces) {
         QJsonObject workspaceObj = workspace->serialize();
-        workspaceObj["id"] = workspace->property("id").toString();
         workspacesArray.append(workspaceObj);
-
-        // Сохраняем элементы рабочего пространства
-        QJsonArray itemsArray;
-        for (AbstractWorkspaceItem *item : workspace->getItems()) {
-            itemsArray.append(item->serialize());
-        }
-        _localStorage->saveWorkspaceItems(workspace->property("id").toString(), itemsArray);
+        
+        qDebug() << "Saving workspace:" << workspace->getName() 
+                 << "ID:" << workspace->getId()
+                 << "Parent:" << (workspace->getParentWorkspace() ? workspace->getParentWorkspace()->getId() : "none")
+                 << "Subworkspaces:" << workspace->getSubWorkspaces().size();
     }
 
     _localStorage->saveWorkspaces(workspacesArray);
@@ -219,17 +245,57 @@ void WorkspaceController::saveWorkspaces()
 void WorkspaceController::loadWorkspaces()
 {
     QJsonArray workspacesArray = _localStorage->loadWorkspaces();
+    QMap<QString, Workspace*> idMap;
 
+    // First pass: Create all workspaces
     for (const QJsonValue &workspaceVal : workspacesArray) {
         QJsonObject workspaceObj = workspaceVal.toObject();
         QString name = workspaceObj["name"].toString();
         QString id = workspaceObj["id"].toString();
+        
+        Workspace *workspace = new Workspace(name);
+        workspace->setId(id);
+        idMap[id] = workspace;
+        _workspaces.append(workspace);
+        
+        qDebug() << "Created workspace:" << name << "ID:" << id;
+    }
 
-        Workspace *workspace = createWorkspace(name, id);
+    // Second pass: Set up parent-child relationships and deserialize content
+    for (const QJsonValue &workspaceVal : workspacesArray) {
+        QJsonObject workspaceObj = workspaceVal.toObject();
+        QString id = workspaceObj["id"].toString();
+        QString parentId = workspaceObj["parentId"].toString();
+        
+        Workspace *workspace = idMap[id];
+        if (!parentId.isEmpty() && idMap.contains(parentId)) {
+            Workspace *parent = idMap[parentId];
+            workspace->setParentWorkspace(parent);
+            parent->addSubWorkspace(workspace);
+            
+            qDebug() << "Setting up relationship:" 
+                     << "Child:" << workspace->getName() 
+                     << "Parent:" << parent->getName();
+        }
+        
+        // Deserialize workspace content
         workspace->deserialize(workspaceObj);
-
-        // Загружаем элементы рабочего пространства
-        QJsonArray itemsArray = _localStorage->loadWorkspaceItems(id);
-        workspace->deserializeItems(itemsArray);
+        
+        // Handle SubspaceLinkItem connections
+        for (const AbstractWorkspaceItem *item : workspace->getItems()) {
+            if (item->type() == "SubspaceLinkItem") {
+                auto *link = static_cast<SubspaceLinkItem *>(const_cast<AbstractWorkspaceItem *>(item));
+                QString subspaceId = link->serialize()["subspaceId"].toString();
+                if (idMap.contains(subspaceId)) {
+                    link->setLinkedWorkspace(idMap[subspaceId]);
+                    QObject::connect(link, &SubspaceLinkItem::subspaceLinkClicked, 
+                                   workspace, &Workspace::subWorkspaceClicked);
+                    
+                    qDebug() << "Setting up link:" 
+                            << "From:" << workspace->getName()
+                            << "To:" << idMap[subspaceId]->getName();
+                }
+            }
+        }
     }
 }

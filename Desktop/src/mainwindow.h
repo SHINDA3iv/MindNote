@@ -28,6 +28,7 @@ private slots:
     void updateAuthMenu();
     void onLoginRequested();
     void onLogoutRequested();
+    void updateWorkspaceList();
 
 private:
     void createMenus();

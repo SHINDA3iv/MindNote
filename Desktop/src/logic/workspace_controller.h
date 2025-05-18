@@ -19,6 +19,11 @@ public:
     explicit WorkspaceController(std::shared_ptr<LocalStorage> localStorage,
                                  QObject *parent = nullptr);
 
+    signals:
+    void workspaceAdded(Workspace *workspace);
+    void workspaceRemoved(Workspace *workspace);
+
+public:
     // Создание нового рабочего пространства
     Workspace *createWorkspace(const QString &name, const QString &id = QString());
     // Удаление рабочего пространства
@@ -50,6 +55,9 @@ public:
     Workspace* createSubWorkspace(Workspace* parent, const QString& name, const QString& id = QString());
     QList<Workspace*> getRootWorkspaces() const;
     Workspace* findWorkspaceById(const QString& id) const;
+
+private slots:
+    void handleAddSubspaceRequest(Workspace *parent);
 
 private:
     QList<Workspace *> _workspaces;

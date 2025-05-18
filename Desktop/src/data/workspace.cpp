@@ -13,6 +13,7 @@
 #include <QIcon>
 #include <QFileDialog>
 #include <QPushButton>
+#include <QDebug>
 
 Workspace::Workspace(const QString &name, QWidget *parent) :
     QWidget(parent),
@@ -94,6 +95,10 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     toolMenu->addAction(QIcon::fromTheme("file"), "Добавить файл", this, [this]() {
         emit addItemByType("FileItem");
     });
+    toolMenu->addSeparator();
+    toolMenu->addAction(QIcon::fromTheme("folder"), "Добавить подпространство", this, [this]() {
+        emit addSubspaceRequested();
+    });
 
     menuButton->setMenu(toolMenu);
     menuButton->setPopupMode(QToolButton::InstantPopup);
@@ -141,38 +146,38 @@ void Workspace::setIcon(const QIcon &icon)
     _iconLabel->setPixmap(icon.pixmap(32, 32));
 }
 
-void Workspace::addItemByType(const QString &type)
-{
-    AbstractWorkspaceItem *item = nullptr;
+// void Workspace::addItemByType(const QString &type)
+// {
+//     AbstractWorkspaceItem *item = nullptr;
 
-    if (type == "TextItem") {
-        item = new TextItem("Текст", this);
-    } else if (type == "CheckboxItem") {
-        item = new CheckboxItem("Задача", this);
-    } else if (type == "OrderedListItem") {
-        ListItem *list = new ListItem(ListItem::Ordered, this);
-        item = list;
-    } else if (type == "UnorderedListItem") {
-        ListItem *list = new ListItem(ListItem::Unordered, this);
-        item = list;
-    } else if (type == "ImageItem") {
-        QString imagePath = QFileDialog::getOpenFileName(this, "Выберите изображение", "",
-                                                         "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
-        if (!imagePath.isEmpty()) {
-            item = new ImageItem(imagePath, this);
-        }
-    } else if (type == "FileItem") {
-        QString filePath =
-         QFileDialog::getOpenFileName(this, "Выберите файл", "", "All Files (*.*)");
-        if (!filePath.isEmpty()) {
-            item = new FileItem(filePath, this);
-        }
-    }
+//     if (type == "TextItem") {
+//         item = new TextItem("Текст", this);
+//     } else if (type == "CheckboxItem") {
+//         item = new CheckboxItem("Задача", this);
+//     } else if (type == "OrderedListItem") {
+//         ListItem *list = new ListItem(ListItem::Ordered, this);
+//         item = list;
+//     } else if (type == "UnorderedListItem") {
+//         ListItem *list = new ListItem(ListItem::Unordered, this);
+//         item = list;
+//     } else if (type == "ImageItem") {
+//         QString imagePath = QFileDialog::getOpenFileName(this, "Выберите изображение", "",
+//                                                          "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
+//         if (!imagePath.isEmpty()) {
+//             item = new ImageItem(imagePath, this);
+//         }
+//     } else if (type == "FileItem") {
+//         QString filePath =
+//          QFileDialog::getOpenFileName(this, "Выберите файл", "", "All Files (*.*)");
+//         if (!filePath.isEmpty()) {
+//             item = new FileItem(filePath, this);
+//         }
+//     }
 
-    if (item) {
-        addItem(item);
-    }
-}
+//     if (item) {
+//         addItem(item);
+//     }
+// }
 
 QString Workspace::getName() const
 {
@@ -226,12 +231,19 @@ QJsonObject Workspace::serialize() const
     json["name"] = _workspaceName;
     json["id"] = _id;
     json["parentId"] = _parentWorkspace ? _parentWorkspace->getId() : "";
-    QJsonArray subArray;
-    for (const Workspace *sub : _subWorkspaces) subArray.append(sub->getId());
-    json["subWorkspaces"] = subArray;
+    
+    // Save items
     QJsonArray itemArray;
-    for (const AbstractWorkspaceItem *item : _items) itemArray.append(item->serialize());
+    for (const AbstractWorkspaceItem *item : _items) {
+        itemArray.append(item->serialize());
+    }
     json["items"] = itemArray;
+    
+    qDebug() << "Serializing workspace:" << _workspaceName 
+             << "ID:" << _id 
+             << "Parent:" << (_parentWorkspace ? _parentWorkspace->getId() : "none")
+             << "Items:" << _items.size();
+             
     return json;
 }
 

@@ -26,12 +26,15 @@ signals:
 public slots:
     void onCreateWorkspace();
     void onCreateSubWorkspace();
+    void updateWorkspaceList();
 
 private slots:
     void onWorkspaceClicked(QTreeWidgetItem *item);
     void showContextMenu(const QPoint &pos);
 
 private:
+    void addSubWorkspacesToTree(QTreeWidgetItem *parentItem, Workspace *parentWorkspace);
+    
     QTreeWidget *_workspaceTree;
     WorkspaceController *_workspaceController { nullptr };
 };

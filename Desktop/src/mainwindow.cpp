@@ -12,6 +12,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QListWidgetItem>
+#include <QVariant>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
@@ -29,6 +31,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     });
 
     showMaximized();
+
+    // Connect workspace controller signals
+    connect(_mainWidget.get(), &MainWidget::workspaceAdded, this, &MainWindow::updateWorkspaceList);
+    connect(_mainWidget.get(), &MainWidget::workspaceRemoved, this, &MainWindow::updateWorkspaceList);
 }
 
 MainWindow::~MainWindow()
@@ -246,5 +252,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
         }
     } else {
         event->accept();
+    }
+}
+
+void MainWindow::updateWorkspaceList()
+{
+    if (_mainWidget) {
+        _mainWidget->updateWorkspaceList();
     }
 }
