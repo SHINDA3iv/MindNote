@@ -14,6 +14,7 @@
 #include <QFileDialog>
 #include <QPushButton>
 #include <QDebug>
+#include <QBuffer>
 
 Workspace::Workspace(const QString &name, QWidget *parent) :
     QWidget(parent),
@@ -234,6 +235,15 @@ QJsonObject Workspace::serialize() const
     json["id"] = _id;
     json["parentId"] = _parentWorkspace ? _parentWorkspace->getId() : "";
     
+    // Save icon if it exists
+    if (!_iconLabel->pixmap().isNull()) {
+        QByteArray iconData;
+        QBuffer buffer(&iconData);
+        buffer.open(QIODevice::WriteOnly);
+        _iconLabel->pixmap().save(&buffer, "PNG");
+        json["icon"] = QString(iconData.toBase64());
+    }
+    
     // Save items
     QJsonArray itemArray;
     for (const AbstractWorkspaceItem *item : _items) {
@@ -256,6 +266,17 @@ void Workspace::deserialize(const QJsonObject &json)
     if (json.contains("id"))
         setId(json["id"].toString());
     // parentId и subWorkspaces обрабатываются в контроллере
+    
+    // Load icon if it exists
+    if (json.contains("icon")) {
+        QByteArray iconData = QByteArray::fromBase64(json["icon"].toString().toUtf8());
+        QPixmap iconPixmap;
+        iconPixmap.loadFromData(iconData, "PNG");
+        if (!iconPixmap.isNull()) {
+            setIcon(QIcon(iconPixmap));
+        }
+    }
+    
     if (json.contains("items")) {
         QJsonArray itemArray = json["items"].toArray();
         for (const QJsonValue &itemVal : itemArray) {
