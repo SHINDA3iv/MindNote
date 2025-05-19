@@ -53,95 +53,125 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toolbarAddButton: MenuItem
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("StartAppTag", "Starting MainActivity.onCreate")
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        enableEdgeToEdge()
-        drawerLayout = binding.drawerLayout
-        navigationView = binding.navView
-        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
+        Log.d("StartAppTag", "Super.onCreate called")
         
-        // Инициализируем ViewModel
-        viewModel.init(applicationContext)
-        
-        // Настройка Toolbar
-        setSupportActionBar(binding.toolbar)
-
-        // Настройка навигации
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        navController = navHostFragment.navController
-
-        // Настройка боковой панели
-        appBarConfiguration = AppBarConfiguration(
-            setOf(R.id.workspaceDetailFragment),
-            binding.drawerLayout
-        )
-
-        setupActionBarWithNavController(navController, appBarConfiguration)
-        binding.navView.setupWithNavController(navController)
-
-        // Инициализация фрагмента боковой панели
-        navigationDrawerFragment = NavigationDrawerFragment()
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.nav_view, navigationDrawerFragment)
-            .commit()
-
-        // Настройка кнопки создания пространства
-        binding.navView.getHeaderView(0)
-            .findViewById<com.google.android.material.button.MaterialButton>(R.id.button_create_workspace)
-            .setOnClickListener {
-                navigationDrawerFragment.showCreateWorkspaceDialog()
+        try {
+            Log.d("StartAppTag", "Initializing binding")
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+            Log.d("StartAppTag", "Binding initialized and content view set")
+            
+            enableEdgeToEdge()
+            Log.d("StartAppTag", "Edge to edge enabled")
+            
+            drawerLayout = binding.drawerLayout
+            navigationView = binding.navView
+            Log.d("StartAppTag", "Drawer layout and navigation view initialized")
+            
+            Log.d("StartAppTag", "Initializing ViewModel")
+            viewModel = ViewModelProvider(this)[MainViewModel::class.java]
+            viewModel.init(applicationContext)
+            Log.d("StartAppTag", "ViewModel initialized")
+            
+            Log.d("StartAppTag", "Initializing WorkspaceRepository")
+            workspaceRepository = WorkspaceRepository.getInstance(applicationContext)
+            Log.d("StartAppTag", "WorkspaceRepository initialized")
+            
+            // Create default workspace if none exists
+            if (workspaceRepository.workspaces.value.isNullOrEmpty()) {
+                Log.d("StartAppTag", "No workspaces found, creating default workspace")
+                val defaultWorkspace = workspaceRepository.createWorkspace("Default Workspace")
+                viewModel.setCurrentWorkspace(defaultWorkspace)
             }
+            
+            Log.d("StartAppTag", "Setting up toolbar")
+            setSupportActionBar(binding.toolbar)
+            Log.d("StartAppTag", "Toolbar setup complete")
 
-        // Наблюдение за изменениями в списке пространств
-        workspaceRepository.workspaces.observe(this) { workspaces ->
-            navigationDrawerFragment.updateWorkspaceList(workspaces)
-        }
+            Log.d("StartAppTag", "Setting up navigation")
+            val navHostFragment = supportFragmentManager
+                .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+            navController = navHostFragment.navController
+            Log.d("StartAppTag", "Navigation controller initialized")
 
-        navigationView.setNavigationItemSelectedListener { menuItem ->
-            val workspaceName = menuItem.title.toString()
-            if (menuItem.itemId != -1) {
-                // Сохраняем текущее рабочее пространство перед переходом
-                viewModel.currentWorkspace.value?.let { currentWorkspace ->
-                    Log.d("MindNote", "Сохраняем текущее рабочее пространство '${currentWorkspace.name}' перед переходом из меню")
-                    viewModel.saveWorkspaces()
+            appBarConfiguration = AppBarConfiguration(
+                setOf(R.id.workspaceDetailFragment),
+                binding.drawerLayout
+            )
+            Log.d("StartAppTag", "AppBar configuration created")
+
+            setupActionBarWithNavController(navController, appBarConfiguration)
+            binding.navView.setupWithNavController(navController)
+            Log.d("StartAppTag", "Navigation setup complete")
+
+            Log.d("StartAppTag", "Initializing navigation drawer fragment")
+            navigationDrawerFragment = NavigationDrawerFragment()
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.nav_view, navigationDrawerFragment)
+                .commit()
+            Log.d("StartAppTag", "Navigation drawer fragment initialized")
+
+            Log.d("StartAppTag", "Setting up workspace creation button")
+            binding.navView.getHeaderView(0)
+                .findViewById<com.google.android.material.button.MaterialButton>(R.id.button_create_workspace)
+                .setOnClickListener {
+                    navigationDrawerFragment.showCreateWorkspaceDialog()
                 }
-                
-                openWorkspace(workspaceName)
-                drawerLayout.closeDrawer(GravityCompat.START)
-                true
-            } else {
-                false
+            Log.d("StartAppTag", "Workspace creation button setup complete")
+
+            Log.d("StartAppTag", "Setting up workspace list observer")
+            workspaceRepository.workspaces.observe(this) { workspaces ->
+                navigationDrawerFragment.updateWorkspaceList(workspaces)
             }
-        }
+            Log.d("StartAppTag", "Workspace list observer setup complete")
 
-        // Загрузка рабочих пространств
-        // viewModel.loadWorkspaces(this) (теперь loadWorkspaces вызывается при инициализации репозитория)
-
-        // Восстановление фрагмента если есть
-        if (savedInstanceState != null) {
-            val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
-            if (currentFragment is WorkspaceFragment) {
-                Log.d("MindNote", "Fragment restored after configuration change")
-            } else {
-                // Если фрагмент не найден и есть текущее рабочее пространство, откроем его
-                viewModel.currentWorkspace.value?.let { workspace ->
-                    Log.d("MindNote", "Reopening current workspace after configuration change")
-                    openWorkspace(workspace.name)
+            Log.d("StartAppTag", "Setting up navigation item selection listener")
+            navigationView.setNavigationItemSelectedListener { menuItem ->
+                val workspaceName = menuItem.title.toString()
+                if (menuItem.itemId != -1) {
+                    viewModel.currentWorkspace.value?.let { currentWorkspace ->
+                        Log.d("StartAppTag", "Saving current workspace '${currentWorkspace.name}' before navigation")
+                        viewModel.saveWorkspaces()
+                    }
+                    
+                    openWorkspace(workspaceName)
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    true
+                } else {
+                    false
                 }
             }
-        }
+            Log.d("StartAppTag", "Navigation item selection listener setup complete")
 
-        // Настраиваем периодическое автосохранение
-        lifecycleScope.launch {
-            while (true) {
-                delay(30000) // автосохранение каждые 30 секунд
-                launch(Dispatchers.IO) {
-                    viewModel.saveWorkspaces()
-                    Log.d("MindNote", "MainActivity: Auto-saved workspaces")
+            if (savedInstanceState != null) {
+                Log.d("StartAppTag", "Restoring state from savedInstanceState")
+                val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                if (currentFragment is WorkspaceFragment) {
+                    Log.d("StartAppTag", "WorkspaceFragment restored from saved state")
+                } else {
+                    viewModel.currentWorkspace.value?.let { workspace ->
+                        Log.d("StartAppTag", "Reopening current workspace '${workspace.name}' after configuration change")
+                        openWorkspace(workspace.name)
+                    }
                 }
             }
+
+            Log.d("StartAppTag", "Setting up auto-save coroutine")
+            lifecycleScope.launch {
+                while (true) {
+                    delay(30000)
+                    launch(Dispatchers.IO) {
+                        viewModel.saveWorkspaces()
+                        Log.d("StartAppTag", "Auto-saved workspaces")
+                    }
+                }
+            }
+            Log.d("StartAppTag", "MainActivity.onCreate completed successfully")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error in MainActivity.onCreate", e)
+            throw e
         }
     }
 

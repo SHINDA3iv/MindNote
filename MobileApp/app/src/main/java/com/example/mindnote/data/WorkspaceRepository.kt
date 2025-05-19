@@ -33,45 +33,50 @@ class WorkspaceRepository private constructor(private val context: Context) {
         .create()
     
     init {
-        Log.d("Repository", "LOADWWORK")
-        loadWorkspaces()
+        Log.d("StartAppTag", "Initializing WorkspaceRepository")
+        try {
+            loadWorkspaces()
+            Log.d("StartAppTag", "WorkspaceRepository initialized successfully")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error initializing WorkspaceRepository", e)
+            throw e
+        }
     }
     
     // Метод загрузки всех рабочих пространств
     fun loadWorkspaces() {
-        Log.d("Repository", "LOADINWORK")
+        Log.d("StartAppTag", "Loading workspaces from storage")
         try {
             val file = File(context.filesDir, "workspaces.json")
             if (file.exists()) {
                 val json = file.readText()
-                Log.d("Repository", "Loading workspaces: $json")
+                Log.d("StartAppTag", "Found workspaces file, size: ${json.length} bytes")
                 val type = object : TypeToken<List<Workspace>>() {}.type
-                Log.d("Repository", "Getting type")
                 val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type) ?: emptyList()
-                Log.d("Repository", "Getting gson")
                 _workspaces.postValue(loadedWorkspaces)
-                Log.d("Repository", "Loaded ${loadedWorkspaces.size} workspaces")
+                Log.d("StartAppTag", "Successfully loaded ${loadedWorkspaces.size} workspaces")
             } else {
                 _workspaces.postValue(emptyList())
-                Log.d("Repository", "No workspaces file found")
+                Log.d("StartAppTag", "No workspaces file found, initializing empty list")
             }
         } catch (e: Exception) {
-            Log.e("Repository", "Error loading workspaces", e)
+            Log.e("StartAppTag", "Error loading workspaces from main file", e)
             
-            // Пробуем восстановить из резервной копии
             try {
+                Log.d("StartAppTag", "Attempting to restore from backup")
                 val backupFile = File(context.filesDir, "workspaces_backup.json")
                 if (backupFile.exists()) {
                     val json = backupFile.readText()
                     val type = object : TypeToken<List<Workspace>>() {}.type
                     val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type) ?: emptyList()
                     _workspaces.postValue(loadedWorkspaces)
-                    Log.d("Repository", "Restored from backup: ${loadedWorkspaces.size} workspaces")
+                    Log.d("StartAppTag", "Successfully restored ${loadedWorkspaces.size} workspaces from backup")
                 } else {
                     _workspaces.postValue(emptyList())
+                    Log.d("StartAppTag", "No backup file found, initializing empty list")
                 }
             } catch (e2: Exception) {
-                Log.e("Repository", "Error restoring from backup", e2)
+                Log.e("StartAppTag", "Error restoring from backup", e2)
                 _workspaces.postValue(emptyList())
             }
         }
@@ -79,139 +84,172 @@ class WorkspaceRepository private constructor(private val context: Context) {
     
     // Метод сохранения всех рабочих пространств
     fun saveWorkspaces() {
+        Log.d("StartAppTag", "Saving workspaces to storage")
         try {
             val currentWorkspaces = _workspaces.value ?: emptyList()
-            Log.d("Repository", "Saving ${currentWorkspaces.size} workspaces")
+            Log.d("StartAppTag", "Preparing to save ${currentWorkspaces.size} workspaces")
             
-            // Создаем JSON
             val json = gson.toJson(currentWorkspaces)
             
-            // Сохраняем в основной файл
             val file = File(context.filesDir, "workspaces.json")
             file.writeText(json)
             
-            // Сохраняем резервную копию
             val backupFile = File(context.filesDir, "workspaces_backup.json")
             backupFile.writeText(json)
 
-            Log.d("repos1", currentWorkspaces.get(0).items.size.toString())
-            Log.d("repos1", currentWorkspaces.get(1).items.size.toString())
-            Log.d("Repository", "Workspaces saved successfully with backup")
+            Log.d("StartAppTag", "Successfully saved workspaces to main file and backup")
+            if (currentWorkspaces.isNotEmpty()) {
+                Log.d("StartAppTag", "First workspace has ${currentWorkspaces[0].items.size} items")
+                if (currentWorkspaces.size > 1) {
+                    Log.d("StartAppTag", "Second workspace has ${currentWorkspaces[1].items.size} items")
+                }
+            }
         } catch (e: Exception) {
-            Log.e("Repository", "Error saving workspaces", e)
+            Log.e("StartAppTag", "Error saving workspaces", e)
+            throw e
         }
     }
     
     // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
-        val workspace = Workspace(name, iconUri?.toString() ?: "")
-        val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
-        currentList.add(workspace)
-        _workspaces.postValue(currentList)
-        saveWorkspaces()
-        return workspace
+        Log.d("StartAppTag", "Creating new workspace: $name")
+        try {
+            val workspace = Workspace(name, iconUri?.toString() ?: "")
+            val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
+            currentList.add(workspace)
+            _workspaces.postValue(currentList)
+            saveWorkspaces()
+            Log.d("StartAppTag", "Successfully created new workspace: $name")
+            return workspace
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error creating workspace: $name", e)
+            throw e
+        }
     }
     
     // Обновление существующего рабочего пространства
     fun updateWorkspace(workspace: Workspace) {
-        val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
-        val index = currentList.indexOfFirst { it.id == workspace.id }
-        if (index != -1) {
-            currentList[index] = workspace
-            _workspaces.postValue(currentList)
-            saveWorkspaces()
+        Log.d("StartAppTag", "Updating workspace: ${workspace.name}")
+        try {
+            val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
+            val index = currentList.indexOfFirst { it.id == workspace.id }
+            if (index != -1) {
+                currentList[index] = workspace
+                _workspaces.postValue(currentList)
+                saveWorkspaces()
+                Log.d("StartAppTag", "Successfully updated workspace: ${workspace.name}")
+            } else {
+                Log.w("StartAppTag", "Workspace not found for update: ${workspace.name}")
+            }
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error updating workspace: ${workspace.name}", e)
+            throw e
         }
     }
     
     // Получение рабочего пространства по имени
     fun getWorkspaceByName(name: String): Workspace? {
-        return _workspaces.value?.find { it.name == name }
+        Log.d("StartAppTag", "Getting workspace by name: $name")
+        return try {
+            val workspace = _workspaces.value?.find { it.name == name }
+            if (workspace != null) {
+                Log.d("StartAppTag", "Found workspace: $name")
+            } else {
+                Log.d("StartAppTag", "Workspace not found: $name")
+            }
+            workspace
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error getting workspace by name: $name", e)
+            null
+        }
     }
     
     // Получение рабочего пространства по ID
     fun getWorkspaceById(id: String): Workspace? {
-        return _workspaces.value?.find { it.id == id }
+        Log.d("StartAppTag", "Getting workspace by ID: $id")
+        return try {
+            val workspace = _workspaces.value?.find { it.id == id }
+            if (workspace != null) {
+                Log.d("StartAppTag", "Found workspace with ID: $id")
+            } else {
+                Log.d("StartAppTag", "Workspace not found with ID: $id")
+            }
+            workspace
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error getting workspace by ID: $id", e)
+            null
+        }
     }
     
     // Добавление элемента содержимого в рабочее пространство
     fun addContentItem(workspace: Workspace, item: ContentItem) {
-        // Получаем актуальную версию из списка
-        val current = getWorkspaceById(workspace.id) ?: workspace
-        
-        // Добавляем элемент
-        current.addItem(item)
-        
-        // Обновляем рабочее пространство
-        updateWorkspace(current)
-        
-        Log.d("Repository", "Added item to workspace '${current.name}', now has ${current.items.size} items")
+        Log.d("StartAppTag", "Adding content item to workspace: ${workspace.name}")
+        try {
+            val current = getWorkspaceById(workspace.id) ?: workspace
+            current.addItem(item)
+            updateWorkspace(current)
+            Log.d("StartAppTag", "Successfully added item to workspace '${current.name}', now has ${current.items.size} items")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error adding content item to workspace: ${workspace.name}", e)
+            throw e
+        }
     }
     
     // Удаление элемента содержимого из рабочего пространства
     fun removeContentItem(workspace: Workspace, itemId: String) {
-        // Получаем актуальную версию из списка
-        val current = getWorkspaceById(workspace.id) ?: workspace
-        
-        // Находим элемент для удаления
-        val itemToRemove = current.items.find { item ->
-            when (item) {
-                is ContentItem.TextItem -> item.id == itemId
-                is ContentItem.CheckboxItem -> item.id == itemId
-                is ContentItem.NumberedListItem -> item.id == itemId
-                is ContentItem.BulletListItem -> item.id == itemId
-                is ContentItem.ImageItem -> item.id == itemId
-                is ContentItem.FileItem -> item.id == itemId
-                is ContentItem.SubWorkspaceLink -> item.id == itemId
+        Log.d("StartAppTag", "Removing content item from workspace: ${workspace.name}")
+        try {
+            val current = getWorkspaceById(workspace.id) ?: workspace
+            val itemToRemove = current.items.find { item ->
+                when (item) {
+                    is ContentItem.TextItem -> item.id == itemId
+                    is ContentItem.CheckboxItem -> item.id == itemId
+                    is ContentItem.NumberedListItem -> item.id == itemId
+                    is ContentItem.BulletListItem -> item.id == itemId
+                    is ContentItem.ImageItem -> item.id == itemId
+                    is ContentItem.FileItem -> item.id == itemId
+                    is ContentItem.SubWorkspaceLink -> item.id == itemId
+                }
             }
-        }
-        
-        // Удаляем элемент если найден
-        if (itemToRemove != null) {
-            current.removeItem(itemId)
-            updateWorkspace(current)
-            Log.d("Repository", "Removed item from workspace '${current.name}', now has ${current.items.size} items")
+            
+            if (itemToRemove != null) {
+                current.removeItem(itemId)
+                updateWorkspace(current)
+                Log.d("StartAppTag", "Successfully removed item from workspace '${current.name}', now has ${current.items.size} items")
+            } else {
+                Log.w("StartAppTag", "Item not found for removal in workspace: ${workspace.name}")
+            }
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error removing content item from workspace: ${workspace.name}", e)
+            throw e
         }
     }
     
     // Обновление элемента содержимого в рабочем пространстве
     fun updateContentItem(workspace: Workspace, updatedItem: ContentItem) {
-        // Получаем актуальную версию из списка
-        val current = getWorkspaceById(workspace.id) ?: workspace
-        
-        // Находим индекс элемента для обновления
-        val itemIndex = current.items.indexOfFirst { item ->
-            when (item) {
-                is ContentItem.TextItem -> 
-                    item.id == (updatedItem as? ContentItem.TextItem)?.id
-                is ContentItem.CheckboxItem -> 
-                    item.id == (updatedItem as? ContentItem.CheckboxItem)?.id
-                is ContentItem.NumberedListItem -> 
-                    item.id == (updatedItem as? ContentItem.NumberedListItem)?.id
-                is ContentItem.BulletListItem -> 
-                    item.id == (updatedItem as? ContentItem.BulletListItem)?.id
-                is ContentItem.ImageItem -> 
-                    item.id == (updatedItem as? ContentItem.ImageItem)?.id
-                is ContentItem.FileItem -> 
-                    item.id == (updatedItem as? ContentItem.FileItem)?.id
-                is ContentItem.SubWorkspaceLink -> 
-                    item.id == (updatedItem as? ContentItem.SubWorkspaceLink)?.id
-            }
-        }
-        
-        // Обновляем элемент если найден
-        if (itemIndex != -1) {
+        Log.d("StartAppTag", "Updating content item in workspace: ${workspace.name}")
+        try {
+            val current = getWorkspaceById(workspace.id) ?: workspace
             current.updateItem(updatedItem)
             updateWorkspace(current)
-            Log.d("Repository", "Updated item in workspace '${current.name}'")
+            Log.d("StartAppTag", "Successfully updated content item in workspace: ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error updating content item in workspace: ${workspace.name}", e)
+            throw e
         }
     }
     
     companion object {
-        @Volatile private var INSTANCE: WorkspaceRepository? = null
+        @Volatile
+        private var INSTANCE: WorkspaceRepository? = null
         
         fun getInstance(context: Context): WorkspaceRepository {
+            Log.d("StartAppTag", "Getting WorkspaceRepository instance")
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: WorkspaceRepository(context.applicationContext).also { INSTANCE = it }
+                Log.d("StartAppTag", "Creating new WorkspaceRepository instance")
+                val instance = WorkspaceRepository(context)
+                INSTANCE = instance
+                instance
             }
         }
     }

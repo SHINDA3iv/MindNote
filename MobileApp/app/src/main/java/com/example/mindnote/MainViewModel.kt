@@ -31,7 +31,14 @@ class MainViewModel : ViewModel() {
     
     // Инициализация репозитория, должна быть вызвана перед использованием
     fun init(context: Context) {
-        repository = WorkspaceRepository.getInstance(context)
+        Log.d("StartAppTag", "Initializing MainViewModel")
+        try {
+            repository = WorkspaceRepository.getInstance(context)
+            Log.d("StartAppTag", "MainViewModel initialized successfully")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error initializing MainViewModel", e)
+            throw e
+        }
     }
     
     // LiveData со списком всех рабочих пространств
@@ -40,83 +47,148 @@ class MainViewModel : ViewModel() {
     
     // Сохранение всех рабочих пространств
     fun saveWorkspaces() {
-        repository.saveWorkspaces()
+        Log.d("StartAppTag", "Saving workspaces")
+        try {
+            repository.saveWorkspaces()
+            Log.d("StartAppTag", "Workspaces saved successfully")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error saving workspaces", e)
+            throw e
+        }
     }
     
     // Обновление рабочих пространств из хранилища
     fun loadWorkspaces() {
-        Log.d("Repository", "LOADWWORK")
-        repository.loadWorkspaces()
+        Log.d("StartAppTag", "Loading workspaces")
+        try {
+            repository.loadWorkspaces()
+            Log.d("StartAppTag", "Workspaces loaded successfully")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error loading workspaces", e)
+            throw e
+        }
     }
     
     // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
-        return repository.createWorkspace(name, iconUri)
+        Log.d("StartAppTag", "Creating new workspace: $name")
+        try {
+            val workspace = repository.createWorkspace(name, iconUri)
+            Log.d("StartAppTag", "Workspace created successfully: $name")
+            return workspace
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error creating workspace: $name", e)
+            throw e
+        }
     }
     
     // Обновление существующего рабочего пространства
     fun updateWorkspace(workspace: Workspace) {
-        repository.updateWorkspace(workspace)
+        Log.d("StartAppTag", "Updating workspace: ${workspace.name}")
+        try {
+            repository.updateWorkspace(workspace)
+            Log.d("StartAppTag", "Workspace updated successfully: ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error updating workspace: ${workspace.name}", e)
+            throw e
+        }
     }
     
     // Установка текущего рабочего пространства
     fun setCurrentWorkspace(workspace: Workspace) {
-        // Обновляем время последнего доступа
-        workspace.lastAccessed = System.currentTimeMillis()
-        repository.updateWorkspace(workspace)
-        
-        // Устанавливаем как текущее рабочее пространство
-        _currentWorkspace.value = workspace
-        
-        Log.d("MainViewModel", "Current workspace set to '${workspace.name}' with ${workspace.items.size} items")
+        Log.d("StartAppTag", "Setting current workspace to: ${workspace.name}")
+        try {
+            workspace.lastAccessed = System.currentTimeMillis()
+            repository.updateWorkspace(workspace)
+            _currentWorkspace.value = workspace
+            Log.d("StartAppTag", "Current workspace set successfully: ${workspace.name} with ${workspace.items.size} items")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error setting current workspace: ${workspace.name}", e)
+            throw e
+        }
     }
     
     // Получение рабочего пространства по имени
     fun getWorkspaceByName(name: String): Workspace? {
-        return repository.getWorkspaceByName(name)
+        Log.d("StartAppTag", "Getting workspace by name: $name")
+        return try {
+            val workspace = repository.getWorkspaceByName(name)
+            Log.d("StartAppTag", "Workspace found: $name")
+            workspace
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error getting workspace by name: $name", e)
+            null
+        }
     }
     
     // Добавление нового элемента содержимого в рабочее пространство
     fun addContentItem(workspace: Workspace, item: ContentItem) {
-        repository.addContentItem(workspace, item)
-        // Если это текущее рабочее пространство, обновляем его
-        if (_currentWorkspace.value?.id == workspace.id) {
-            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+        Log.d("StartAppTag", "Adding content item to workspace: ${workspace.name}")
+        try {
+            repository.addContentItem(workspace, item)
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+            Log.d("StartAppTag", "Content item added successfully to workspace: ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error adding content item to workspace: ${workspace.name}", e)
+            throw e
         }
     }
     
     // Удаление элемента содержимого из рабочего пространства
     fun removeContentItem(workspace: Workspace, itemId: String) {
-        repository.removeContentItem(workspace, itemId)
-        // Если это текущее рабочее пространство, обновляем его
-        if (_currentWorkspace.value?.id == workspace.id) {
-            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+        Log.d("StartAppTag", "Removing content item from workspace: ${workspace.name}")
+        try {
+            repository.removeContentItem(workspace, itemId)
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+            Log.d("StartAppTag", "Content item removed successfully from workspace: ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error removing content item from workspace: ${workspace.name}", e)
+            throw e
         }
     }
     
     // Обновление элемента содержимого в рабочем пространстве
     fun updateContentItem(workspace: Workspace, item: ContentItem) {
-        repository.updateContentItem(workspace, item)
-        // Если это текущее рабочее пространство, обновляем его
-        if (_currentWorkspace.value?.id == workspace.id) {
-            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+        Log.d("StartAppTag", "Updating content item in workspace: ${workspace.name}")
+        try {
+            repository.updateContentItem(workspace, item)
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+            Log.d("StartAppTag", "Content item updated successfully in workspace: ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error updating content item in workspace: ${workspace.name}", e)
+            throw e
         }
     }
     
     // Получение списка избранных рабочих пространств
     fun getFavorites(): List<Workspace> {
+        Log.d("StartAppTag", "Getting favorite workspaces")
         return workspaces.value?.filter { it.isFavorite } ?: emptyList()
     }
     
     // Переключение статуса "избранное" для рабочего пространства
     fun toggleFavorite(workspace: Workspace): Boolean {
-        workspace.isFavorite = !workspace.isFavorite
-        repository.updateWorkspace(workspace)
-        return workspace.isFavorite
+        Log.d("StartAppTag", "Toggling favorite status for workspace: ${workspace.name}")
+        try {
+            workspace.isFavorite = !workspace.isFavorite
+            repository.updateWorkspace(workspace)
+            Log.d("StartAppTag", "Favorite status toggled successfully for workspace: ${workspace.name}")
+            return workspace.isFavorite
+        } catch (e: Exception) {
+            Log.e("StartAppTag", "Error toggling favorite status for workspace: ${workspace.name}", e)
+            throw e
+        }
     }
     
     // Получение недавно использовавшихся рабочих пространств
     fun getRecentlyAccessed(limit: Int = 5): List<Workspace> {
+        Log.d("StartAppTag", "Getting recently accessed workspaces")
         return workspaces.value?.sortedByDescending { it.lastAccessed }?.take(limit) ?: emptyList()
     }
 }

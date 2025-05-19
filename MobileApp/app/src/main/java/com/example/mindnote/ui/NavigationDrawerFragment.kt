@@ -71,11 +71,6 @@ class NavigationDrawerFragment : Fragment() {
             adapter = workspaceAdapter
         }
 
-        // Обработка кнопки создания пространства
-        view.findViewById<MaterialButton>(R.id.button_create_workspace).setOnClickListener {
-            showCreateWorkspaceDialog()
-        }
-
         // Observe workspaces
         viewModel.workspaces.observe(viewLifecycleOwner) { workspaces ->
             workspaceAdapter.submitList(workspaces)

@@ -18,6 +18,7 @@ import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.mindnote.R
+import com.example.mindnote.MainViewModel
 import com.example.mindnote.data.ContentItem
 import com.example.mindnote.data.Workspace
 import com.example.mindnote.data.WorkspaceRepository
@@ -66,21 +67,55 @@ class WorkspaceDetailFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        
+        // Initialize ViewModel and Repository first
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
-
         workspaceRepository = WorkspaceRepository.getInstance(requireContext())
 
-        // Инициализация RecyclerView
+        // Initialize UI components
+        setupUI(view)
+
+        // Load workspace
+        loadWorkspace()
+
+        // Start observing changes
+        observeWorkspace()
+    }
+
+    private fun loadWorkspace() {
+        // If no workspaceId is provided, use the current workspace from ViewModel
+        if (workspaceId.isNullOrEmpty()) {
+            currentWorkspace = viewModel.currentWorkspace.value
+        } else {
+            currentWorkspace = workspaceRepository.getWorkspaceById(workspaceId)
+        }
+
+        if (currentWorkspace == null) {
+            // If still no workspace is available, create a default one
+            currentWorkspace = workspaceRepository.createWorkspace("Default Workspace")
+            viewModel.setCurrentWorkspace(currentWorkspace!!)
+        }
+
+        // Update UI with workspace data
+        currentWorkspace?.let { workspace ->
+            view?.findViewById<ImageView>(R.id.workspace_icon)?.setImageURI(workspace.iconUri)
+            view?.findViewById<TextView>(R.id.workspace_title)?.text = workspace.name
+            updateBreadcrumbs(workspace)
+            itemsAdapter.submitList(workspace.items)
+        }
+    }
+
+    private fun setupUI(view: View) {
+        // Initialize RecyclerView
         val recyclerView = view.findViewById<RecyclerView>(R.id.items_list)
         itemsAdapter = ContentItemsAdapter(
             onItemClick = { item ->
                 when (item) {
                     is ContentItem.SubWorkspaceLink -> {
-                        // Открываем вложенное пространство
                         navigateToWorkspace(item.workspaceId)
                     }
                     else -> {
-                        // Обработка клика по другим типам элементов
+                        // Handle other item types
                     }
                 }
             },
@@ -93,14 +128,13 @@ class WorkspaceDetailFragment : Fragment() {
             adapter = itemsAdapter
         }
 
-        // Загрузка пространства
-        loadWorkspace()
-
-        // Настройка кнопки добавления
+        // Setup add button
         view.findViewById<FloatingActionButton>(R.id.fab_add).setOnClickListener {
             showAddItemMenu(it)
         }
+    }
 
+    private fun observeWorkspace() {
         // Observe workspace changes
         viewModel.workspaces.observe(viewLifecycleOwner) { workspaces ->
             currentWorkspace = workspaces.find { it.id == workspaceId }
@@ -110,33 +144,20 @@ class WorkspaceDetailFragment : Fragment() {
         }
     }
 
-    private fun loadWorkspace() {
-        currentWorkspace = workspaceRepository.getWorkspaceById(workspaceId)
-        currentWorkspace?.let { workspace ->
-            // Обновляем заголовок
-            view?.findViewById<ImageView>(R.id.workspace_icon)?.setImageURI(workspace.iconUri)
-            view?.findViewById<TextView>(R.id.workspace_title)?.text = workspace.name
+    private fun updateBreadcrumbs(workspace: Workspace?) {
+        workspace?.let { workspace ->
+            val breadcrumbs = mutableListOf<Workspace>()
+            var current: Workspace? = workspace
+            while (current != null) {
+                breadcrumbs.add(0, current)
+                current = current.parentId?.let { workspaceRepository.getWorkspaceById(it) }
+            }
 
-            // Обновляем хлебные крошки
-            updateBreadcrumbs(workspace)
-
-            // Обновляем список элементов
-            itemsAdapter.submitList(workspace.items)
-        }
-    }
-
-    private fun updateBreadcrumbs(workspace: Workspace) {
-        val breadcrumbs = mutableListOf<Workspace>()
-        var current: Workspace? = workspace
-        while (current != null) {
-            breadcrumbs.add(0, current)
-            current = current.parentId?.let { workspaceRepository.getWorkspaceById(it) }
-        }
-
-        view?.findViewById<ChipGroup>(R.id.breadcrumbs)?.apply {
-            removeAllViews()
-            breadcrumbs.forEach { ws ->
-                addView(createBreadcrumbChip(ws))
+            view?.findViewById<ChipGroup>(R.id.breadcrumbs)?.apply {
+                removeAllViews()
+                breadcrumbs.forEach { ws ->
+                    addView(createBreadcrumbChip(ws))
+                }
             }
         }
     }
