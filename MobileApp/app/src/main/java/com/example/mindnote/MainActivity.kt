@@ -1,7 +1,9 @@
 package com.example.mindnote
 
 import android.app.Activity
+import android.app.ProgressDialog
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -27,6 +29,7 @@ import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -200,11 +203,68 @@ class MainActivity : AppCompatActivity() {
                 PICK_IMAGE_REQUEST -> {
                     data.data?.let { uri ->
                         Log.d("MindNote", "MainActivity: Image picked: $uri")
-                        // Копируем изображение в приватное хранилище приложения
-                        val persistentUri = copyFileToInternalStorage(uri, "images")
-                        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
-                        fragment?.addImageView(ContentItem.ImageItem(persistentUri))
-                        viewModel.saveWorkspaces()
+                        try {
+                            // Проверяем размер файла
+                            val fileSize = getFileSize(uri)
+                            if (fileSize > 10 * 1024 * 1024) { // 10MB limit
+                                Toast.makeText(this, "Изображение слишком большое. Максимальный размер: 10MB", Toast.LENGTH_LONG).show()
+                                return
+                            }
+                            
+                            // Показываем прогресс
+                            val progressDialog = ProgressDialog(this).apply {
+                                setMessage("Обработка изображения...")
+                                setCancelable(false)
+                                show()
+                            }
+                            
+                            // Копируем изображение в фоновом потоке
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    // Проверяем доступность файла
+                                    contentResolver.openInputStream(uri)?.use { input ->
+                                        // Проверяем, что это действительно изображение
+                                        val options = BitmapFactory.Options().apply {
+                                            inJustDecodeBounds = true
+                                        }
+                                        BitmapFactory.decodeStream(input, null, options)
+                                        if (options.outWidth <= 0 || options.outHeight <= 0) {
+                                            throw Exception("Invalid image format")
+                                        }
+                                    } ?: throw Exception("Cannot open image file")
+
+                                    val persistentUri = copyFileToInternalStorage(uri, "images")
+                                    Log.d("MindNote", "Image copied to: $persistentUri")
+                                    
+                                    withContext(Dispatchers.Main) {
+                                        progressDialog.dismiss()
+                                        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                                        if (fragment != null) {
+                                            val imageItem = ContentItem.ImageItem(persistentUri)
+                                            fragment.addImageView(imageItem)
+                                            viewModel.saveWorkspaces()
+                                            Log.d("MindNote", "Image added to workspace")
+                                        } else {
+                                            Log.e("MindNote", "Fragment not found")
+                                            Toast.makeText(this@MainActivity, "Ошибка: фрагмент не найден", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("MindNote", "Error processing image", e)
+                                    withContext(Dispatchers.Main) {
+                                        progressDialog.dismiss()
+                                        Toast.makeText(this@MainActivity, 
+                                            "Ошибка при обработке изображения: ${e.message}", 
+                                            Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MindNote", "Error handling image pick", e)
+                            Toast.makeText(this, 
+                                "Ошибка при выборе изображения: ${e.message}", 
+                                Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
                 PICK_FILE_REQUEST -> {
@@ -243,6 +303,8 @@ class MainActivity : AppCompatActivity() {
     // Копирует файл из внешнего URI в приватное хранилище приложения
     private fun copyFileToInternalStorage(sourceUri: Uri, dirName: String, customFileName: String? = null): Uri {
         val inputStream = contentResolver.openInputStream(sourceUri)
+            ?: throw Exception("Cannot open source file")
+            
         val fileName = customFileName ?: getFileName(sourceUri)
         val timeStamp = System.currentTimeMillis()
         val safeFileName = "$timeStamp-${fileName.replace("[^a-zA-Z0-9.-]".toRegex(), "_")}"
@@ -255,20 +317,23 @@ class MainActivity : AppCompatActivity() {
         
         // Создаем файл
         val file = File(directory, safeFileName)
+        Log.d("MindNote", "Copying file to: ${file.absolutePath}")
         
         // Копируем данные
-        inputStream?.use { input ->
+        inputStream.use { input ->
             file.outputStream().use { output ->
                 input.copyTo(output)
             }
         }
         
         // Возвращаем URI для сохраненного файла через FileProvider
-        return androidx.core.content.FileProvider.getUriForFile(
+        val fileUri = androidx.core.content.FileProvider.getUriForFile(
             this,
             "${packageName}.fileprovider",
             file
         )
+        Log.d("MindNote", "File URI: $fileUri")
+        return fileUri
     }
 
     private fun getFileName(uri: Uri): String {

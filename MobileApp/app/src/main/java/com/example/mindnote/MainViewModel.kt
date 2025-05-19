@@ -101,6 +101,8 @@ class MainViewModel : ViewModel() {
         if (_currentWorkspace.value?.id == workspace.id) {
             _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
         }
+        // Сохраняем изменения в файл
+        saveWorkspaces()
     }
     
     // Получение списка избранных рабочих пространств

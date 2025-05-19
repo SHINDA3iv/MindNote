@@ -48,8 +48,7 @@ data class Workspace(
     
     // Обновление элемента содержимого
     fun updateItem(updatedItem: ContentItem) {
-        // Находим индекс элемента для обновления
-        val itemIndex = _items.indexOfFirst { item ->
+        val index = _items.indexOfFirst { item ->
             when (item) {
                 is ContentItem.TextItem -> 
                     item.id == (updatedItem as? ContentItem.TextItem)?.id
@@ -66,12 +65,28 @@ data class Workspace(
             }
         }
         
-        // Обновляем элемент если найден
-        if (itemIndex != -1) {
-            _items[itemIndex] = updatedItem
-            Log.d("Workspace", "Item updated in workspace '$name' at position $itemIndex")
+        if (index != -1) {
+            _items[index] = updatedItem
+            val itemId = when (updatedItem) {
+                is ContentItem.TextItem -> updatedItem.id
+                is ContentItem.CheckboxItem -> updatedItem.id
+                is ContentItem.NumberedListItem -> updatedItem.id
+                is ContentItem.BulletListItem -> updatedItem.id
+                is ContentItem.ImageItem -> updatedItem.id
+                is ContentItem.FileItem -> updatedItem.id
+            }
+            Log.d("Workspace", "Item updated in workspace '$name': id=$itemId, type=${updatedItem.javaClass.simpleName}")
         } else {
-            Log.d("Workspace", "Item not found for update in workspace '$name'")
+            val itemId = when (updatedItem) {
+                is ContentItem.TextItem -> updatedItem.id
+                is ContentItem.CheckboxItem -> updatedItem.id
+                is ContentItem.NumberedListItem -> updatedItem.id
+                is ContentItem.BulletListItem -> updatedItem.id
+                is ContentItem.ImageItem -> updatedItem.id
+                is ContentItem.FileItem -> updatedItem.id
+            }
+            Log.d("Workspace", "Item with ID $itemId not found in workspace '$name', adding as new item")
+            _items.add(updatedItem)
         }
     }
     

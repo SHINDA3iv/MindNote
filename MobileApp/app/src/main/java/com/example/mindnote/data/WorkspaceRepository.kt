@@ -46,9 +46,42 @@ class WorkspaceRepository private constructor(private val context: Context) {
                 val json = file.readText()
                 Log.d("Repository", "Loading workspaces: $json")
                 val type = object : TypeToken<List<Workspace>>() {}.type
-                Log.d("Repository", "Getting type")
                 val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type) ?: emptyList()
-                Log.d("Repository", "Getting gson")
+                
+                // Восстанавливаем URI для изображений и файлов
+                loadedWorkspaces.forEach { workspace ->
+                    workspace.items.forEach { item ->
+                        when (item) {
+                            is ContentItem.ImageItem -> {
+                                try {
+                                    // Проверяем доступность файла
+                                    context.contentResolver.openInputStream(item.imageUri)?.close()
+                                } catch (e: Exception) {
+                                    Log.e("Repository", "Image file not accessible: ${item.imageUri}", e)
+                                    // Создаем новый элемент с пустым URI
+                                    val newItem = item.copy(imageUri = Uri.EMPTY)
+                                    workspace.updateItem(newItem)
+                                }
+                            }
+                            is ContentItem.FileItem -> {
+                                try {
+                                    // Проверяем доступность файла
+                                    context.contentResolver.openInputStream(item.fileUri)?.close()
+                                } catch (e: Exception) {
+                                    Log.e("Repository", "File not accessible: ${item.fileUri}", e)
+                                    // Создаем новый элемент с пустым URI
+                                    val newItem = item.copy(fileUri = Uri.EMPTY)
+                                    workspace.updateItem(newItem)
+                                }
+                            }
+                            is ContentItem.CheckboxItem -> {
+                                Log.d("Repository", "Loaded checkbox item: text='${item.text}', isChecked=${item.isChecked}")
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+                
                 _workspaces.postValue(loadedWorkspaces)
                 Log.d("Repository", "Loaded ${loadedWorkspaces.size} workspaces")
             } else {
@@ -83,22 +116,53 @@ class WorkspaceRepository private constructor(private val context: Context) {
             val currentWorkspaces = _workspaces.value ?: emptyList()
             Log.d("Repository", "Saving ${currentWorkspaces.size} workspaces")
             
-            // Создаем JSON
-            val json = gson.toJson(currentWorkspaces)
+            // Создаем копию рабочих пространств для сохранения
+            val workspacesToSave = currentWorkspaces.map { workspace ->
+                workspace.copy(
+                    _items = workspace.items.map { item ->
+                        when (item) {
+                            is ContentItem.ImageItem -> {
+                                // Сохраняем URI изображения
+                                item.copy(imageUri = item.imageUri)
+                            }
+                            is ContentItem.FileItem -> {
+                                // Сохраняем URI файла
+                                item.copy(fileUri = item.fileUri)
+                            }
+                            is ContentItem.CheckboxItem -> {
+                                // Сохраняем состояние чекбокса
+                                item.copy(isChecked = item.isChecked)
+                            }
+                            else -> item
+                        }
+                    }.toMutableList()
+                )
+            }
             
-            // Сохраняем в основной файл
+            // Создаем JSON
+            val json = gson.toJson(workspacesToSave)
+            
+            // Сначала сохраняем резервную копию
+            val backupFile = File(context.filesDir, "workspaces_backup.json")
+            backupFile.writeText(json)
+            
+            // Затем сохраняем основной файл
             val file = File(context.filesDir, "workspaces.json")
             file.writeText(json)
             
-            // Сохраняем резервную копию
-            val backupFile = File(context.filesDir, "workspaces_backup.json")
-            backupFile.writeText(json)
-
-            Log.d("repos1", currentWorkspaces.get(0).items.size.toString())
-            Log.d("repos1", currentWorkspaces.get(1).items.size.toString())
             Log.d("Repository", "Workspaces saved successfully with backup")
         } catch (e: Exception) {
             Log.e("Repository", "Error saving workspaces", e)
+            // Если произошла ошибка при сохранении, пробуем восстановить из резервной копии
+            try {
+                val backupFile = File(context.filesDir, "workspaces_backup.json")
+                if (backupFile.exists()) {
+                    backupFile.copyTo(File(context.filesDir, "workspaces.json"), overwrite = true)
+                    Log.d("Repository", "Restored from backup after save error")
+                }
+            } catch (e2: Exception) {
+                Log.e("Repository", "Error restoring from backup after save error", e2)
+            }
         }
     }
     
@@ -199,7 +263,12 @@ class WorkspaceRepository private constructor(private val context: Context) {
         if (itemIndex != -1) {
             current.updateItem(updatedItem)
             updateWorkspace(current)
-            Log.d("Repository", "Updated item in workspace '${current.name}'")
+            Log.d("Repository", "Updated item in workspace '${current.name}': id=${updatedItem.id}, type=${updatedItem.javaClass.simpleName}")
+        } else {
+            // Если элемент не найден, добавляем его как новый
+            current.addItem(updatedItem)
+            updateWorkspace(current)
+            Log.d("Repository", "Added new item to workspace '${current.name}': id=${updatedItem.id}, type=${updatedItem.javaClass.simpleName}")
         }
     }
     
