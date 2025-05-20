@@ -20,6 +20,8 @@ public:
 
     void setCurrentWorkspace(Workspace *workspace);
 
+    Workspace *currentWorkspace() const;
+
 public slots:
     void onWorkspaceRemoved(Workspace* workspace);
 

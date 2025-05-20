@@ -246,23 +246,29 @@ QJsonObject Workspace::serialize() const
     json["id"] = _id;
     json["parentId"] = _parentWorkspace ? _parentWorkspace->getId() : "";
 
+    qDebug() << "Starting serialization of workspace:" << _workspaceName << "ID:" << _id;
+
     // Save icon if it exists
-    if (!_iconLabel->pixmap()->isNull()) {
+    if (!_iconLabel->pixmap().isNull()) {
         QByteArray iconData;
         QBuffer buffer(&iconData);
         buffer.open(QIODevice::WriteOnly);
-        _iconLabel->pixmap()->save(&buffer, "PNG");
+        _iconLabel->pixmap().save(&buffer, "PNG");
         json["icon"] = QString(iconData.toBase64());
+        qDebug() << "Saved icon for workspace:" << _workspaceName;
     }
 
     // Save items
     QJsonArray itemArray;
     for (const AbstractWorkspaceItem *item : _items) {
-        itemArray.append(item->serialize());
+        QJsonObject itemJson = item->serialize();
+        itemArray.append(itemJson);
+        qDebug() << "Serialized item of type:" << item->type() << "in workspace:" << _workspaceName;
     }
     json["items"] = itemArray;
 
-    qDebug() << "Serializing workspace:" << _workspaceName << "ID:" << _id
+    qDebug() << "Finished serializing workspace:" << _workspaceName 
+             << "ID:" << _id
              << "Parent:" << (_parentWorkspace ? _parentWorkspace->getId() : "none")
              << "Items:" << _items.size();
 

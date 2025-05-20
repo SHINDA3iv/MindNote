@@ -9,6 +9,7 @@
 #include <QHBoxLayout>
 #include <QFileDialog>
 #include <QApplication>
+#include <QDebug>
 
 MainWidget::MainWidget(QWidget *parent) :
     QWidget(parent),
@@ -34,18 +35,18 @@ MainWidget::MainWidget(QWidget *parent) :
     }
 
     // Connect workspace controller signals
-    connect(_workspaceController.get(), &WorkspaceController::workspaceAdded, 
-            this, &MainWidget::workspaceAdded);
-    connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved, 
-            this, &MainWidget::workspaceRemoved);
-    connect(_workspaceController.get(), &WorkspaceController::pathUpdated,
-            this, [this](Workspace* workspace) {
+    connect(_workspaceController.get(), &WorkspaceController::workspaceAdded, this,
+            &MainWidget::workspaceAdded);
+    connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved, this,
+            &MainWidget::workspaceRemoved);
+    connect(_workspaceController.get(), &WorkspaceController::pathUpdated, this,
+            [this](Workspace *workspace) {
                 if (_editorWidget) {
                     _editorWidget->setCurrentWorkspace(workspace);
                 }
             });
-    connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved,
-            _editorWidget.get(), &EditorWidget::onWorkspaceRemoved);
+    connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved, _editorWidget.get(),
+            &EditorWidget::onWorkspaceRemoved);
 
     // initUI();
     // initConnections();
@@ -202,10 +203,28 @@ void MainWidget::openWorkspace()
 
 bool MainWidget::saveCurrentWorkspace()
 {
-    // TODO: Implement workspace saving
-    _hasUnsavedChanges = false;
-    emit statusMessage("Workspace saved");
-    return true;
+    if (!_editorWidget) {
+        qWarning() << "No editor widget available for saving workspace";
+        return false;
+    }
+
+    Workspace *currentWorkspace = _editorWidget->currentWorkspace();
+    if (!currentWorkspace) {
+        qWarning() << "No current workspace to save";
+        return false;
+    }
+
+    qDebug() << "Saving current workspace:" << currentWorkspace->getName();
+
+    if (_workspaceController) {
+        _workspaceController->saveWorkspaces();
+        _hasUnsavedChanges = false;
+        emit statusMessage("Workspace saved: " + currentWorkspace->getName());
+        return true;
+    }
+
+    qWarning() << "Workspace controller not available for saving";
+    return false;
 }
 
 bool MainWidget::saveWorkspaceAs()

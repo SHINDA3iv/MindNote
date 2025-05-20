@@ -92,3 +92,8 @@ void EditorWidget::onWorkspaceRemoved(Workspace* workspace)
         setCurrentWorkspace(parent);
     }
 }
+
+Workspace* EditorWidget::currentWorkspace() const
+{
+    return _currentWorkspace;
+}
