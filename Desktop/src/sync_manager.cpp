@@ -40,24 +40,24 @@ void SyncManager::performFullSync()
 
 void SyncManager::onWorkspacesFetched(const QJsonArray &workspaces)
 {
-    _localStorage->saveWorkspaces(workspaces);
-    for (const QJsonValue &workspace : workspaces) {
-        QString workspaceId = workspace.toObject()["id"].toString();
-        _apiClient->getWorkspaceItems(workspaceId);
-    }
+    // _localStorage->saveWorkspaces(workspaces);
+    // for (const QJsonValue &workspace : workspaces) {
+    //     QString workspaceId = workspace.toObject()["id"].toString();
+    //     _apiClient->getWorkspaceItems(workspaceId);
+    // }
 }
 
 void SyncManager::onItemsFetched(const QString &workspaceId, const QJsonArray &items)
 {
-    _localStorage->saveWorkspaceItems(workspaceId, items);
+    // _localStorage->saveWorkspaceItems(workspaceId, items);
 }
 
 void SyncManager::onSyncCompleted(const QJsonObject &response)
 {
-    _isSyncing = false;
-    _localStorage->setLastSyncTime(QDateTime::currentDateTime());
+    // _isSyncing = false;
+    // _localStorage->setLastSyncTime(QDateTime::currentDateTime());
 
-    performFullSync();
+    // performFullSync();
 }
 
 void SyncManager::onError(const QString &message)
@@ -80,14 +80,14 @@ QJsonObject SyncManager::collectLocalChanges()
 {
     QJsonObject changes;
 
-    QJsonArray workspaces = _localStorage->loadWorkspaces();
-    changes["workspaces"] = workspaces;
+    // QJsonArray workspaces = _localStorage->loadWorkspaces();
+    // changes["workspaces"] = workspaces;
 
-    for (const QJsonValue &workspace : workspaces) {
-        QString workspaceId = workspace.toObject()["id"].toString();
-        QJsonArray items = _localStorage->loadWorkspaceItems(workspaceId);
-        changes[workspaceId + "_items"] = items;
-    }
+    // for (const QJsonValue &workspace : workspaces) {
+    //     QString workspaceId = workspace.toObject()["id"].toString();
+    //     QJsonArray items = _localStorage->loadWorkspaceItems(workspaceId);
+    //     changes[workspaceId + "_items"] = items;
+    // }
 
     return changes;
 }

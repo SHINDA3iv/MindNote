@@ -35,7 +35,8 @@ public:
     void addItemByType(const QString &type);
 
     void setIcon(const QIcon &icon);
-    QLabel *getIcon();
+    QLabel *getIconLabel();
+    QIcon getIcon() const;
 
     // --- ВЛОЖЕННОСТЬ ---
     Workspace *getParentWorkspace() const;
@@ -49,6 +50,10 @@ public:
     QString getFullPathName() const;
     QList<Workspace *> getPathChain() const;
 
+    QString getPath() const;
+
+public slots:
+    Workspace *getRootWorkspace();
 signals:
     void subWorkspaceClicked(Workspace *subspace);
     void addSubspaceRequested();
@@ -63,6 +68,7 @@ private:
     QPointer<QWidget> _contentWidget;
     QPointer<QLabel> _titleLabel;
     QPointer<QLabel> _iconLabel;
+    QIcon _icon;
 
     QList<AbstractWorkspaceItem *> _items;
     QSpacerItem *_spacerItem { nullptr };

@@ -3,33 +3,34 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
-SubspaceLinkItem::SubspaceLinkItem(Workspace* subspace, Workspace* parent)
-    : AbstractWorkspaceItem(parent), _linkedWorkspace(subspace)
+SubspaceLinkItem::SubspaceLinkItem(Workspace *subspace, Workspace *parent) :
+    AbstractWorkspaceItem(parent),
+    _linkedWorkspace(subspace)
 {
     if (subspace)
         _subspaceId = subspace->getId();
 
     // Create horizontal layout
-    QHBoxLayout* layout = new QHBoxLayout(this);
+    QHBoxLayout *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 8, 12, 8);
     layout->setSpacing(8);
     layout->setAlignment(Qt::AlignTop);
 
     // Create icon container
-    QWidget* iconContainer = new QWidget(this);
-    QVBoxLayout* iconLayout = new QVBoxLayout(iconContainer);
+    QWidget *iconContainer = new QWidget(this);
+    QVBoxLayout *iconLayout = new QVBoxLayout(iconContainer);
     iconLayout->setContentsMargins(8, 8, 8, 8);
     iconLayout->setSpacing(0);
 
     // Create icon label
-    QLabel* iconLabel = new QLabel(iconContainer);
+    QLabel *iconLabel = new QLabel(iconContainer);
     iconLabel->setAlignment(Qt::AlignCenter);
     iconLabel->setMinimumSize(40, 40);
     iconLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-    
+
     QPixmap iconPixmap;
-    if (subspace && !subspace->getIcon()->pixmap().isNull()) {
-        iconPixmap = subspace->getIcon()->pixmap().scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    if (!subspace->getIcon().isNull()) {
+        iconPixmap = subspace->getIcon().pixmap(40, 40);
     } else {
         iconPixmap = QIcon(":/icons/workspace.png").pixmap(40, 40);
     }
@@ -70,7 +71,8 @@ SubspaceLinkItem::SubspaceLinkItem(Workspace* subspace, Workspace* parent)
     });
 }
 
-QJsonObject SubspaceLinkItem::serialize() const {
+QJsonObject SubspaceLinkItem::serialize() const
+{
     QJsonObject json;
     json["type"] = type();
     json["subspaceId"] = _linkedWorkspace ? _linkedWorkspace->getId() : _subspaceId;
@@ -78,30 +80,35 @@ QJsonObject SubspaceLinkItem::serialize() const {
     return json;
 }
 
-void SubspaceLinkItem::deserialize(const QJsonObject& json) {
+void SubspaceLinkItem::deserialize(const QJsonObject &json)
+{
     if (json.contains("subspaceId")) {
         _subspaceId = json["subspaceId"].toString();
-        QString name = json.contains("subspaceName") ? json["subspaceName"].toString() : "[Подпространство]";
+        QString name =
+         json.contains("subspaceName") ? json["subspaceName"].toString() : "[Подпространство]";
         _linkButton->setText(name);
     }
 }
 
-Workspace* SubspaceLinkItem::getLinkedWorkspace() const {
+Workspace *SubspaceLinkItem::getLinkedWorkspace() const
+{
     return _linkedWorkspace;
 }
 
-void SubspaceLinkItem::setLinkedWorkspace(Workspace* newLinkedWorkspace)
+void SubspaceLinkItem::setLinkedWorkspace(Workspace *newLinkedWorkspace)
 {
     _linkedWorkspace = newLinkedWorkspace;
     if (_linkedWorkspace) {
         _subspaceId = _linkedWorkspace->getId();
         _linkButton->setText(_linkedWorkspace->getName());
-        
+
         // Update icon
-        QLabel* iconLabel = qobject_cast<QLabel*>(layout()->itemAt(0)->widget()->layout()->itemAt(0)->widget());
+        QLabel *iconLabel =
+         qobject_cast<QLabel *>(layout()->itemAt(0)->widget()->layout()->itemAt(0)->widget());
         if (iconLabel) {
-            if (!_linkedWorkspace->getIcon()->pixmap().isNull()) {
-                iconLabel->setPixmap(_linkedWorkspace->getIcon()->pixmap().scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            if (!_linkedWorkspace->getIcon().isNull()) {
+                iconLabel->setPixmap(
+                 _linkedWorkspace->getIcon().pixmap(QSize(40, 40), QIcon::Normal, QIcon::On));
             } else {
                 iconLabel->setPixmap(QIcon(":/icons/workspace.png").pixmap(40, 40));
             }
@@ -112,11 +119,10 @@ void SubspaceLinkItem::setLinkedWorkspace(Workspace* newLinkedWorkspace)
 void SubspaceLinkItem::deleteItem()
 {
     if (_linkedWorkspace) {
-        Workspace* parent = qobject_cast<Workspace*>(this->parent());
+        Workspace *parent = qobject_cast<Workspace *>(this->parent());
         if (parent) {
             parent->removeSubWorkspace(_linkedWorkspace);
         }
     }
     AbstractWorkspaceItem::deleteItem();
 }
-

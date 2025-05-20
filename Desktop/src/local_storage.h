@@ -2,8 +2,8 @@
 #define LOCALSTORAGE_H
 
 #include <QObject>
-#include <QSettings>
-#include <QJsonObject>
+#include <QDir>
+#include "workspace.h"
 
 class LocalStorage : public QObject
 {
@@ -11,17 +11,13 @@ class LocalStorage : public QObject
 public:
     explicit LocalStorage(QObject *parent = nullptr);
 
-    void saveWorkspaces(const QJsonArray &workspaces);
-    QJsonArray loadWorkspaces() const;
-
-    void saveWorkspaceItems(const QString &workspaceId, const QJsonArray &items);
-    QJsonArray loadWorkspaceItems(const QString &workspaceId) const;
-
-    QDateTime lastSyncTime() const;
-    void setLastSyncTime(const QDateTime &time);
+    void saveWorkspace(Workspace *workspace);
+    Workspace *loadWorkspace(const QString &workspaceName);
+    void deleteWorkspace(const QString &workspaceName);
 
 private:
     QString storagePath;
+    void saveWorkspaceRecursive(Workspace *workspace, QJsonObject &json);
+    Workspace *loadWorkspaceRecursive(const QJsonObject &json, Workspace *parent = nullptr);
 };
-
 #endif // LOCALSTORAGE_H

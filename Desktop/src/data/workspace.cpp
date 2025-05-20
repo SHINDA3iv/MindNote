@@ -137,13 +137,24 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     setLayout(contentLayout);
 }
 
-QLabel *Workspace::getIcon()
+QLabel *Workspace::getIconLabel()
 {
     return _iconLabel;
 }
 
+QIcon Workspace::getIcon() const
+{
+    return _icon;
+}
+
 void Workspace::setIcon(const QIcon &icon)
 {
+    if (!icon.isNull()) {
+        _icon = icon;
+    } else {
+        // Устанавливаем иконку по умолчанию, если пользовательская иконка не задана
+        _icon = QIcon(":/icons/workspace.png");
+    }
     _iconLabel->setPixmap(icon.pixmap(32, 32));
 }
 
@@ -234,28 +245,27 @@ QJsonObject Workspace::serialize() const
     json["name"] = _workspaceName;
     json["id"] = _id;
     json["parentId"] = _parentWorkspace ? _parentWorkspace->getId() : "";
-    
+
     // Save icon if it exists
-    if (!_iconLabel->pixmap().isNull()) {
+    if (!_iconLabel->pixmap()->isNull()) {
         QByteArray iconData;
         QBuffer buffer(&iconData);
         buffer.open(QIODevice::WriteOnly);
-        _iconLabel->pixmap().save(&buffer, "PNG");
+        _iconLabel->pixmap()->save(&buffer, "PNG");
         json["icon"] = QString(iconData.toBase64());
     }
-    
+
     // Save items
     QJsonArray itemArray;
     for (const AbstractWorkspaceItem *item : _items) {
         itemArray.append(item->serialize());
     }
     json["items"] = itemArray;
-    
-    qDebug() << "Serializing workspace:" << _workspaceName 
-             << "ID:" << _id 
+
+    qDebug() << "Serializing workspace:" << _workspaceName << "ID:" << _id
              << "Parent:" << (_parentWorkspace ? _parentWorkspace->getId() : "none")
              << "Items:" << _items.size();
-             
+
     return json;
 }
 
@@ -266,7 +276,7 @@ void Workspace::deserialize(const QJsonObject &json)
     if (json.contains("id"))
         setId(json["id"].toString());
     // parentId и subWorkspaces обрабатываются в контроллере
-    
+
     // Load icon if it exists
     if (json.contains("icon")) {
         QByteArray iconData = QByteArray::fromBase64(json["icon"].toString().toUtf8());
@@ -276,7 +286,7 @@ void Workspace::deserialize(const QJsonObject &json)
             setIcon(QIcon(iconPixmap));
         }
     }
-    
+
     if (json.contains("items")) {
         QJsonArray itemArray = json["items"].toArray();
         for (const QJsonValue &itemVal : itemArray) {
@@ -391,7 +401,8 @@ void Workspace::addSubWorkspace(Workspace *sub)
         }
         if (!hasLink) {
             auto *linkItem = new SubspaceLinkItem(sub, this);
-            connect(linkItem, &SubspaceLinkItem::subspaceLinkClicked, this, &Workspace::subWorkspaceClicked);
+            connect(linkItem, &SubspaceLinkItem::subspaceLinkClicked, this,
+                    &Workspace::subWorkspaceClicked);
             addItem(linkItem);
         }
     }
@@ -433,4 +444,23 @@ QString Workspace::getFullPathName() const
     QStringList names;
     for (auto *ws : chain) names << ws->getName();
     return names.join("/");
+}
+QString Workspace::getPath() const
+{
+    QStringList pathParts;
+    const Workspace *current = this;
+    while (current) {
+        pathParts.prepend(current->getName());
+        current = current->getParentWorkspace();
+    }
+    return pathParts.join("/");
+}
+
+Workspace *Workspace::getRootWorkspace()
+{
+    Workspace *root = this;
+    while (root->getParentWorkspace()) {
+        root = root->getParentWorkspace();
+    }
+    return root;
 }
