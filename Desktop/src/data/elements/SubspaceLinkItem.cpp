@@ -25,14 +25,18 @@ SubspaceLinkItem::SubspaceLinkItem(Workspace *subspace, Workspace *parent) :
     // Create icon label
     QLabel *iconLabel = new QLabel(iconContainer);
     iconLabel->setAlignment(Qt::AlignCenter);
-    iconLabel->setMinimumSize(40, 40);
+    iconLabel->setFixedSize(32, 32);
     iconLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
     QPixmap iconPixmap;
+    // Получаем размеры label
+    int width = iconLabel->width();
+    int height = iconLabel->height();
+
     if (!subspace->getIcon().isNull()) {
-        iconPixmap = subspace->getIcon().pixmap(40, 40);
+        iconPixmap = subspace->getIcon().pixmap(width, height);
     } else {
-        iconPixmap = QIcon(":/icons/workspace.png").pixmap(40, 40);
+        iconPixmap = QIcon(":/icons/workspace.png").pixmap(width, height);
     }
     iconLabel->setPixmap(iconPixmap);
     iconLayout->addWidget(iconLabel, 0, Qt::AlignCenter);
@@ -105,12 +109,14 @@ void SubspaceLinkItem::setLinkedWorkspace(Workspace *newLinkedWorkspace)
         // Update icon
         QLabel *iconLabel =
          qobject_cast<QLabel *>(layout()->itemAt(0)->widget()->layout()->itemAt(0)->widget());
+        int width = iconLabel->width();
+        int height = iconLabel->height();
         if (iconLabel) {
             if (!_linkedWorkspace->getIcon().isNull()) {
-                iconLabel->setPixmap(
-                 _linkedWorkspace->getIcon().pixmap(QSize(40, 40), QIcon::Normal, QIcon::On));
+                iconLabel->setPixmap(_linkedWorkspace->getIcon().pixmap(QSize(width, height),
+                                                                        QIcon::Normal, QIcon::On));
             } else {
-                iconLabel->setPixmap(QIcon(":/icons/workspace.png").pixmap(40, 40));
+                iconLabel->setPixmap(QIcon(":/icons/workspace.png").pixmap(width, height));
             }
         }
     }
