@@ -19,7 +19,7 @@ SubspaceLinkItem::SubspaceLinkItem(Workspace *subspace, Workspace *parent) :
     // Create icon container
     QWidget *iconContainer = new QWidget(this);
     QVBoxLayout *iconLayout = new QVBoxLayout(iconContainer);
-    iconLayout->setContentsMargins(8, 8, 8, 8);
+    iconLayout->setContentsMargins(0, 0, 0, 0);
     iconLayout->setSpacing(0);
 
     // Create icon label

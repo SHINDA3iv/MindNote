@@ -155,7 +155,18 @@ void Workspace::setIcon(const QIcon &icon)
         // Устанавливаем иконку по умолчанию, если пользовательская иконка не задана
         _icon = QIcon(":/icons/workspace.png");
     }
-    _iconLabel->setPixmap(icon.pixmap(32, 32));
+    // Получаем размеры label
+    int width = _iconLabel->width();
+    int height = _iconLabel->height();
+
+    // Масштабируем pixmap с сохранением пропорций
+    QPixmap pixmap = _icon.pixmap(width, height);
+    QPixmap scaledPixmap = pixmap.scaled(width, height,
+                                         Qt::KeepAspectRatio,
+                                         Qt::SmoothTransformation);
+
+    _iconLabel->setPixmap(scaledPixmap);
+    _iconLabel->setAlignment(Qt::AlignCenter); // Центрируем иконку в label
 }
 
 void Workspace::addItemByType(const QString &type)
