@@ -1,9 +1,10 @@
 #include "image_item.h"
+#include <QBuffer>
+#include <QDebug>
 
 ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
     ResizableItem(parent),
-    _imageLabel(new QLabel(this)),
-    _imagePath(imagePath)
+    _imageLabel(new QLabel(this))
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(_imageLabel);
@@ -14,6 +15,7 @@ ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
     if (!imagePath.isEmpty()) {
         QPixmap pixmap(imagePath);
         _originalPixmap = pixmap;
+        _imageData = imageToBase64(pixmap);
 
         // Calculate initial size while respecting minimum size
         int initialWidth = qMax(qMin(pixmap.width(), 500), 250);
@@ -33,27 +35,43 @@ QString ImageItem::type() const
     return "ImageItem";
 }
 
+QString ImageItem::imageToBase64(const QPixmap &pixmap) const
+{
+    QByteArray imageData;
+    QBuffer buffer(&imageData);
+    buffer.open(QIODevice::WriteOnly);
+    pixmap.save(&buffer, "PNG");
+    return QString(imageData.toBase64());
+}
+
+QPixmap ImageItem::base64ToImage(const QString &base64String) const
+{
+    QByteArray imageData = QByteArray::fromBase64(base64String.toUtf8());
+    QPixmap pixmap;
+    pixmap.loadFromData(imageData, "PNG");
+    return pixmap;
+}
+
 QJsonObject ImageItem::serialize() const
 {
     QJsonObject json;
     json["type"] = type();
-    json["imagePath"] = _imagePath;
+    json["imageData"] = _imageData;
     return json;
 }
 
 void ImageItem::deserialize(const QJsonObject &json)
 {
-    if (json.contains("imagePath")) {
-        _imagePath = json["imagePath"].toString();
-        QPixmap pixmap(_imagePath);
-        _originalPixmap = pixmap;
+    if (json.contains("imageData")) {
+        _imageData = json["imageData"].toString();
+        _originalPixmap = base64ToImage(_imageData);
         updateImageSize();
     }
 }
 
 void ImageItem::resizeEvent(QResizeEvent *event)
 {
-    if (!_imagePath.isEmpty()) {
+    if (!_imageData.isEmpty()) {
         updateImageSize();
     }
     ResizableItem::resizeEvent(event);
