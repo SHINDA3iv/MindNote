@@ -8,14 +8,14 @@ SyncManager::SyncManager(std::shared_ptr<ApiClient> apiClient,
                          std::shared_ptr<LocalStorage> localStorage,
                          QObject *parent) :
     QObject(parent),
-    _apiClient(apiClient),
-    _localStorage(localStorage)
+    apiClient(apiClient),
+    localStorage(localStorage)
 {
     connect(apiClient.get(), &ApiClient::workspacesReceived, this,
             &SyncManager::onWorkspacesFetched);
     connect(apiClient.get(), &ApiClient::itemsReceived, this, &SyncManager::onItemsFetched);
     connect(apiClient.get(), &ApiClient::syncCompleted, this, &SyncManager::onSyncCompleted);
-    connect(apiClient.get(), &ApiClient::errorOccurred, this, &SyncManager::onError);
+    connect(apiClient.get(), &ApiClient::error, this, &SyncManager::onError);
     connect(&_syncTimer, &QTimer::timeout, this, &SyncManager::syncLocalChanges);
 }
 
@@ -35,27 +35,27 @@ void SyncManager::performFullSync()
         return;
 
     _isSyncing = true;
-    _apiClient->getWorkspaces();
+    apiClient->getWorkspaces();
 }
 
 void SyncManager::onWorkspacesFetched(const QJsonArray &workspaces)
 {
-    // _localStorage->saveWorkspaces(workspaces);
+    // localStorage->saveWorkspaces(workspaces);
     // for (const QJsonValue &workspace : workspaces) {
     //     QString workspaceId = workspace.toObject()["id"].toString();
-    //     _apiClient->getWorkspaceItems(workspaceId);
+    //     apiClient->getWorkspaceItems(workspaceId);
     // }
 }
 
 void SyncManager::onItemsFetched(const QString &workspaceId, const QJsonArray &items)
 {
-    // _localStorage->saveWorkspaceItems(workspaceId, items);
+    // localStorage->saveWorkspaceItems(workspaceId, items);
 }
 
 void SyncManager::onSyncCompleted(const QJsonObject &response)
 {
     // _isSyncing = false;
-    // _localStorage->setLastSyncTime(QDateTime::currentDateTime());
+    // localStorage->setLastSyncTime(QDateTime::currentDateTime());
 
     // performFullSync();
 }
@@ -73,19 +73,19 @@ void SyncManager::syncLocalChanges()
 
     _isSyncing = true;
     QJsonObject changes = collectLocalChanges();
-    _apiClient->syncChanges(changes);
+    apiClient->syncChanges(changes);
 }
 
 QJsonObject SyncManager::collectLocalChanges()
 {
     QJsonObject changes;
 
-    // QJsonArray workspaces = _localStorage->loadWorkspaces();
+    // QJsonArray workspaces = localStorage->loadWorkspaces();
     // changes["workspaces"] = workspaces;
 
     // for (const QJsonValue &workspace : workspaces) {
     //     QString workspaceId = workspace.toObject()["id"].toString();
-    //     QJsonArray items = _localStorage->loadWorkspaceItems(workspaceId);
+    //     QJsonArray items = localStorage->loadWorkspaceItems(workspaceId);
     //     changes[workspaceId + "_items"] = items;
     // }
 

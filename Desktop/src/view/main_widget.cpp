@@ -62,7 +62,7 @@ MainWidget::~MainWidget()
 
 void MainWidget::showAuthDialog()
 {
-    AuthDialog *authDialog = new AuthDialog(this);
+    auto authDialog = new AuthDialog(this);
     authDialog->setWindowTitle("Авторизация");
     authDialog->setWindowModality(Qt::ApplicationModal);
 
@@ -73,28 +73,18 @@ void MainWidget::showAuthDialog()
         initApplication();
     });
 
-    connect(_apiClient.get(), &ApiClient::loginSuccess, this,
-            [this, authDialog](const QString &token) {
-                _isGuestMode = false;
-                _authManager->login(token, "");
-                authDialog->accept();
-                initApplication();
-            });
-
-    connect(_apiClient.get(), &ApiClient::loginFailed, this, [authDialog](const QString &error) {
+    connect(_apiClient.get(), &ApiClient::loginSuccess, this, [authDialog](const QString &token) {
+        authDialog->accept();
+    });
+    connect(_apiClient.get(), &ApiClient::loginError, this, [authDialog](const QString &error) {
         QMessageBox::warning(authDialog, "Ошибка входа", error);
     });
-
-    connect(_apiClient.get(), &ApiClient::registrationSuccess, this, [authDialog]() {
-        QMessageBox::information(authDialog, "Успешная регистрация",
-                                 "Регистрация завершена. Теперь вы можете войти.");
-        authDialog->setCurrentTab(0);
+    connect(_apiClient.get(), &ApiClient::registerSuccess, this, [authDialog]() {
+        QMessageBox::information(authDialog, "Успех", "Регистрация успешна");
     });
-
-    connect(_apiClient.get(), &ApiClient::registrationFailed, this,
-            [authDialog](const QString &error) {
-                QMessageBox::warning(authDialog, "Ошибка регистрации", error);
-            });
+    connect(_apiClient.get(), &ApiClient::registerError, this, [authDialog](const QString &error) {
+        QMessageBox::warning(authDialog, "Ошибка регистрации", error);
+    });
 
     // Обработка закрытия диалога
     connect(authDialog, &QDialog::rejected, this, [this]() {

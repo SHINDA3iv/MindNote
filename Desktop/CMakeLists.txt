@@ -52,6 +52,9 @@ target_include_directories(Desktop PRIVATE
     ${SRC_DIR}/theme
     ${SRC_DIR}/data
     ${SRC_DIR}/data/elements
+    ${SRC_DIR}/api
+    ${Qt${QT_VERSION_MAJOR}Widgets_INCLUDE_DIRS}
+    ${Qt${QT_VERSION_MAJOR}Network_INCLUDE_DIRS}
 )
 
 # Копирование ресурсов в директорию сборки

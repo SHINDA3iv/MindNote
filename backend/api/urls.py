@@ -13,5 +13,6 @@ router.register(r'pages', PageViewSet, basename='page')
 
 urlpatterns = [
     path("", include(router.urls)),
-    # path("auth/", include("djoser.urls.authtoken")),
+    path('', include('djoser.urls')),
+    path('auth/', include('djoser.urls.authtoken')),
 ]
