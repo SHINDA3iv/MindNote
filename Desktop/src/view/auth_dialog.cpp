@@ -110,54 +110,54 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
                                         "}");
 
     // Вкладка входа
-    QWidget *loginTab = new QWidget();
+    QWidget *loginTab = new QWidget(this);
     QVBoxLayout *loginLayout = new QVBoxLayout(loginTab);
     loginLayout->setContentsMargins(15, 15, 15, 15);
     loginLayout->setSpacing(15);
 
     // Поля входа
-    _loginEmail = new QLineEdit();
+    _loginEmail = new QLineEdit(this);
     _loginEmail->setPlaceholderText("Email");
 
-    _loginPassword = new QLineEdit();
+    _loginPassword = new QLineEdit(this);
     _loginPassword->setPlaceholderText("Пароль");
     _loginPassword->setEchoMode(QLineEdit::Password);
 
-    _loginButton = new QPushButton("Войти");
+    _loginButton = new QPushButton("Войти", this);
     _loginButton->setObjectName("loginButton");
 
-    loginLayout->addWidget(new QLabel("Email:"));
+    loginLayout->addWidget(new QLabel("Email:", this));
     loginLayout->addWidget(_loginEmail);
-    loginLayout->addWidget(new QLabel("Пароль:"));
+    loginLayout->addWidget(new QLabel("Пароль:", this));
     loginLayout->addWidget(_loginPassword);
     loginLayout->addWidget(_loginButton);
     loginLayout->addStretch();
 
     // Вкладка регистрации
-    QWidget *registerTab = new QWidget();
+    QWidget *registerTab = new QWidget(this);
     QVBoxLayout *registerLayout = new QVBoxLayout(registerTab);
     registerLayout->setContentsMargins(15, 15, 15, 15);
     registerLayout->setSpacing(15);
 
     // Поля регистрации
-    _registerEmail = new QLineEdit();
+    _registerEmail = new QLineEdit(this);
     _registerEmail->setPlaceholderText("Email");
 
-    _registerUsername = new QLineEdit();
+    _registerUsername = new QLineEdit(this);
     _registerUsername->setPlaceholderText("Имя пользователя");
 
-    _registerPassword = new QLineEdit();
+    _registerPassword = new QLineEdit(this);
     _registerPassword->setPlaceholderText("Пароль");
     _registerPassword->setEchoMode(QLineEdit::Password);
 
-    _registerButton = new QPushButton("Зарегистрироваться");
+    _registerButton = new QPushButton("Зарегистрироваться", this);
     _registerButton->setObjectName("registerButton");
 
-    registerLayout->addWidget(new QLabel("Email:"));
+    registerLayout->addWidget(new QLabel("Email:", this));
     registerLayout->addWidget(_registerEmail);
-    registerLayout->addWidget(new QLabel("Имя пользователя:"));
+    registerLayout->addWidget(new QLabel("Имя пользователя:", this));
     registerLayout->addWidget(_registerUsername);
-    registerLayout->addWidget(new QLabel("Пароль:"));
+    registerLayout->addWidget(new QLabel("Пароль:", this));
     registerLayout->addWidget(_registerPassword);
     registerLayout->addWidget(_registerButton);
 
@@ -167,13 +167,13 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     mainLayout->addWidget(_tabWidget);
 
     // Разделитель
-    QFrame *divider = new QFrame();
+    QFrame *divider = new QFrame(this);
     divider->setFrameShape(QFrame::HLine);
     divider->setFrameShadow(QFrame::Plain);
     mainLayout->addWidget(divider);
 
     // Кнопка гостевого входа
-    QPushButton *guestButton = new QPushButton("Продолжить как гость");
+    QPushButton *guestButton = new QPushButton("Продолжить как гость", this);
     guestButton->setObjectName("guestButton");
     mainLayout->addWidget(guestButton);
 

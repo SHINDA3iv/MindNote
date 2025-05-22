@@ -55,7 +55,9 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
 
     QVBoxLayout *contentLayout = new QVBoxLayout(this);
 
-    QHBoxLayout *headerLayout = new QHBoxLayout();
+    auto headerWidget = new QWidget(this);
+    QHBoxLayout *headerLayout = new QHBoxLayout(headerWidget);
+    headerWidget->setLayout(headerLayout);
 
     _titleLabel = new QLabel(_workspaceName, this);
     _titleLabel->setAlignment(Qt::AlignCenter);
@@ -108,7 +110,9 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
 
     // --- Кнопки-ссылки на подпространства ---
     if (!_subWorkspaces.isEmpty()) {
-        QHBoxLayout *subLinksLayout = new QHBoxLayout();
+        auto sublinkWidget = new QWidget(this);
+        QHBoxLayout *subLinksLayout = new QHBoxLayout(sublinkWidget);
+        sublinkWidget->setLayout(subLinksLayout);
         for (Workspace *sub : _subWorkspaces) {
             QPushButton *subBtn = new QPushButton(sub->getName(), this);
             subBtn->setFlat(true);
@@ -119,10 +123,10 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
             });
             subLinksLayout->addWidget(subBtn);
         }
-        headerLayout->addLayout(subLinksLayout);
+        headerLayout->addWidget(sublinkWidget);
     }
 
-    contentLayout->addLayout(headerLayout);
+    contentLayout->addWidget(headerWidget);
 
     _contentWidget = new QWidget(this);
     _layout = new QVBoxLayout(_contentWidget);
@@ -161,9 +165,8 @@ void Workspace::setIcon(const QIcon &icon)
 
     // Масштабируем pixmap с сохранением пропорций
     QPixmap pixmap = _icon.pixmap(width, height);
-    QPixmap scaledPixmap = pixmap.scaled(width, height,
-                                         Qt::KeepAspectRatio,
-                                         Qt::SmoothTransformation);
+    QPixmap scaledPixmap =
+     pixmap.scaled(width, height, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
     _iconLabel->setPixmap(scaledPixmap);
     _iconLabel->setAlignment(Qt::AlignCenter); // Центрируем иконку в label
@@ -278,8 +281,7 @@ QJsonObject Workspace::serialize() const
     }
     json["items"] = itemArray;
 
-    qDebug() << "Finished serializing workspace:" << _workspaceName 
-             << "ID:" << _id
+    qDebug() << "Finished serializing workspace:" << _workspaceName << "ID:" << _id
              << "Parent:" << (_parentWorkspace ? _parentWorkspace->getId() : "none")
              << "Items:" << _items.size();
 

@@ -17,7 +17,7 @@ class WorkspaceController : public QObject
 
 public:
     explicit WorkspaceController(std::shared_ptr<LocalStorage> localStorage,
-                                 QObject *parent = nullptr);
+                                 QWidget *parent = nullptr);
 
 signals:
     void workspaceAdded(Workspace *workspace);
@@ -50,7 +50,7 @@ public:
     // Сохранение всех рабочих пространств
     void saveWorkspaces();
     // Загрузка рабочих пространств
-    void loadWorkspaces();
+    void loadWorkspaces(QWidget *parent = nullptr);
 
     // --- ВЛОЖЕННОСТЬ ---
     Workspace *createSubWorkspace(Workspace *parent, const QString &name);

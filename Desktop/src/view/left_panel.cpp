@@ -38,7 +38,7 @@ void LeftPanel::refreshWorkspaceList()
     _workspaceTree->setIconSize(iconSize);
     std::function<void(Workspace *, QTreeWidgetItem *)> addTree = [&](Workspace *ws,
                                                                       QTreeWidgetItem *parentItem) {
-        QTreeWidgetItem *item = new QTreeWidgetItem();
+        QTreeWidgetItem *item = new QTreeWidgetItem(parentItem);
         item->setText(0, ws->getName());
         if (!ws->getIcon().isNull()) {
             QPixmap pixmap = ws->getIcon().pixmap(iconSize);

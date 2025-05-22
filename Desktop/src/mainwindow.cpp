@@ -165,7 +165,7 @@ void MainWindow::createMenus()
     authLayout->addWidget(_logoutButton);
 
     // Добавляем виджет аутентификации в правый угол
-    QWidget* spacer = new QWidget();
+    QWidget* spacer = new QWidget(this);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     menuBar()->setCornerWidget(spacer, Qt::TopLeftCorner);
     menuBar()->setCornerWidget(authWidget, Qt::TopRightCorner);

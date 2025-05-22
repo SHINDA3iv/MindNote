@@ -7,11 +7,11 @@
 #include <qapplication.h>
 
 WorkspaceController::WorkspaceController(std::shared_ptr<LocalStorage> localStorage,
-                                         QObject *parent) :
+                                         QWidget *parent) :
     QObject(parent),
     _localStorage(localStorage)
 {
-    loadWorkspaces();
+    loadWorkspaces(parent);
 
     // Connect signals from loaded workspaces
     for (Workspace *ws : _workspaces) {
@@ -256,7 +256,7 @@ void WorkspaceController::saveWorkspaces()
     }
 }
 
-void WorkspaceController::loadWorkspaces()
+void WorkspaceController::loadWorkspaces(QWidget *parent)
 {
     QDir workspacesDir(QApplication::applicationDirPath() + "/Workspaces/");
     if (!workspacesDir.exists())
@@ -264,7 +264,7 @@ void WorkspaceController::loadWorkspaces()
 
     QFileInfoList folders = workspacesDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
     for (const QFileInfo &folder : folders) {
-        Workspace *workspace = _localStorage->loadWorkspace(folder.baseName());
+        Workspace *workspace = _localStorage->loadWorkspace(folder.baseName(), parent);
         if (workspace) {
             _workspaces.append(workspace);
         }

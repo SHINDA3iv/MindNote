@@ -20,13 +20,13 @@ MainWidget::MainWidget(QWidget *parent) :
     QString settingsPath = QCoreApplication::applicationDirPath() + "/settings.ini";
     _settings = new QSettings(settingsPath, QSettings::IniFormat, this);
 
-    _localStorage = std::make_shared<LocalStorage>();
-    _apiClient = std::make_shared<ApiClient>();
-    _syncManager = std::make_shared<SyncManager>(_apiClient, _localStorage);
+    _localStorage = std::make_shared<LocalStorage>(this);
+    _apiClient = std::make_shared<ApiClient>(this);
+    _syncManager = std::make_shared<SyncManager>(_apiClient, _localStorage, this);
 
-    _workspaceController = std::make_unique<WorkspaceController>(_localStorage);
+    _workspaceController = std::make_unique<WorkspaceController>(_localStorage, this);
 
-    _authManager = std::make_shared<AuthManager>();
+    _authManager = std::make_shared<AuthManager>(this);
 
     if (!_authManager->isAuthenticated()) {
         showAuthDialog();

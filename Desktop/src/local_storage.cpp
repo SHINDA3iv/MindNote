@@ -40,7 +40,8 @@ void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &jso
     json["name"] = workspace->getName();
     json["id"] = workspace->getId();
 
-    qDebug() << "Saving workspace recursively:" << workspace->getName() << "ID:" << workspace->getId();
+    qDebug() << "Saving workspace recursively:" << workspace->getName()
+             << "ID:" << workspace->getId();
 
     // Сохранение иконки
     QIcon icon = workspace->getIcon();
@@ -61,7 +62,8 @@ void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &jso
     QJsonArray itemsArray;
     for (const AbstractWorkspaceItem *item : workspace->getItems()) {
         itemsArray.append(item->serialize());
-        qDebug() << "Saved item of type:" << item->type() << "in workspace:" << workspace->getName();
+        qDebug() << "Saved item of type:" << item->type()
+                 << "in workspace:" << workspace->getName();
     }
     json["items"] = itemsArray;
 
@@ -76,7 +78,7 @@ void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &jso
     json["subspaces"] = subspaces;
 }
 
-Workspace *LocalStorage::loadWorkspace(const QString &workspaceName)
+Workspace *LocalStorage::loadWorkspace(const QString &workspaceName, QWidget *parent)
 {
     QString workspacePath = storagePath + workspaceName + "/workspace.json";
     QFile file(workspacePath);
@@ -100,15 +102,16 @@ Workspace *LocalStorage::loadWorkspace(const QString &workspaceName)
         return nullptr;
     }
 
-    return loadWorkspaceRecursive(doc.object());
+    return loadWorkspaceRecursive(doc.object(), parent);
 }
 
-Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, Workspace *parent)
+Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget *parent)
 {
     Workspace *workspace = new Workspace(json["name"].toString(), parent);
     workspace->setId(json["id"].toString());
 
-    qDebug() << "Loading workspace recursively:" << workspace->getName() << "ID:" << workspace->getId();
+    qDebug() << "Loading workspace recursively:" << workspace->getName()
+             << "ID:" << workspace->getId();
 
     // Загрузка иконки
     if (json.contains("icon")) {
@@ -137,7 +140,8 @@ Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, Workspa
             Workspace *sub = loadWorkspaceRecursive(value.toObject(), workspace);
             if (sub) {
                 workspace->addSubWorkspace(sub);
-                qDebug() << "Loaded subspace:" << sub->getName() << "for workspace:" << workspace->getName();
+                qDebug() << "Loaded subspace:" << sub->getName()
+                         << "for workspace:" << workspace->getName();
             }
         }
     }

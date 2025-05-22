@@ -25,12 +25,14 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     mainLayout->addWidget(_tabWidget);
 
     // Buttons
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    QWidget *buttonWidget = new QWidget(this);
+    QHBoxLayout *buttonLayout = new QHBoxLayout(buttonWidget);
+    buttonWidget->setLayout(buttonLayout);
     buttonLayout->setSpacing(10);
 
-    _applyButton = new QPushButton("Применить", this);
-    _resetButton = new QPushButton("Сбросить", this);
-    _cancelButton = new QPushButton("Отмена", this);
+    _applyButton = new QPushButton("Применить", buttonWidget);
+    _resetButton = new QPushButton("Сбросить", buttonWidget);
+    _cancelButton = new QPushButton("Отмена", buttonWidget);
 
     buttonLayout->addStretch();
     buttonLayout->addWidget(_applyButton);
@@ -49,7 +51,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
 
 void SettingsDialog::initThemeTab()
 {
-    QWidget *themeTab = new QWidget();
+    QWidget *themeTab = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(themeTab);
     layout->setContentsMargins(15, 15, 15, 15);
     layout->setSpacing(15);
@@ -101,7 +103,7 @@ void SettingsDialog::initThemeTab()
 
 void SettingsDialog::initEditorTab()
 {
-    QWidget *editorTab = new QWidget();
+    QWidget *editorTab = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(editorTab);
     layout->setContentsMargins(15, 15, 15, 15);
     layout->setSpacing(15);
@@ -141,7 +143,7 @@ void SettingsDialog::initEditorTab()
 
 void SettingsDialog::initSyncTab()
 {
-    QWidget *syncTab = new QWidget();
+    QWidget *syncTab = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(syncTab);
     layout->setContentsMargins(15, 15, 15, 15);
     layout->setSpacing(15);
@@ -167,8 +169,10 @@ void SettingsDialog::loadSettings()
 {
     // Theme settings
     _themeCombo->setCurrentText(SettingsManager::instance().theme());
-    _primaryColorButton->setStyleSheet(QString("background-color: %1").arg(SettingsManager::instance().primaryColor().name()));
-    _secondaryColorButton->setStyleSheet(QString("background-color: %1").arg(SettingsManager::instance().secondaryColor().name()));
+    _primaryColorButton->setStyleSheet(
+     QString("background-color: %1").arg(SettingsManager::instance().primaryColor().name()));
+    _secondaryColorButton->setStyleSheet(
+     QString("background-color: %1").arg(SettingsManager::instance().secondaryColor().name()));
     _darkModeCheck->setChecked(SettingsManager::instance().darkMode());
 
     // Editor settings
@@ -188,8 +192,10 @@ void SettingsDialog::saveSettings()
 {
     // Theme settings
     SettingsManager::instance().setTheme(_themeCombo->currentText());
-    SettingsManager::instance().setPrimaryColor(_primaryColorButton->palette().color(QPalette::Button));
-    SettingsManager::instance().setSecondaryColor(_secondaryColorButton->palette().color(QPalette::Button));
+    SettingsManager::instance().setPrimaryColor(
+     _primaryColorButton->palette().color(QPalette::Button));
+    SettingsManager::instance().setSecondaryColor(
+     _secondaryColorButton->palette().color(QPalette::Button));
     SettingsManager::instance().setDarkMode(_darkModeCheck->isChecked());
 
     // Editor settings
