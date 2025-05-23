@@ -16,8 +16,10 @@ public:
     bool isAuthenticated() const;
     QString getUsername() const;
     QString getAuthToken() const;
+    bool isRememberMeEnabled() const;
 
-    void login(const QString &token, const QString &username);
+    void login(const QString &token, const QString &username, bool rememberMe = false);
+    void setRememberMe(bool enabled);
     void logout();
     void registerUser(const QString &email, const QString &password, const QString &username);
 
@@ -35,6 +37,7 @@ private:
     QString _authToken;
     QString _username;
     bool _isAuthenticated;
+    bool _rememberMe;
     QSettings _settings;
 };
 

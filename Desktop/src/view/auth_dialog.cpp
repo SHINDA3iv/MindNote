@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 #include <qevent.h>
 #include <qtabbar.h>
+#include <QCheckBox>
 
 AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
 {
@@ -123,6 +124,9 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     _loginPassword->setPlaceholderText("Пароль");
     _loginPassword->setEchoMode(QLineEdit::Password);
 
+    _rememberMe = new QCheckBox("Запомнить меня", this);
+    _rememberMe->setChecked(true);
+
     _loginButton = new QPushButton("Войти", this);
     _loginButton->setObjectName("loginButton");
 
@@ -130,6 +134,7 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     loginLayout->addWidget(_loginEmail);
     loginLayout->addWidget(new QLabel("Пароль:", this));
     loginLayout->addWidget(_loginPassword);
+    loginLayout->addWidget(_rememberMe);
     loginLayout->addWidget(_loginButton);
     loginLayout->addStretch();
 
@@ -195,7 +200,7 @@ void AuthDialog::closeEvent(QCloseEvent *event)
 
 void AuthDialog::onLoginClicked()
 {
-    emit loginRequested(_loginEmail->text(), _loginPassword->text());
+    emit loginRequested(_loginEmail->text(), _loginPassword->text(), _rememberMe->isChecked());
 }
 
 void AuthDialog::onRegisterClicked()

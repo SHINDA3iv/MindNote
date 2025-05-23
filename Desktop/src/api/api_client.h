@@ -22,6 +22,7 @@ public:
     void setBaseUrl(const QString &url);
     void setAuthToken(const QString &token);
     bool isAuthenticated() const;
+    QString getUsername() const;
     
     // Методы для работы с API
     void login(const QString &username, const QString &password);
@@ -63,6 +64,7 @@ private:
     QNetworkAccessManager *networkManager;
     QString baseUrl;
     QString authToken;
+    QString _username;
 
     QNetworkRequest createRequest(const QString &endpoint);
     void handleResponse(QNetworkReply *reply, const std::function<void(const QJsonDocument &)> &successCallback);

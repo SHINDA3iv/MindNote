@@ -9,6 +9,7 @@
 class QLineEdit;
 class QPushButton;
 class QTabWidget;
+class QCheckBox;
 
 class AuthDialog : public QDialog
 {
@@ -26,7 +27,7 @@ public:
     }
 
 signals:
-    void loginRequested(const QString &email, const QString &password);
+    void loginRequested(const QString &email, const QString &password, bool rememberMe);
     void registerRequested(const QString &email, const QString &password, const QString &username);
     void guestLoginRequested();
 
@@ -42,6 +43,7 @@ private:
     QLineEdit *_loginEmail;
     QLineEdit *_loginPassword;
     QPushButton *_loginButton;
+    QCheckBox *_rememberMe;
 
     QLineEdit *_registerEmail;
     QLineEdit *_registerPassword;

@@ -65,6 +65,9 @@ private slots:
     void onLoginRequested();
     void onAuthStateChanged();
     void updateAuthUI();
+    void onVersionConflictDetected(const QJsonArray &serverWorkspaces);
+    void onSyncCompleted();
+    void onSyncError(const QString &error);
 
 private:
     void initWindow();

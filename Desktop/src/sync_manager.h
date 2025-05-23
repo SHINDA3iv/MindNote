@@ -21,6 +21,13 @@ public:
     void startAutoSync(int intervalMs);
     void stopAutoSync();
     void performFullSync();
+    void syncWithVersionSelection(const QJsonArray &serverWorkspaces);
+
+signals:
+    void syncStarted();
+    void syncCompleted();
+    void syncError(const QString &error);
+    void versionConflictDetected(const QJsonArray &serverWorkspaces);
 
 private slots:
     void onWorkspacesFetched(const QJsonArray &workspaces);
@@ -31,6 +38,7 @@ private slots:
 
 private:
     QJsonObject collectLocalChanges();
+    bool hasVersionConflicts(const QJsonArray &serverWorkspaces);
 
     std::shared_ptr<ApiClient> apiClient;
     std::shared_ptr<LocalStorage> localStorage;

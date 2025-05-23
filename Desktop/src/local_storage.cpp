@@ -4,19 +4,34 @@
 #include <qapplication.h>
 #include <qbuffer.h>
 #include <QDebug>
+#include <QMessageBox>
 
 LocalStorage::LocalStorage(QObject *parent) : QObject(parent)
 {
-    storagePath = QApplication::applicationDirPath() + "/Workspaces/";
-    QDir().mkpath(storagePath);
+    initializePaths();
 }
 
-void LocalStorage::saveWorkspace(Workspace *workspace)
+void LocalStorage::initializePaths()
+{
+    storagePath = QApplication::applicationDirPath() + "/Workspaces/";
+    guestPath = storagePath + "guest/";
+    userPath = storagePath + "user/";
+    
+    QDir().mkpath(guestPath);
+    QDir().mkpath(userPath);
+}
+
+QString LocalStorage::getWorkspacePath(bool isGuest) const
+{
+    return isGuest ? guestPath : userPath;
+}
+
+void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
 {
     if (!workspace)
         return;
 
-    QString workspacePath = storagePath + workspace->getName() + "/";
+    QString workspacePath = getWorkspacePath(isGuest) + workspace->getName() + "/";
     QDir().mkpath(workspacePath);
 
     QFile file(workspacePath + "workspace.json");
@@ -78,9 +93,9 @@ void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &jso
     json["subspaces"] = subspaces;
 }
 
-Workspace *LocalStorage::loadWorkspace(const QString &workspaceName, QWidget *parent)
+Workspace *LocalStorage::loadWorkspace(const QString &workspaceName, QWidget *parent, bool isGuest)
 {
-    QString workspacePath = storagePath + workspaceName + "/workspace.json";
+    QString workspacePath = getWorkspacePath(isGuest) + workspaceName + "/workspace.json";
     QFile file(workspacePath);
 
     if (!file.exists()) {
@@ -149,23 +164,74 @@ Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget
     return workspace;
 }
 
-void LocalStorage::deleteWorkspace(const QString &workspaceName)
+void LocalStorage::deleteWorkspace(const QString &workspaceName, bool isGuest)
 {
-    QString workspacePath = storagePath + workspaceName + "/";
+    QString workspacePath = getWorkspacePath(isGuest) + workspaceName;
     QDir dir(workspacePath);
-
     if (dir.exists()) {
-        // Удаляем все содержимое папки
-        QFileInfoList files = dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
-        for (const QFileInfo &file : files) {
-            if (file.isDir()) {
-                deleteWorkspace(file.baseName());
-            } else {
-                QFile::remove(file.absoluteFilePath());
+        dir.removeRecursively();
+    }
+}
+
+void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepLocal)
+{
+    // Get list of local workspaces
+    QDir guestDir(guestPath);
+    QDir userDir(userPath);
+    
+    QStringList localWorkspaces;
+    if (keepLocal) {
+        localWorkspaces = guestDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    }
+    
+    // Process server workspaces
+    for (const QJsonValue &workspaceValue : serverWorkspaces) {
+        QJsonObject workspaceObj = workspaceValue.toObject();
+        QString workspaceName = workspaceObj["name"].toString();
+        QString workspaceId = workspaceObj["id"].toString();
+        QString version = workspaceObj["version"].toString();
+        
+        // Check if workspace exists locally
+        bool existsLocally = localWorkspaces.contains(workspaceName);
+        
+        if (existsLocally && keepLocal) {
+            // Keep local version
+            continue;
+        }
+        
+        // Create or update workspace
+        Workspace *workspace = new Workspace(workspaceName);
+        workspace->setId(workspaceId);
+        workspace->setVersion(version);
+        
+        // Load workspace items if any
+        if (workspaceObj.contains("items")) {
+            QJsonArray items = workspaceObj["items"].toArray();
+            for (const QJsonValue &itemValue : items) {
+                QJsonObject itemObj = itemValue.toObject();
+                // Create and add workspace item
+                // TODO: Implement workspace item creation based on type
             }
         }
-
-        // Удаляем саму папку
-        dir.rmdir(workspacePath);
+        
+        // Save workspace to user directory
+        saveWorkspace(workspace, false);
+        delete workspace;
+    }
+    
+    // Remove workspaces that don't exist on server
+    if (!keepLocal) {
+        QStringList serverWorkspaceNames;
+        for (const QJsonValue &workspaceValue : serverWorkspaces) {
+            QJsonObject workspaceObj = workspaceValue.toObject();
+            serverWorkspaceNames.append(workspaceObj["name"].toString());
+        }
+        
+        QStringList localWorkspaceNames = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &workspaceName : localWorkspaceNames) {
+            if (!serverWorkspaceNames.contains(workspaceName)) {
+                deleteWorkspace(workspaceName, false);
+            }
+        }
     }
 }

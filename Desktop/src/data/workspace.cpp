@@ -258,6 +258,7 @@ QJsonObject Workspace::serialize() const
     QJsonObject json;
     json["name"] = _workspaceName;
     json["id"] = _id;
+    json["version"] = _version;
     json["parentId"] = _parentWorkspace ? _parentWorkspace->getId() : "";
 
     qDebug() << "Starting serialization of workspace:" << _workspaceName << "ID:" << _id;
@@ -466,13 +467,17 @@ QString Workspace::getFullPathName() const
 }
 QString Workspace::getPath() const
 {
-    QStringList pathParts;
-    const Workspace *current = this;
-    while (current) {
-        pathParts.prepend(current->getName());
-        current = current->getParentWorkspace();
-    }
-    return pathParts.join("/");
+    return getFullPathName();
+}
+
+QString Workspace::getVersion() const
+{
+    return _version;
+}
+
+void Workspace::setVersion(const QString &version)
+{
+    _version = version;
 }
 
 Workspace *Workspace::getRootWorkspace()

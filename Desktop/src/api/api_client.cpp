@@ -32,6 +32,11 @@ bool ApiClient::isAuthenticated() const
     return !authToken.isEmpty();
 }
 
+QString ApiClient::getUsername() const
+{
+    return _username;
+}
+
 QNetworkRequest ApiClient::createRequest(const QString &endpoint)
 {
     QNetworkRequest request(QUrl(baseUrl + endpoint));
@@ -64,6 +69,7 @@ void ApiClient::login(const QString &username, const QString &password)
     QJsonObject data;
     data["username"] = username;
     data["password"] = password;
+    _username = username;  // Store username
 
     QNetworkRequest request = createRequest("auth/token/login/");
     QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());

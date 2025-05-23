@@ -52,6 +52,10 @@ public:
 
     QString getPath() const;
 
+    // Version management
+    QString getVersion() const;
+    void setVersion(const QString &version);
+
 public slots:
     Workspace *getRootWorkspace();
 signals:
@@ -62,6 +66,7 @@ private:
     void updateContentSize();
 
     QString _workspaceName;
+    QString _version;
 
     QPointer<QVBoxLayout> _layout;
     QPointer<QScrollArea> _scrollArea;

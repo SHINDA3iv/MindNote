@@ -23,16 +23,12 @@ MainWidget::MainWidget(QWidget *parent) :
     _localStorage = std::make_shared<LocalStorage>(this);
     _apiClient = std::make_shared<ApiClient>(this);
     _syncManager = std::make_shared<SyncManager>(_apiClient, _localStorage, this);
-
     _workspaceController = std::make_unique<WorkspaceController>(_localStorage, this);
-
     _authManager = std::make_shared<AuthManager>(this);
 
-    if (!_authManager->isAuthenticated()) {
-        showAuthDialog();
-    } else {
-        initApplication();
-    }
+    // Initialize UI first
+    initWindow();
+    initConnections();
 
     // Connect workspace controller signals
     connect(_workspaceController.get(), &WorkspaceController::workspaceAdded, this,
@@ -48,8 +44,15 @@ MainWidget::MainWidget(QWidget *parent) :
     connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved, _editorWidget.get(),
             &EditorWidget::onWorkspaceRemoved);
 
-    // initUI();
-    // initConnections();
+    // Check authentication after UI is initialized
+    if (!_authManager->isAuthenticated()) {
+        showAuthDialog();
+    } else {
+        initApplication();
+    }
+
+    // Update UI state
+    updateAuthUI();
 }
 
 MainWidget::~MainWidget()
@@ -62,18 +65,27 @@ MainWidget::~MainWidget()
 
 void MainWidget::showAuthDialog()
 {
+    qDebug() << "Showing auth dialog";
     auto authDialog = new AuthDialog(this);
     authDialog->setWindowTitle("Авторизация");
     authDialog->setWindowModality(Qt::ApplicationModal);
 
-    connect(authDialog, &AuthDialog::loginRequested, _apiClient.get(), &ApiClient::login);
+    connect(authDialog, &AuthDialog::loginRequested, this, [this, authDialog](const QString &email, const QString &password, bool rememberMe) {
+        qDebug() << "Login requested - email:" << email << "rememberMe:" << rememberMe;
+        _apiClient->login(email, password);
+        _authManager->setRememberMe(rememberMe);
+    });
     connect(authDialog, &AuthDialog::registerRequested, _apiClient.get(), &ApiClient::registerUser);
     connect(authDialog, &AuthDialog::guestLoginRequested, this, [this]() {
         _isGuestMode = true;
         initApplication();
     });
 
-    connect(_apiClient.get(), &ApiClient::loginSuccess, this, [authDialog](const QString &token) {
+    connect(_apiClient.get(), &ApiClient::loginSuccess, this, [this, authDialog](const QString &token) {
+        _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
+        
+        // Get server workspaces after successful login
+        _apiClient->getWorkspaces();
         authDialog->accept();
     });
     connect(_apiClient.get(), &ApiClient::loginError, this, [authDialog](const QString &error) {
@@ -86,6 +98,28 @@ void MainWidget::showAuthDialog()
         QMessageBox::warning(authDialog, "Ошибка регистрации", error);
     });
 
+    // Handle workspace synchronization after login
+    connect(_apiClient.get(), &ApiClient::workspacesReceived, this, [this](const QJsonArray &serverWorkspaces) {
+        if (_authManager->isRememberMeEnabled()) {
+            // Show dialog to choose synchronization strategy
+            QMessageBox::StandardButton reply = QMessageBox::question(this, "Синхронизация пространств",
+                "Обнаружены различия между локальными и серверными пространствами. "
+                "Хотите сохранить локальные версии?",
+                QMessageBox::Yes | QMessageBox::No);
+
+            if (reply == QMessageBox::Yes) {
+                // Keep local versions
+                _localStorage->syncWorkspaces(serverWorkspaces, true);
+            } else {
+                // Use server versions
+                _localStorage->syncWorkspaces(serverWorkspaces, false);
+            }
+        } else {
+            // If remember me is not enabled, only sync to server
+            _localStorage->syncWorkspaces(serverWorkspaces, false);
+        }
+    });
+
     // Обработка закрытия диалога
     connect(authDialog, &QDialog::rejected, this, [this]() {
         // Если пользователь закрыл диалог, продолжаем как гость
@@ -95,7 +129,9 @@ void MainWidget::showAuthDialog()
         }
     });
 
+    qDebug() << "Executing auth dialog";
     authDialog->exec();
+    qDebug() << "Auth dialog finished";
     authDialog->deleteLater();
 }
 
@@ -135,6 +171,14 @@ void MainWidget::initConnections()
             &MainWidget::onAuthStateChanged);
     connect(_authManager.get(), &AuthManager::loginRequested, this, &MainWidget::onLoginRequested);
     connect(_authManager.get(), &AuthManager::logoutRequested, this, &MainWidget::onLogout);
+
+    // Sync connections
+    connect(_syncManager.get(), &SyncManager::versionConflictDetected, this,
+            &MainWidget::onVersionConflictDetected);
+    connect(_syncManager.get(), &SyncManager::syncCompleted, this,
+            &MainWidget::onSyncCompleted);
+    connect(_syncManager.get(), &SyncManager::syncError, this,
+            &MainWidget::onSyncError);
 }
 
 void MainWidget::onAuthStateChanged()
@@ -148,12 +192,54 @@ void MainWidget::updateAuthUI()
     bool isAuthenticated = _authManager->isAuthenticated();
     QString username = _authManager->getUsername();
 
+    qDebug() << "Updating auth UI - isAuthenticated:" << isAuthenticated << "username:" << username;
+
     // Update status message
     if (isAuthenticated) {
         emit statusMessage(tr("Logged in as: %1").arg(username));
     } else {
         emit statusMessage(tr("Not logged in"));
     }
+
+    // Emit auth state changed to update main window UI
+    emit authStateChanged();
+}
+
+void MainWidget::onVersionConflictDetected(const QJsonArray &serverWorkspaces)
+{
+    QMessageBox::StandardButton reply = QMessageBox::question(this, "Конфликт версий",
+        "Обнаружены различия между локальными и серверными пространствами. "
+        "Хотите сохранить локальные версии?",
+        QMessageBox::Yes | QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+        // Keep local versions
+        _localStorage->syncWorkspaces(serverWorkspaces, true);
+    } else {
+        // Use server versions
+        _localStorage->syncWorkspaces(serverWorkspaces, false);
+    }
+}
+
+void MainWidget::onSyncCompleted()
+{
+    emit statusMessage(tr("Синхронизация завершена"));
+    updateWorkspaceList();
+}
+
+void MainWidget::onSyncError(const QString &error)
+{
+    emit statusMessage(tr("Ошибка синхронизации: %1").arg(error));
+}
+
+void MainWidget::syncWorkspaces()
+{
+    if (!_authManager->isAuthenticated()) {
+        emit statusMessage(tr("Требуется авторизация для синхронизации"));
+        return;
+    }
+
+    _syncManager->performFullSync();
 }
 
 // Workspace operations
@@ -229,12 +315,6 @@ bool MainWidget::saveWorkspaceAs()
         return true;
     }
     return false;
-}
-
-void MainWidget::syncWorkspaces()
-{
-    // TODO: Implement workspace synchronization
-    emit statusMessage("Workspaces synchronized");
 }
 
 // Edit operations

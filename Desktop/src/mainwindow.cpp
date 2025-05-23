@@ -14,6 +14,7 @@
 #include <QPushButton>
 #include <QListWidgetItem>
 #include <QVariant>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
@@ -179,9 +180,14 @@ void MainWindow::updateAuthMenu()
     bool isAuthenticated = _mainWidget->isAuthenticated();
     QString username = _mainWidget->getUsername();
 
+    qDebug() << "Updating auth menu - isAuthenticated:" << isAuthenticated << "username:" << username;
+
     _userLabel->setText(isAuthenticated ? username : "Гость");
     _loginButton->setVisible(!isAuthenticated);
     _logoutButton->setVisible(isAuthenticated);
+
+    // Force update of the menu bar
+    menuBar()->update();
 }
 
 void MainWindow::onLoginRequested()
