@@ -36,6 +36,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     // Connect workspace controller signals
     connect(_mainWidget.get(), &MainWidget::workspaceAdded, this, &MainWindow::updateWorkspaceList);
     connect(_mainWidget.get(), &MainWidget::workspaceRemoved, this, &MainWindow::updateWorkspaceList);
+
+    // Подключаем к изменениям состояния аутентификации
+    connect(_mainWidget.get(), &MainWidget::authStateChanged, this, &MainWindow::updateAuthMenu);
+    
+    // Update auth UI with initial state
+    updateAuthMenu();
 }
 
 MainWindow::~MainWindow()
@@ -170,9 +176,6 @@ void MainWindow::createMenus()
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     menuBar()->setCornerWidget(spacer, Qt::TopLeftCorner);
     menuBar()->setCornerWidget(authWidget, Qt::TopRightCorner);
-
-    // Подключаем к изменениям состояния аутентификации
-    connect(_mainWidget.get(), &MainWidget::authStateChanged, this, &MainWindow::updateAuthMenu);
 }
 
 void MainWindow::updateAuthMenu()
