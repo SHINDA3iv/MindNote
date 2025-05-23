@@ -30,8 +30,6 @@ data class Workspace(
             when (item) {
                 is ContentItem.TextItem -> item.id == itemId
                 is ContentItem.CheckboxItem -> item.id == itemId
-                is ContentItem.NumberedListItem -> item.id == itemId
-                is ContentItem.BulletListItem -> item.id == itemId
                 is ContentItem.ImageItem -> item.id == itemId
                 is ContentItem.FileItem -> item.id == itemId
             }
@@ -54,10 +52,6 @@ data class Workspace(
                     item.id == (updatedItem as? ContentItem.TextItem)?.id
                 is ContentItem.CheckboxItem -> 
                     item.id == (updatedItem as? ContentItem.CheckboxItem)?.id
-                is ContentItem.NumberedListItem -> 
-                    item.id == (updatedItem as? ContentItem.NumberedListItem)?.id
-                is ContentItem.BulletListItem -> 
-                    item.id == (updatedItem as? ContentItem.BulletListItem)?.id
                 is ContentItem.ImageItem -> 
                     item.id == (updatedItem as? ContentItem.ImageItem)?.id
                 is ContentItem.FileItem -> 
@@ -70,8 +64,6 @@ data class Workspace(
             val itemId = when (updatedItem) {
                 is ContentItem.TextItem -> updatedItem.id
                 is ContentItem.CheckboxItem -> updatedItem.id
-                is ContentItem.NumberedListItem -> updatedItem.id
-                is ContentItem.BulletListItem -> updatedItem.id
                 is ContentItem.ImageItem -> updatedItem.id
                 is ContentItem.FileItem -> updatedItem.id
             }
@@ -80,8 +72,6 @@ data class Workspace(
             val itemId = when (updatedItem) {
                 is ContentItem.TextItem -> updatedItem.id
                 is ContentItem.CheckboxItem -> updatedItem.id
-                is ContentItem.NumberedListItem -> updatedItem.id
-                is ContentItem.BulletListItem -> updatedItem.id
                 is ContentItem.ImageItem -> updatedItem.id
                 is ContentItem.FileItem -> updatedItem.id
             }
@@ -89,23 +79,4 @@ data class Workspace(
             _items.add(updatedItem)
         }
     }
-    
-    // Создаем копию рабочего пространства с новым списком элементов
-//    fun copy(
-//        name: String = this.name,
-//        iconUri: Uri? = this.iconUri,
-//        isFavorite: Boolean = this.isFavorite,
-//        lastAccessed: Long = this.lastAccessed,
-//        items: List<ContentItem> = this.items,
-//        id: String = this.id
-//    ): Workspace {
-//        return Workspace(
-//            name = name,
-//            iconUri = iconUri,
-//            isFavorite = isFavorite,
-//            lastAccessed = lastAccessed,
-//            _items = items.toMutableList(),
-//            id = id
-//        )
-//    }
 } 

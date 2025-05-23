@@ -142,17 +142,6 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("isChecked", src.isChecked)
                 jsonObject.addProperty("id", src.id)
             }
-            is ContentItem.NumberedListItem -> {
-                jsonObject.addProperty("type", "NumberedListItem")
-                jsonObject.addProperty("text", src.text)
-                jsonObject.addProperty("number", src.number)
-                jsonObject.addProperty("id", src.id)
-            }
-            is ContentItem.BulletListItem -> {
-                jsonObject.addProperty("type", "BulletListItem")
-                jsonObject.addProperty("text", src.text)
-                jsonObject.addProperty("id", src.id)
-            }
             is ContentItem.ImageItem -> {
                 jsonObject.addProperty("type", "ImageItem")
                 jsonObject.addProperty("imageUri", src.imageUri.toString())
@@ -182,15 +171,6 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
             "CheckboxItem" -> ContentItem.CheckboxItem(
                 text = jsonObject.get("text")?.asString ?: "",
                 isChecked = jsonObject.get("isChecked")?.asBoolean ?: false,
-                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
-            )
-            "NumberedListItem" -> ContentItem.NumberedListItem(
-                text = jsonObject.get("text")?.asString ?: "",
-                number = jsonObject.get("number")?.asInt ?: 0,
-                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
-            )
-            "BulletListItem" -> ContentItem.BulletListItem(
-                text = jsonObject.get("text")?.asString ?: "",
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             "ImageItem" -> ContentItem.ImageItem(

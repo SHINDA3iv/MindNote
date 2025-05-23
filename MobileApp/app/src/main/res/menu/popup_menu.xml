@@ -13,10 +13,4 @@
     <item
         android:id="@+id/popup_option4"
         android:title="Файл" />
-    <item
-        android:id="@+id/popup_option5"
-        android:title="Нумерованный список" />
-    <item
-        android:id="@+id/popup_option6"
-        android:title="Маркированный список" />
 </menu> 

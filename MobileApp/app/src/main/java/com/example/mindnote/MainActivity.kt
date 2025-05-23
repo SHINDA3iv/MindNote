@@ -57,10 +57,9 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
 
         // Навигация
-        ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close).also { toggle ->
-            drawerLayout.addDrawerListener(toggle)
-            toggle.syncState()
-        }
+        val toggle = ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close)
+        drawerLayout.addDrawerListener(toggle)
+        toggle.syncState()
 
         val headerView = navigationView.getHeaderView(0)
         val addButton = headerView.findViewById<Button>(R.id.nav_header_add_button)
@@ -107,11 +106,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+
+        // Инициализируем пункт меню
         toolbarAddButton = menu?.findItem(R.id.action_add) ?: return false
         toolbarAddButton.setOnMenuItemClickListener {
             showPopupMenu()
             true
         }
+
+        // По умолчанию скрываем кнопку
+        toolbarAddButton.isVisible = false
+
         return true
     }
 
@@ -152,18 +157,6 @@ class MainActivity : AppCompatActivity() {
                     intent.type = "*/*"
                     intent.addCategory(Intent.CATEGORY_OPENABLE)
                     startActivityForResult(intent, PICK_FILE_REQUEST)
-                    true
-                }
-                R.id.popup_option5 -> {
-                    Log.d("MindNote", "MainActivity: Add numbered list selected")
-                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
-                    fragment?.addNumberedListItem(null)
-                    true
-                }
-                R.id.popup_option6 -> {
-                    Log.d("MindNote", "MainActivity: Add bullet list selected")
-                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
-                    fragment?.addBulletListItem(null)
                     true
                 }
                 else -> false
@@ -384,14 +377,16 @@ class MainActivity : AppCompatActivity() {
         workspace?.let {
             Log.d("MindNote", "MainActivity: Opening workspace '${workspace.name}' with ${workspace.items.size} items")
             viewModel.setCurrentWorkspace(it)
-            
+
             // Очищаем стек фрагментов перед добавлением нового
             supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-            
             val fragment = WorkspaceFragment.newInstance(workspaceName)
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .commit()
+
+            // Показываем кнопку меню
+            toolbarAddButton.isVisible = true
         }
     }
 

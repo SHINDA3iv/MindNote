@@ -16,17 +16,6 @@ sealed class ContentItem {
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()
 
-    data class NumberedListItem(
-        var text: String,
-        var number: Int,
-        override val id: String = java.util.UUID.randomUUID().toString()
-    ) : ContentItem()
-
-    data class BulletListItem(
-        var text: String,
-        override val id: String = java.util.UUID.randomUUID().toString()
-    ) : ContentItem()
-
     data class ImageItem(
         var imageUri: Uri,
         override val id: String = java.util.UUID.randomUUID().toString()

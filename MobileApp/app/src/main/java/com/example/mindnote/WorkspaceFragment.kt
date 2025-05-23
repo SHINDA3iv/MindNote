@@ -112,8 +112,6 @@ class WorkspaceFragment : Fragment() {
             when (item) {
                 is ContentItem.TextItem -> addTextField(item)
                 is ContentItem.CheckboxItem -> addCheckboxItem(item)
-                is ContentItem.NumberedListItem -> addNumberedListItem(item)
-                is ContentItem.BulletListItem -> addBulletListItem(item)
                 is ContentItem.FileItem -> addFileItem(item)
                 is ContentItem.ImageItem -> addImageView(item)
             }
@@ -497,76 +495,6 @@ class WorkspaceFragment : Fragment() {
         container.addView(checkboxItemView)
     }
 
-    fun addNumberedListItem(item: ContentItem.NumberedListItem? = null) {
-        val listItemView = layoutInflater.inflate(R.layout.numbered_list_item, null)
-        val numberText = listItemView.findViewById<TextView>(R.id.numberText)
-        val editText = listItemView.findViewById<EditText>(R.id.editTextListItem)
-
-        val number = (container.childCount + 1).toString()
-        numberText.text = number
-
-        item?.let {
-            editText.setText(it.text)
-        }
-
-        editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val text = editText.text.toString()
-                if (item != null) {
-                    item.text = text
-                    currentWorkspace?.let { 
-                        viewModel.updateContentItem(it, item)
-                    }
-                } else {
-                    val newItem = ContentItem.NumberedListItem(text, number.toInt())
-                    currentWorkspace?.let { 
-                        viewModel.addContentItem(it, newItem)
-                    }
-                }
-            }
-        }
-
-        listItemView.setOnLongClickListener {
-            showPopupMenuForItem(listItemView, item)
-            true
-        }
-
-        container.addView(listItemView)
-    }
-
-    fun addBulletListItem(item: ContentItem.BulletListItem? = null) {
-        val listItemView = layoutInflater.inflate(R.layout.bullet_list_item, null)
-        val editText = listItemView.findViewById<EditText>(R.id.editTextListItem)
-
-        item?.let {
-            editText.setText(it.text)
-        }
-
-        editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val text = editText.text.toString()
-                if (item != null) {
-                    item.text = text
-                    currentWorkspace?.let { 
-                        viewModel.updateContentItem(it, item)
-                    }
-                } else {
-                    val newItem = ContentItem.BulletListItem(text)
-                    currentWorkspace?.let { 
-                        viewModel.addContentItem(it, newItem)
-                    }
-                }
-            }
-        }
-
-        listItemView.setOnLongClickListener {
-            showPopupMenuForItem(listItemView, item)
-            true
-        }
-
-        container.addView(listItemView)
-    }
-
     fun addImageView(item: ContentItem.ImageItem? = null, preloadedBitmap: Bitmap? = null) {
         if (item == null) return
 
@@ -663,8 +591,6 @@ class WorkspaceFragment : Fragment() {
                             val itemId = when (it) {
                                 is ContentItem.TextItem -> it.id
                                 is ContentItem.CheckboxItem -> it.id
-                                is ContentItem.NumberedListItem -> it.id
-                                is ContentItem.BulletListItem -> it.id
                                 is ContentItem.ImageItem -> it.id
                                 is ContentItem.FileItem -> it.id
                             }
