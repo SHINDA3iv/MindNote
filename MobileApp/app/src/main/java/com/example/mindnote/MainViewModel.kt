@@ -38,42 +38,29 @@ class MainViewModel : ViewModel() {
     val workspaces: LiveData<List<Workspace>> 
         get() = repository.workspaces
     
-    // Сохранение всех рабочих пространств
-    fun saveWorkspaces() {
-        repository.saveWorkspaces()
-    }
-    
-    // Обновление рабочих пространств из хранилища
-    fun loadWorkspaces() {
-        Log.d("Repository", "LOADWWORK")
-        repository.loadWorkspaces()
-    }
-    
     // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
         return repository.createWorkspace(name, iconUri)
     }
     
-    // Обновление существующего рабочего пространства
+    // Обновление рабочего пространства
     fun updateWorkspace(workspace: Workspace) {
         repository.updateWorkspace(workspace)
-    }
-    
-    // Установка текущего рабочего пространства
-    fun setCurrentWorkspace(workspace: Workspace) {
-        // Обновляем время последнего доступа
-        workspace.lastAccessed = System.currentTimeMillis()
-        repository.updateWorkspace(workspace)
-        
-        // Устанавливаем как текущее рабочее пространство
-        _currentWorkspace.value = workspace
-        
-        Log.d("MainViewModel", "Current workspace set to '${workspace.name}' with ${workspace.items.size} items")
     }
     
     // Получение рабочего пространства по имени
     fun getWorkspaceByName(name: String): Workspace? {
         return repository.getWorkspaceByName(name)
+    }
+    
+    // Получение рабочего пространства по ID
+    fun getWorkspaceById(id: String): Workspace? {
+        return repository.getWorkspaceById(id)
+    }
+    
+    // Установка текущего рабочего пространства
+    fun setCurrentWorkspace(workspace: Workspace) {
+        _currentWorkspace.value = workspace
     }
     
     // Добавление нового элемента содержимого в рабочее пространство
@@ -101,8 +88,6 @@ class MainViewModel : ViewModel() {
         if (_currentWorkspace.value?.id == workspace.id) {
             _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
         }
-        // Сохраняем изменения в файл
-        saveWorkspaces()
     }
     
     // Получение списка избранных рабочих пространств

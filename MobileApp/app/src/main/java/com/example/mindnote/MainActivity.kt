@@ -71,12 +71,6 @@ class MainActivity : AppCompatActivity() {
         navigationView.setNavigationItemSelectedListener { menuItem ->
             val workspaceName = menuItem.title.toString()
             if (menuItem.itemId != -1) {
-                // Сохраняем текущее рабочее пространство перед переходом
-                viewModel.currentWorkspace.value?.let { currentWorkspace ->
-                    Log.d("MindNote", "Сохраняем текущее рабочее пространство '${currentWorkspace.name}' перед переходом из меню")
-                    viewModel.saveWorkspaces()
-                }
-                
                 openWorkspace(workspaceName)
                 drawerLayout.closeDrawer(GravityCompat.START)
                 true
@@ -84,9 +78,6 @@ class MainActivity : AppCompatActivity() {
                 false
             }
         }
-
-        // Загрузка рабочих пространств
-        // viewModel.loadWorkspaces(this) (теперь loadWorkspaces вызывается при инициализации репозитория)
 
         // Восстановление фрагмента если есть
         if (savedInstanceState != null) {
@@ -112,17 +103,6 @@ class MainActivity : AppCompatActivity() {
                 Log.d("MindNote", "MainActivity: Added menu item for '${workspace.name}' with ${workspace.items.size} items")
             }
         }
-        
-        // Настраиваем периодическое автосохранение
-        lifecycleScope.launch {
-            while (true) {
-                delay(30000) // автосохранение каждые 30 секунд
-                launch(Dispatchers.IO) {
-                    viewModel.saveWorkspaces()
-                    Log.d("MindNote", "MainActivity: Auto-saved workspaces")
-                }
-            }
-        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -144,7 +124,6 @@ class MainActivity : AppCompatActivity() {
                     Log.d("MindNote", "MainActivity: Add text field selected")
                     val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                     fragment?.addTextField()
-                    viewModel.saveWorkspaces()
                     true
                 }
                 R.id.popup_option2 -> {
@@ -157,7 +136,6 @@ class MainActivity : AppCompatActivity() {
                             id = java.util.UUID.randomUUID().toString()
                         )
                         it.addCheckboxItem(checkboxItem)
-                        viewModel.saveWorkspaces()
                     }
                     true
                 }
@@ -180,14 +158,12 @@ class MainActivity : AppCompatActivity() {
                     Log.d("MindNote", "MainActivity: Add numbered list selected")
                     val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                     fragment?.addNumberedListItem(null)
-                    viewModel.saveWorkspaces()
                     true
                 }
                 R.id.popup_option6 -> {
                     Log.d("MindNote", "MainActivity: Add bullet list selected")
                     val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
                     fragment?.addBulletListItem(null)
-                    viewModel.saveWorkspaces()
                     true
                 }
                 else -> false
@@ -242,7 +218,6 @@ class MainActivity : AppCompatActivity() {
                                         if (fragment != null) {
                                             val imageItem = ContentItem.ImageItem(persistentUri)
                                             fragment.addImageView(imageItem)
-                                            viewModel.saveWorkspaces()
                                             Log.d("MindNote", "Image added to workspace")
                                         } else {
                                             Log.e("MindNote", "Fragment not found")
@@ -269,14 +244,55 @@ class MainActivity : AppCompatActivity() {
                 }
                 PICK_FILE_REQUEST -> {
                     data.data?.let { uri ->
-                        val fileName = getFileName(uri)
-                        val fileSize = getFileSize(uri)
-                        Log.d("MindNote", "MainActivity: File picked: $fileName, size: $fileSize")
-                        // Копируем файл в приватное хранилище приложения
-                        val persistentUri = copyFileToInternalStorage(uri, "files", fileName)
-                        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
-                        fragment?.addFileItem(ContentItem.FileItem(fileName, persistentUri, fileSize))
-                        viewModel.saveWorkspaces()
+                        val progressDialog = ProgressDialog(this).apply {
+                            setMessage("Обработка файла...")
+                            setCancelable(false)
+                            show()
+                        }
+
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            try {
+                                val fileName = getFileName(uri)
+                                val fileSize = getFileSize(uri)
+                                Log.d("MindNote", "MainActivity: File picked: $fileName, size: $fileSize")
+
+                                // Проверяем доступность файла
+                                contentResolver.openInputStream(uri)?.use { input ->
+                                    if (input.available() <= 0) {
+                                        throw Exception("File is empty or not accessible")
+                                    }
+                                } ?: throw Exception("Cannot open file")
+
+                                val persistentUri = copyFileToInternalStorage(uri, "files", fileName)
+                                Log.d("MindNote", "File copied to: $persistentUri")
+
+                                withContext(Dispatchers.Main) {
+                                    progressDialog.dismiss()
+                                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                                    if (fragment != null) {
+                                        val fileItem = ContentItem.FileItem(
+                                            fileName = fileName,
+                                            fileUri = persistentUri,
+                                            fileSize = fileSize,
+                                            id = java.util.UUID.randomUUID().toString()
+                                        )
+                                        fragment.addFileItem(fileItem)
+                                        Log.d("MindNote", "File added to workspace: $fileName")
+                                    } else {
+                                        Log.e("MindNote", "Fragment not found")
+                                        Toast.makeText(this@MainActivity, "Ошибка: фрагмент не найден", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MindNote", "Error processing file", e)
+                                withContext(Dispatchers.Main) {
+                                    progressDialog.dismiss()
+                                    Toast.makeText(this@MainActivity, 
+                                        "Ошибка при обработке файла: ${e.message}", 
+                                        Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
                     }
                 }
                 PICK_ICON_REQUEST -> {
@@ -290,7 +306,6 @@ class MainActivity : AppCompatActivity() {
                             workspace?.let {
                                 it.iconUri = persistentUri
                                 viewModel.updateWorkspace(it)
-                                viewModel.saveWorkspaces()
                                 updateWorkspaceMenuItem(name, persistentUri)
                             }
                         }
@@ -300,7 +315,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Копирует файл из внешнего URI в приватное хранилище приложения
     private fun copyFileToInternalStorage(sourceUri: Uri, dirName: String, customFileName: String? = null): Uri {
         val inputStream = contentResolver.openInputStream(sourceUri)
             ?: throw Exception("Cannot open source file")
@@ -319,21 +333,24 @@ class MainActivity : AppCompatActivity() {
         val file = File(directory, safeFileName)
         Log.d("MindNote", "Copying file to: ${file.absolutePath}")
         
-        // Копируем данные
-        inputStream.use { input ->
-            file.outputStream().use { output ->
-                input.copyTo(output)
+        try {
+            // Копируем данные
+            inputStream.use { input ->
+                file.outputStream().use { output ->
+                    input.copyTo(output)
+                }
             }
+            
+            // Возвращаем URI для сохраненного файла через FileProvider
+            return androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                file
+            )
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error copying file", e)
+            throw Exception("Failed to copy file: ${e.message}")
         }
-        
-        // Возвращаем URI для сохраненного файла через FileProvider
-        val fileUri = androidx.core.content.FileProvider.getUriForFile(
-            this,
-            "${packageName}.fileprovider",
-            file
-        )
-        Log.d("MindNote", "File URI: $fileUri")
-        return fileUri
     }
 
     private fun getFileName(uri: Uri): String {
@@ -367,10 +384,13 @@ class MainActivity : AppCompatActivity() {
         workspace?.let {
             Log.d("MindNote", "MainActivity: Opening workspace '${workspace.name}' with ${workspace.items.size} items")
             viewModel.setCurrentWorkspace(it)
+            
+            // Очищаем стек фрагментов перед добавлением нового
+            supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+            
             val fragment = WorkspaceFragment.newInstance(workspaceName)
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, fragment)
-                .addToBackStack(null)
                 .commit()
         }
     }
@@ -398,7 +418,6 @@ class MainActivity : AppCompatActivity() {
                     val workspace = viewModel.createWorkspace(newItemName, selectedIconUri)
                     addMenuItem(newItemName, workspace)
                     editText.text.clear()
-                    viewModel.saveWorkspaces()
                 } else {
                     Toast.makeText(this, "Имя пункта не может быть пустым", Toast.LENGTH_SHORT).show()
                 }
@@ -461,24 +480,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.loadWorkspaces()
     }
 
     override fun onPause() {
         super.onPause()
-        viewModel.saveWorkspaces()
-        Log.d("MindNote", "MainActivity: Saved workspaces in onPause")
     }
 
     override fun onStop() {
         super.onStop()
-        viewModel.saveWorkspaces()
-        Log.d("MindNote", "MainActivity: Saved workspaces in onStop")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        viewModel.saveWorkspaces()
-        Log.d("MindNote", "MainActivity: Saved workspaces in onDestroy")
     }
 }
