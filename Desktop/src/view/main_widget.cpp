@@ -1,5 +1,7 @@
 #include "main_widget.h"
 #include "auth_dialog.h"
+#include <qmainwindow.h>
+#include <qmenubar.h>
 #include <qtoolbar.h>
 
 #include <QLayout>
@@ -26,9 +28,11 @@ MainWidget::MainWidget(QWidget *parent) :
     _workspaceController = std::make_unique<WorkspaceController>(_localStorage, this);
     _authManager = std::make_shared<AuthManager>(this);
 
-    // Initialize UI first
-    initWindow();
-    initConnections();
+    if (!_authManager->isAuthenticated()) {
+        showAuthDialog();
+    } else {
+        initApplication();
+    }
 
     // Connect workspace controller signals
     connect(_workspaceController.get(), &WorkspaceController::workspaceAdded, this,
@@ -44,15 +48,8 @@ MainWidget::MainWidget(QWidget *parent) :
     connect(_workspaceController.get(), &WorkspaceController::workspaceRemoved, _editorWidget.get(),
             &EditorWidget::onWorkspaceRemoved);
 
-    // Check authentication after UI is initialized
-    if (!_authManager->isAuthenticated()) {
-        showAuthDialog();
-    } else {
-        initApplication();
-    }
-
-    // Update UI state
-    updateAuthUI();
+    // initUI();
+    // initConnections();
 }
 
 MainWidget::~MainWidget()
@@ -64,28 +61,18 @@ MainWidget::~MainWidget()
 }
 
 void MainWidget::showAuthDialog()
-{
-    qDebug() << "Showing auth dialog";
-    auto authDialog = new AuthDialog(this);
+{    auto authDialog = new AuthDialog(this);
     authDialog->setWindowTitle("Авторизация");
     authDialog->setWindowModality(Qt::ApplicationModal);
 
-    connect(authDialog, &AuthDialog::loginRequested, this, [this, authDialog](const QString &email, const QString &password, bool rememberMe) {
-        qDebug() << "Login requested - email:" << email << "rememberMe:" << rememberMe;
-        _apiClient->login(email, password);
-        _authManager->setRememberMe(rememberMe);
-    });
+    connect(authDialog, &AuthDialog::loginRequested, _apiClient.get(), &ApiClient::login);
     connect(authDialog, &AuthDialog::registerRequested, _apiClient.get(), &ApiClient::registerUser);
     connect(authDialog, &AuthDialog::guestLoginRequested, this, [this]() {
         _isGuestMode = true;
         initApplication();
     });
 
-    connect(_apiClient.get(), &ApiClient::loginSuccess, this, [this, authDialog](const QString &token) {
-        _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
-        
-        // Get server workspaces after successful login
-        _apiClient->getWorkspaces();
+    connect(_apiClient.get(), &ApiClient::loginSuccess, this, [authDialog](const QString &token) {
         authDialog->accept();
     });
     connect(_apiClient.get(), &ApiClient::loginError, this, [authDialog](const QString &error) {
@@ -98,28 +85,6 @@ void MainWidget::showAuthDialog()
         QMessageBox::warning(authDialog, "Ошибка регистрации", error);
     });
 
-    // Handle workspace synchronization after login
-    connect(_apiClient.get(), &ApiClient::workspacesReceived, this, [this](const QJsonArray &serverWorkspaces) {
-        if (_authManager->isRememberMeEnabled()) {
-            // Show dialog to choose synchronization strategy
-            QMessageBox::StandardButton reply = QMessageBox::question(this, "Синхронизация пространств",
-                "Обнаружены различия между локальными и серверными пространствами. "
-                "Хотите сохранить локальные версии?",
-                QMessageBox::Yes | QMessageBox::No);
-
-            if (reply == QMessageBox::Yes) {
-                // Keep local versions
-                _localStorage->syncWorkspaces(serverWorkspaces, true);
-            } else {
-                // Use server versions
-                _localStorage->syncWorkspaces(serverWorkspaces, false);
-            }
-        } else {
-            // If remember me is not enabled, only sync to server
-            _localStorage->syncWorkspaces(serverWorkspaces, false);
-        }
-    });
-
     // Обработка закрытия диалога
     connect(authDialog, &QDialog::rejected, this, [this]() {
         // Если пользователь закрыл диалог, продолжаем как гость
@@ -129,9 +94,7 @@ void MainWidget::showAuthDialog()
         }
     });
 
-    qDebug() << "Executing auth dialog";
     authDialog->exec();
-    qDebug() << "Auth dialog finished";
     authDialog->deleteLater();
 }
 
@@ -175,10 +138,8 @@ void MainWidget::initConnections()
     // Sync connections
     connect(_syncManager.get(), &SyncManager::versionConflictDetected, this,
             &MainWidget::onVersionConflictDetected);
-    connect(_syncManager.get(), &SyncManager::syncCompleted, this,
-            &MainWidget::onSyncCompleted);
-    connect(_syncManager.get(), &SyncManager::syncError, this,
-            &MainWidget::onSyncError);
+    connect(_syncManager.get(), &SyncManager::syncCompleted, this, &MainWidget::onSyncCompleted);
+    connect(_syncManager.get(), &SyncManager::syncError, this, &MainWidget::onSyncError);
 }
 
 void MainWidget::onAuthStateChanged()
@@ -201,16 +162,24 @@ void MainWidget::updateAuthUI()
         emit statusMessage(tr("Not logged in"));
     }
 
+    // Force update of the menu bar and auth UI elements
+    if (auto mainWindow = qobject_cast<QMainWindow *>(window())) {
+        if (auto menuBar = mainWindow->menuBar()) {
+            menuBar->update();
+        }
+    }
+
     // Emit auth state changed to update main window UI
     emit authStateChanged();
 }
 
 void MainWidget::onVersionConflictDetected(const QJsonArray &serverWorkspaces)
 {
-    QMessageBox::StandardButton reply = QMessageBox::question(this, "Конфликт версий",
-        "Обнаружены различия между локальными и серверными пространствами. "
-        "Хотите сохранить локальные версии?",
-        QMessageBox::Yes | QMessageBox::No);
+    QMessageBox::StandardButton reply =
+     QMessageBox::question(this, "Конфликт версий",
+                           "Обнаружены различия между локальными и серверными пространствами. "
+                           "Хотите сохранить локальные версии?",
+                           QMessageBox::Yes | QMessageBox::No);
 
     if (reply == QMessageBox::Yes) {
         // Keep local versions
