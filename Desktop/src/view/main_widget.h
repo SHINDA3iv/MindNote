@@ -13,6 +13,7 @@
 #include <QSettings>
 #include <memory>
 #include <QScrollArea>
+#include <QTimer>
 
 class MainWidget : public QWidget
 {
@@ -75,8 +76,9 @@ private:
     void restoreSettings();
     void saveSettings();
     void initApplication();
+    void checkToken();
 
-    bool _isGuestMode = true;
+    bool _isGuestMode = false;
 
     QPointer<QSplitter> _mainSplitter;
     QScrollArea *_workspaceArea;
@@ -97,6 +99,7 @@ private:
     double _zoomFactor;
     bool _sidebarVisible;
     int _lastPanelWidth = 200; // Default width for the first time
+    QTimer _tokenCheckTimer;
 };
 
 #endif // MAIN_WIDGET_H

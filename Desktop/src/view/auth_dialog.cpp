@@ -205,5 +205,6 @@ void AuthDialog::onLoginClicked()
 
 void AuthDialog::onRegisterClicked()
 {
-    emit registerRequested(_loginEmail->text(), _loginPassword->text(), _registerUsername->text());
+    emit registerRequested(_registerEmail->text(), _registerPassword->text(),
+                           _registerUsername->text());
 }

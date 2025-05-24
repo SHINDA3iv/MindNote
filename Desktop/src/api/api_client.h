@@ -23,10 +23,10 @@ public:
     void setAuthToken(const QString &token);
     bool isAuthenticated() const;
     QString getUsername() const;
-    
+
     // Методы для работы с API
     void login(const QString &username, const QString &password);
-    void registerUser(const QString &username, const QString &email, const QString &password);
+    void registerUser(const QString &email, const QString &password, const QString &username);
     void getWorkspaces();
     void createWorkspace(const QString &name, const QString &description);
     void updateWorkspace(int id, const QString &name, const QString &description);
@@ -34,13 +34,15 @@ public:
 
     void getWorkspaceItems(const QString &workspaceId);
     void createWorkspaceItem(const QString &workspaceId, const QJsonObject &data);
-    void updateWorkspaceItem(const QString &workspaceId, const QString &itemId, const QJsonObject &data);
+    void
+    updateWorkspaceItem(const QString &workspaceId, const QString &itemId, const QJsonObject &data);
     void deleteWorkspaceItem(const QString &workspaceId, const QString &itemId);
 
     void syncChanges(const QJsonObject &changes);
     void getCurrentUser();
     void updateUser(const QJsonObject &userData);
     void deleteUser();
+    void validateToken();
 
 signals:
     void loginSuccess(const QString &token);
@@ -52,6 +54,8 @@ signals:
     void workspaceUpdated(const QJsonObject &workspace);
     void workspaceDeleted(int id);
     void error(const QString &error);
+    void tokenValid();
+    void tokenInvalid();
 
     void itemsReceived(const QString &workspaceId, const QJsonArray &items);
     void itemCreated(const QString &workspaceId, const QJsonObject &item);
@@ -67,7 +71,8 @@ private:
     QString _username;
 
     QNetworkRequest createRequest(const QString &endpoint);
-    void handleResponse(QNetworkReply *reply, const std::function<void(const QJsonDocument &)> &successCallback);
+    void handleResponse(QNetworkReply *reply,
+                        const std::function<void(const QJsonDocument &)> &successCallback);
 };
 
 #endif // API_CLIENT_H
