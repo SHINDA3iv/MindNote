@@ -43,6 +43,8 @@ class MainActivity : AppCompatActivity() {
     private var imageUri: Uri? = null
     private lateinit var toolbarAddButton: MenuItem
     private var selectedIconUri: Uri? = null
+    private var isLoggedIn = false
+    private var currentUserName = "Гость"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,8 +67,26 @@ class MainActivity : AppCompatActivity() {
 
         val headerView = navigationView.getHeaderView(0)
         val addButton = headerView.findViewById<Button>(R.id.nav_header_add_button)
+        val authButton = findViewById<Button>(R.id.auth_button)
+        val userNameText = findViewById<TextView>(R.id.user_name)
+
         addButton.setOnClickListener {
             showAddMenuItemDialog()
+        }
+
+        authButton.setOnClickListener {
+            if (isLoggedIn) {
+                // Logout
+                isLoggedIn = false
+                currentUserName = "Гость"
+                authButton.text = "Войти"
+                userNameText.text = currentUserName
+                Toast.makeText(this, "Выход выполнен", Toast.LENGTH_SHORT).show()
+            } else {
+                // Login
+                val intent = Intent(this, LoginActivity::class.java)
+                startActivityForResult(intent, 100)
+            }
         }
 
         navigationView.setNavigationItemSelectedListener { menuItem ->
@@ -175,7 +195,26 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == Activity.RESULT_OK && data != null) {
+        if (requestCode == 100 && resultCode == RESULT_OK) {
+            // Handle successful login
+            val authButton = findViewById<Button>(R.id.auth_button)
+            val userNameText = findViewById<TextView>(R.id.user_name)
+
+            // Check if this was a guest login
+            val isGuestLogin = data?.getBooleanExtra("is_guest", false) ?: false
+            
+            if (isGuestLogin) {
+                isLoggedIn = false
+                currentUserName = "Гость"
+                authButton.text = "Войти"
+            } else {
+                isLoggedIn = true
+                currentUserName = "Пользователь" // TODO: Get actual user name from login
+                authButton.text = "Выйти"
+            }
+            
+            userNameText.text = currentUserName
+        } else if (resultCode == Activity.RESULT_OK && data != null) {
             when (requestCode) {
                 PICK_IMAGE_REQUEST -> {
                     data.data?.let { uri ->
