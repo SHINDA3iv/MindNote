@@ -3,6 +3,7 @@ package com.example.mindnote
 import android.app.Activity
 import android.app.ProgressDialog
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -41,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val PICK_ICON_REQUEST = 3
     private var imageUri: Uri? = null
     private lateinit var toolbarAddButton: MenuItem
+    private var selectedIconUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -290,18 +292,12 @@ class MainActivity : AppCompatActivity() {
                 }
                 PICK_ICON_REQUEST -> {
                     data.data?.let { uri ->
-                        val workspaceName = data.getStringExtra("workspace_name")
-                        workspaceName?.let { name ->
-                            Log.d("MindNote", "MainActivity: Icon picked for workspace '$name': $uri")
-                            // Копируем иконку в приватное хранилище приложения
-                            val persistentUri = copyFileToInternalStorage(uri, "icons", "${name}_icon")
-                            val workspace = viewModel.workspaces.value?.find { it.name == name }
-                            workspace?.let {
-                                it.iconUri = persistentUri
-                                viewModel.updateWorkspace(it)
-                                updateWorkspaceMenuItem(name, persistentUri)
-                            }
-                        }
+                        // Копируем иконку в приватное хранилище приложения
+                        val persistentUri = copyFileToInternalStorage(uri, "icons", "temp_icon")
+                        // Обновляем выбранную иконку
+                        selectedIconUri = persistentUri
+                        // Показываем уведомление об успешном выборе иконки
+                        Toast.makeText(this, "Иконка выбрана", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -387,6 +383,28 @@ class MainActivity : AppCompatActivity() {
 
             // Показываем кнопку меню
             toolbarAddButton.isVisible = true
+
+            // Обновляем заголовок и иконку в toolbar
+            val toolbar = findViewById<Toolbar>(R.id.toolbar)
+            toolbar.title = workspaceName
+            
+            // Устанавливаем иконку в toolbar
+            workspace.iconUri?.let { uri ->
+                try {
+                    val icon = contentResolver.openInputStream(uri)?.use {
+                        android.graphics.BitmapFactory.decodeStream(it)
+                    }
+                    icon?.let {
+                        val scaledIcon = android.graphics.Bitmap.createScaledBitmap(it, 48, 48, true)
+                        toolbar.logo = android.graphics.drawable.BitmapDrawable(resources, scaledIcon)
+                    }
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error setting toolbar icon", e)
+                    toolbar.logo = null
+                }
+            } ?: run {
+                toolbar.logo = null
+            }
         }
     }
 
@@ -395,13 +413,9 @@ class MainActivity : AppCompatActivity() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_menu_item, null)
         val editText = dialogView.findViewById<EditText>(R.id.editTextMenuItem)
         val iconButton = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
-        var selectedIconUri: Uri? = null
 
         iconButton.setOnClickListener {
-            val intent = Intent(Intent.ACTION_PICK)
-            intent.type = "image/*"
-            intent.putExtra("workspace_name", editText.text.toString())
-            startActivityForResult(intent, PICK_ICON_REQUEST)
+            showIconSelectionDialog()
         }
 
         builder.setTitle("Создание нового пространства")
@@ -413,12 +427,108 @@ class MainActivity : AppCompatActivity() {
                     val workspace = viewModel.createWorkspace(newItemName, selectedIconUri)
                     addMenuItem(newItemName, workspace)
                     editText.text.clear()
+                    selectedIconUri = null
                 } else {
                     Toast.makeText(this, "Имя пункта не может быть пустым", Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton("Отмена") { dialog, which -> dialog.cancel() }
+            .setNegativeButton("Отмена") { dialog, which -> 
+                dialog.cancel()
+                selectedIconUri = null
+            }
         builder.show()
+    }
+
+    private fun showIconSelectionDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_select_icon, null)
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        // Устанавливаем обработчики для каждой иконки
+        val iconIds = arrayOf(
+            R.id.icon1, R.id.icon2, R.id.icon3, R.id.icon4,
+            R.id.icon5, R.id.icon6, R.id.icon7, R.id.icon8
+        )
+
+        iconIds.forEachIndexed { index, id ->
+            dialogView.findViewById<ImageButton>(id).setOnClickListener {
+                try {
+                    // Получаем ID ресурса иконки
+                    val typedArray = resources.obtainTypedArray(R.array.workspace_icons)
+                    val iconResId = typedArray.getResourceId(index, 0)
+                    typedArray.recycle()
+
+                    if (iconResId == 0) {
+                        throw Exception("Не удалось получить ресурс иконки")
+                    }
+
+                    // Создаем директорию для иконок
+                    val iconsDir = File(filesDir, "icons")
+                    if (!iconsDir.exists() && !iconsDir.mkdirs()) {
+                        throw Exception("Не удалось создать директорию для иконок")
+                    }
+
+                    // Сохраняем иконку
+                    val file = File(iconsDir, "icon_$index.png")
+                    
+                    // Получаем векторный drawable
+                    val drawable = resources.getDrawable(iconResId, theme)
+                    
+                    // Создаем bitmap с поддержкой прозрачности
+                    val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bitmap)
+                    
+                    // Очищаем canvas прозрачным цветом
+                    canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+                    
+                    // Устанавливаем границы drawable
+                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                    
+                    // Рисуем drawable на canvas
+                    drawable.draw(canvas)
+
+                    // Сохраняем bitmap в файл
+                    file.outputStream().use { out ->
+                        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                            throw Exception("Не удалось сохранить иконку")
+                        }
+                    }
+
+                    // Освобождаем память
+                    bitmap.recycle()
+
+                    // Создаем URI через FileProvider
+                    selectedIconUri = androidx.core.content.FileProvider.getUriForFile(
+                        this,
+                        "${packageName}.fileprovider",
+                        file
+                    )
+
+                    // Показываем уведомление об успешном выборе
+                    Toast.makeText(this, "Иконка выбрана", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error saving icon", e)
+                    Toast.makeText(this, "Ошибка при сохранении иконки: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        // Обработчик для кнопки выбора своей иконки
+        dialogView.findViewById<Button>(R.id.buttonCustomIcon).setOnClickListener {
+            dialog.dismiss()
+            try {
+                val intent = Intent(Intent.ACTION_PICK)
+                intent.type = "image/*"
+                startActivityForResult(intent, PICK_ICON_REQUEST)
+            } catch (e: Exception) {
+                Log.e("MindNote", "Error launching image picker", e)
+                Toast.makeText(this, "Ошибка при открытии галереи: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        dialog.show()
     }
 
     private fun addMenuItem(itemName: String, workspace: Workspace) {
