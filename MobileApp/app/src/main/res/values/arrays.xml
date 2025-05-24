@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="workspace_icons">
+        <item>@android:drawable/ic_menu_agenda</item>
+        <item>@android:drawable/ic_menu_compass</item>
+        <item>@android:drawable/ic_menu_help</item>
+        <item>@android:drawable/ic_menu_myplaces</item>
+        <item>@android:drawable/ic_menu_share</item>
+        <item>@android:drawable/ic_menu_slideshow</item>
+        <item>@android:drawable/ic_menu_sort_by_size</item>
+        <item>@android:drawable/ic_menu_zoom</item>
+    </array>
+</resources> 

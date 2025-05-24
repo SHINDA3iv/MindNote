@@ -27,4 +27,10 @@ sealed class ContentItem {
         var fileSize: Long,
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()
+
+    data class NestedPageItem(
+        var pageName: String,
+        var pageId: String = java.util.UUID.randomUUID().toString(),
+        override val id: String = java.util.UUID.randomUUID().toString()
+    ) : ContentItem()
 } 

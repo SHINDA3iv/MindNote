@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:background="?attr/selectableItemBackground">
+
+    <ImageView
+        android:id="@+id/pageIcon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center_vertical"
+        android:src="@android:drawable/ic_menu_agenda"
+        android:tint="@color/design_default_color_primary" />
+
+    <TextView
+        android:id="@+id/pageName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:layout_gravity="center_vertical"
+        android:textSize="16sp"
+        android:textColor="@color/design_default_color_primary" />
+
+</LinearLayout> 

@@ -161,6 +161,12 @@ class MainActivity : AppCompatActivity() {
                     startActivityForResult(intent, PICK_FILE_REQUEST)
                     true
                 }
+                R.id.popup_option5 -> {
+                    Log.d("MindNote", "MainActivity: Add nested page selected")
+                    val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as? WorkspaceFragment
+                    fragment?.showCreateNestedPageDialog()
+                    true
+                }
                 else -> false
             }
         }

@@ -63,7 +63,9 @@ class WorkspaceRepository private constructor(private val context: Context) {
     
     // Получение рабочего пространства по ID
     fun getWorkspaceById(id: String): Workspace? {
-        return _workspaces.value?.find { it.id == id }
+        val workspace = _workspaces.value?.find { it.id == id }
+        Log.d("MindNote", "WorkspaceRepository: Looking for workspace with ID '$id', found: ${workspace?.name}, total workspaces: ${_workspaces.value?.size}")
+        return workspace
     }
 
     // Добавление элемента содержимого в рабочее пространство
@@ -87,12 +89,31 @@ class WorkspaceRepository private constructor(private val context: Context) {
     }
     
     // Обновление элемента содержимого в рабочем пространстве
-    fun updateContentItem(workspace: Workspace, updatedItem: ContentItem) {
-        val currentWorkspace = _workspaces.value?.find { it.id == workspace.id }
-        currentWorkspace?.let {
-            it.updateItem(updatedItem)
-            updateWorkspace(it)
-            Log.d("MindNote", "WorkspaceRepository: Updated item ${updatedItem.id} in workspace ${workspace.name}")
+    fun updateContentItem(workspace: Workspace, item: ContentItem) {
+        when (item) {
+            is ContentItem.TextItem -> workspace.updateItem(item)
+            is ContentItem.CheckboxItem -> workspace.updateItem(item)
+            is ContentItem.ImageItem -> workspace.updateItem(item)
+            is ContentItem.FileItem -> workspace.updateItem(item)
+            is ContentItem.NestedPageItem -> workspace.updateItem(item)
+        }
+        updateWorkspace(workspace)
+    }
+
+    // Сохранение всех рабочих пространств
+    fun saveWorkspaces() {
+        val gson = GsonBuilder()
+            .registerTypeAdapter(Uri::class.java, UriTypeAdapter())
+            .registerTypeAdapter(ContentItem::class.java, ContentItemTypeAdapter())
+            .create()
+
+        try {
+            val json = gson.toJson(_workspaces.value)
+            val file = File(context.filesDir, "workspaces.json")
+            file.writeText(json)
+            Log.d("MindNote", "Workspaces saved successfully")
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error saving workspaces", e)
         }
     }
 }
@@ -146,6 +167,12 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("fileSize", src.fileSize)
                 jsonObject.addProperty("id", src.id)
             }
+            is ContentItem.NestedPageItem -> {
+                jsonObject.addProperty("type", "NestedPageItem")
+                jsonObject.addProperty("pageName", src.pageName)
+                jsonObject.addProperty("pageId", src.pageId)
+                jsonObject.addProperty("id", src.id)
+            }
             null -> return JsonObject()
         }
         return jsonObject
@@ -173,6 +200,11 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 fileName = jsonObject.get("fileName")?.asString ?: "",
                 fileUri = Uri.parse(jsonObject.get("fileUri")?.asString),
                 fileSize = jsonObject.get("fileSize")?.asLong ?: 0L,
+                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
+            )
+            "NestedPageItem" -> ContentItem.NestedPageItem(
+                pageName = jsonObject.get("pageName")?.asString ?: "",
+                pageId = jsonObject.get("pageId")?.asString ?: java.util.UUID.randomUUID().toString(),
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             else -> ContentItem.TextItem("")

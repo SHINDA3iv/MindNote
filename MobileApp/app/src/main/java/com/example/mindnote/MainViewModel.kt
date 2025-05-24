@@ -55,7 +55,9 @@ class MainViewModel : ViewModel() {
     
     // Получение рабочего пространства по ID
     fun getWorkspaceById(id: String): Workspace? {
-        return repository.getWorkspaceById(id)
+        val workspace = repository.getWorkspaceById(id)
+        Log.d("MindNote", "MainViewModel: Looking for workspace with ID '$id', found: ${workspace?.name}")
+        return workspace
     }
     
     // Установка текущего рабочего пространства
@@ -83,11 +85,14 @@ class MainViewModel : ViewModel() {
     
     // Обновление элемента содержимого в рабочем пространстве
     fun updateContentItem(workspace: Workspace, item: ContentItem) {
-        repository.updateContentItem(workspace, item)
-        // Если это текущее рабочее пространство, обновляем его
-        if (_currentWorkspace.value?.id == workspace.id) {
-            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+        when (item) {
+            is ContentItem.TextItem -> workspace.updateItem(item)
+            is ContentItem.CheckboxItem -> workspace.updateItem(item)
+            is ContentItem.ImageItem -> workspace.updateItem(item)
+            is ContentItem.FileItem -> workspace.updateItem(item)
+            is ContentItem.NestedPageItem -> workspace.updateItem(item)
         }
+        repository.updateWorkspace(workspace)
     }
     
     // Получение списка избранных рабочих пространств
@@ -104,6 +109,11 @@ class MainViewModel : ViewModel() {
     // Получение недавно использовавшихся рабочих пространств
     fun getRecentlyAccessed(limit: Int = 5): List<Workspace> {
         return workspaces.value?.sortedByDescending { it.lastAccessed }?.take(limit) ?: emptyList()
+    }
+
+    // Сохранение всех рабочих пространств
+    private fun saveWorkspaces() {
+        repository.saveWorkspaces()
     }
 }
 
@@ -154,6 +164,12 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("fileSize", src.fileSize)
                 jsonObject.addProperty("id", src.id)
             }
+            is ContentItem.NestedPageItem -> {
+                jsonObject.addProperty("type", "NestedPageItem")
+                jsonObject.addProperty("pageName", src.pageName)
+                jsonObject.addProperty("pageId", src.pageId)
+                jsonObject.addProperty("id", src.id)
+            }
             null -> return JsonObject()
         }
         return jsonObject
@@ -181,6 +197,11 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 fileName = jsonObject.get("fileName")?.asString ?: "",
                 fileUri = Uri.parse(jsonObject.get("fileUri")?.asString),
                 fileSize = jsonObject.get("fileSize")?.asLong ?: 0L,
+                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
+            )
+            "NestedPageItem" -> ContentItem.NestedPageItem(
+                pageName = jsonObject.get("pageName")?.asString ?: "",
+                pageId = jsonObject.get("pageId")?.asString ?: java.util.UUID.randomUUID().toString(),
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             else -> ContentItem.TextItem("")

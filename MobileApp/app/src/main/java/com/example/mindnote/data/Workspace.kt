@@ -23,60 +23,66 @@ data class Workspace(
     
     // Удаление элемента содержимого
     fun removeItem(itemId: String) {
-        val initialSize = _items.size
-        
-        // Находим элемент для удаления
         val itemToRemove = _items.find { item ->
             when (item) {
                 is ContentItem.TextItem -> item.id == itemId
                 is ContentItem.CheckboxItem -> item.id == itemId
                 is ContentItem.ImageItem -> item.id == itemId
                 is ContentItem.FileItem -> item.id == itemId
+                is ContentItem.NestedPageItem -> item.id == itemId
             }
         }
         
-        // Удаляем элемент если найден
         if (itemToRemove != null) {
             _items.remove(itemToRemove)
             Log.d("Workspace", "Item removed from workspace '$name', now has ${_items.size} items")
-        } else {
-            Log.d("Workspace", "Item with ID $itemId not found in workspace '$name'")
         }
     }
     
     // Обновление элемента содержимого
-    fun updateItem(updatedItem: ContentItem) {
-        val index = _items.indexOfFirst { item ->
-            when (item) {
-                is ContentItem.TextItem -> 
-                    item.id == (updatedItem as? ContentItem.TextItem)?.id
-                is ContentItem.CheckboxItem -> 
-                    item.id == (updatedItem as? ContentItem.CheckboxItem)?.id
-                is ContentItem.ImageItem -> 
-                    item.id == (updatedItem as? ContentItem.ImageItem)?.id
-                is ContentItem.FileItem -> 
-                    item.id == (updatedItem as? ContentItem.FileItem)?.id
+    fun updateItem(item: ContentItem) {
+        val index = _items.indexOfFirst { existingItem ->
+            when (existingItem) {
+                is ContentItem.TextItem -> existingItem.id == item.id
+                is ContentItem.CheckboxItem -> existingItem.id == item.id
+                is ContentItem.ImageItem -> existingItem.id == item.id
+                is ContentItem.FileItem -> existingItem.id == item.id
+                is ContentItem.NestedPageItem -> existingItem.id == item.id
             }
         }
         
         if (index != -1) {
-            _items[index] = updatedItem
-            val itemId = when (updatedItem) {
-                is ContentItem.TextItem -> updatedItem.id
-                is ContentItem.CheckboxItem -> updatedItem.id
-                is ContentItem.ImageItem -> updatedItem.id
-                is ContentItem.FileItem -> updatedItem.id
+            _items[index] = item
+            val itemId = when (item) {
+                is ContentItem.TextItem -> item.id
+                is ContentItem.CheckboxItem -> item.id
+                is ContentItem.ImageItem -> item.id
+                is ContentItem.FileItem -> item.id
+                is ContentItem.NestedPageItem -> item.id
             }
-            Log.d("Workspace", "Item updated in workspace '$name': id=$itemId, type=${updatedItem.javaClass.simpleName}")
+            Log.d("Workspace", "Item updated in workspace '$name': id=$itemId, type=${item.javaClass.simpleName}")
         } else {
-            val itemId = when (updatedItem) {
-                is ContentItem.TextItem -> updatedItem.id
-                is ContentItem.CheckboxItem -> updatedItem.id
-                is ContentItem.ImageItem -> updatedItem.id
-                is ContentItem.FileItem -> updatedItem.id
+            val itemId = when (item) {
+                is ContentItem.TextItem -> item.id
+                is ContentItem.CheckboxItem -> item.id
+                is ContentItem.ImageItem -> item.id
+                is ContentItem.FileItem -> item.id
+                is ContentItem.NestedPageItem -> item.id
             }
             Log.d("Workspace", "Item with ID $itemId not found in workspace '$name', adding as new item")
-            _items.add(updatedItem)
+            _items.add(item)
+        }
+    }
+
+    fun getItemById(id: String): ContentItem? {
+        return _items.find { item ->
+            when (item) {
+                is ContentItem.TextItem -> item.id == id
+                is ContentItem.CheckboxItem -> item.id == id
+                is ContentItem.ImageItem -> item.id == id
+                is ContentItem.FileItem -> item.id == id
+                is ContentItem.NestedPageItem -> item.id == id
+            }
         }
     }
 } 
