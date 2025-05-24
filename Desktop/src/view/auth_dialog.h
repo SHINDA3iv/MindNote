@@ -10,6 +10,7 @@ class QLineEdit;
 class QPushButton;
 class QTabWidget;
 class QCheckBox;
+class QLabel;
 
 class AuthDialog : public QDialog
 {
@@ -26,8 +27,11 @@ public:
         _tabWidget->setCurrentIndex(index);
     }
 
+    void showLoginError(const QString &error);
+    void showRegisterError(const QString &error);
+
 signals:
-    void loginRequested(const QString &email, const QString &password, bool rememberMe);
+    void loginRequested(const QString &username, const QString &password, bool rememberMe);
     void registerRequested(const QString &email, const QString &password, const QString &username);
     void guestLoginRequested();
 
@@ -40,15 +44,17 @@ private slots:
 
 private:
     QTabWidget *_tabWidget;
-    QLineEdit *_loginEmail;
+    QLineEdit *_loginUsername;
     QLineEdit *_loginPassword;
     QPushButton *_loginButton;
     QCheckBox *_rememberMe;
+    QLabel *_loginErrorLabel;
 
     QLineEdit *_registerEmail;
     QLineEdit *_registerPassword;
     QLineEdit *_registerUsername;
     QPushButton *_registerButton;
+    QLabel *_registerErrorLabel;
 };
 
 #endif // AUTH_DIALOG_H

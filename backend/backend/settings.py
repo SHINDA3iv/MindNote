@@ -130,6 +130,19 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Workspace files
+WORKSPACE_ROOT = os.path.join(BASE_DIR, 'workspaces')
+GUEST_WORKSPACE_ROOT = os.path.join(WORKSPACE_ROOT, 'guest')
+USER_WORKSPACE_ROOT = os.path.join(WORKSPACE_ROOT, 'user')
+
+# Create workspace directories if they don't exist
+os.makedirs(GUEST_WORKSPACE_ROOT, exist_ok=True)
+os.makedirs(USER_WORKSPACE_ROOT, exist_ok=True)
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
@@ -164,9 +177,6 @@ REST_FRAMEWORK = {
 # }
 
 AUTHENTICATION_BACKENDS = ("django.contrib.auth.backends.ModelBackend",)
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # В продакшене лучше указать конкретные домены

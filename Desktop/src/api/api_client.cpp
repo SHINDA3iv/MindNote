@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QUrlQuery>
+#include "../error_handler.h"
 
 ApiClient::ApiClient(QObject *parent) :
     QObject(parent),
@@ -64,24 +65,131 @@ void ApiClient::handleResponse(QNetworkReply *reply,
             int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
             if (statusCode == 400 && jsonResponse.isObject()) {
-                // Попробуем найти ошибки валидации
-                QString errorMsg = "Ошибка валидации:";
+                QString errorMsg;
                 QJsonObject errorObj = jsonResponse.object();
-                for (const QString &key : errorObj.keys()) {
-                    errorMsg += "\n" + key + ": ";
-                    QJsonValue value = errorObj.value(key);
-                    if (value.isArray()) {
-                        for (const QJsonValue &val : value.toArray()) {
-                            errorMsg += val.toString() + ", ";
+                
+                // Обработка специальных случаев ошибок
+                if (errorObj.contains("non_field_errors")) {
+                    QJsonValue nonFieldErrors = errorObj["non_field_errors"];
+                    if (nonFieldErrors.isArray()) {
+                        QString error = nonFieldErrors.toArray().first().toString();
+                        if (error.contains("Unable to log in with provided credentials")) {
+                            errorMsg = "Неверное имя пользователя или пароль";
+                        } else if (error.contains("Invalid token")) {
+                            errorMsg = "Недействительный токен авторизации";
+                        } else if (error.contains("Token has expired")) {
+                            errorMsg = "Срок действия токена истек. Пожалуйста, войдите снова";
+                        } else if (error.contains("User is inactive")) {
+                            errorMsg = "Аккаунт деактивирован";
+                        } else if (error.contains("User account is disabled")) {
+                            errorMsg = "Аккаунт заблокирован";
+                        } else {
+                            errorMsg = error;
                         }
-                        errorMsg.chop(2); // Удалить последнюю запятую и пробел
-                    } else {
-                        errorMsg += value.toString();
+                    }
+                } else {
+                    // Обработка ошибок валидации полей
+                    for (const QString &key : errorObj.keys()) {
+                        QString fieldName;
+                        // Преобразование имен полей в более понятные
+                        if (key == "username") fieldName = "Имя пользователя";
+                        else if (key == "password") fieldName = "Пароль";
+                        else if (key == "email") fieldName = "Email";
+                        else if (key == "name") fieldName = "Название";
+                        else if (key == "description") fieldName = "Описание";
+                        else if (key == "token") fieldName = "Токен авторизации";
+                        else fieldName = key;
+
+                        QJsonValue value = errorObj.value(key);
+                        if (value.isArray()) {
+                            QStringList errors;
+                            for (const QJsonValue &val : value.toArray()) {
+                                QString error = val.toString();
+                                // Преобразование сообщений об ошибках
+                                if (error.contains("already exists")) {
+                                    if (key == "username") {
+                                        error = "Пользователь с таким именем уже существует";
+                                    } else if (key == "email") {
+                                        error = "Пользователь с таким email уже существует";
+                                    }
+                                } else if (error.contains("required")) {
+                                    error = "Это поле обязательно для заполнения";
+                                } else if (error.contains("invalid")) {
+                                    if (key == "password") {
+                                        error = "Пароль должен содержать минимум 8 символов, включая буквы и цифры";
+                                    } else if (key == "email") {
+                                        error = "Неверный формат email адреса";
+                                    } else if (key == "token") {
+                                        error = "Неверный формат токена авторизации";
+                                    } else {
+                                        error = "Неверный формат";
+                                    }
+                                } else if (error.contains("too short")) {
+                                    if (key == "password") {
+                                        error = "Пароль слишком короткий (минимум 8 символов)";
+                                    } else if (key == "username") {
+                                        error = "Имя пользователя слишком короткое (минимум 3 символа)";
+                                    }
+                                } else if (error.contains("too long")) {
+                                    if (key == "username") {
+                                        error = "Имя пользователя слишком длинное (максимум 150 символов)";
+                                    } else if (key == "password") {
+                                        error = "Пароль слишком длинный (максимум 128 символов)";
+                                    }
+                                } else if (error.contains("not found")) {
+                                    if (key == "username") {
+                                        error = "Пользователь не найден";
+                                    }
+                                } else if (error.contains("incorrect")) {
+                                    if (key == "password") {
+                                        error = "Неверный пароль";
+                                    }
+                                } else if (error.contains("too similar")) {
+                                    if (key == "password") {
+                                        error = "Пароль слишком похож на имя пользователя. Используйте более сложный пароль";
+                                    }
+                                } else if (error.contains("Enter a valid email address")) {
+                                    if (key == "email") {
+                                        error = "Введите корректный email адрес (например: user@example.com)";
+                                    }
+                                }
+                                errors.append(error);
+                            }
+                            errorMsg += fieldName + ": " + errors.join(", ") + "\n";
+                        } else {
+                            errorMsg += fieldName + ": " + value.toString() + "\n";
+                        }
                     }
                 }
+
+                // Удаляем последний перенос строки
+                if (!errorMsg.isEmpty()) {
+                    errorMsg.chop(1);
+                }
+
+                ErrorHandler::instance().showError("Ошибка", errorMsg);
+                emit error(errorMsg);
+            } else if (statusCode == 401) {
+                QString errorMsg = "Требуется авторизация. Пожалуйста, войдите в систему.";
+                ErrorHandler::instance().showError("Ошибка авторизации", errorMsg);
+                emit error(errorMsg);
+            } else if (statusCode == 403) {
+                QString errorMsg = "Доступ запрещен. У вас нет прав для выполнения этого действия.";
+                ErrorHandler::instance().showError("Ошибка доступа", errorMsg);
                 emit error(errorMsg);
             } else {
-                emit error(reply->errorString());
+                QString errorMsg = reply->errorString();
+                // Преобразование сетевых ошибок
+                if (errorMsg.contains("Connection refused")) {
+                    errorMsg = "Не удалось подключиться к серверу. Проверьте подключение к интернету.";
+                } else if (errorMsg.contains("timeout")) {
+                    errorMsg = "Превышено время ожидания ответа от сервера.";
+                } else if (errorMsg.contains("SSL handshake failed")) {
+                    errorMsg = "Ошибка безопасного соединения с сервером.";
+                }
+                
+                ErrorHandler::instance().showError("Ошибка", errorMsg);
+                emit error(errorMsg);
             }
         }
     });

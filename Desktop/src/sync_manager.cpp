@@ -3,6 +3,9 @@
 #include "local_storage.h"
 #include <QJsonArray>
 #include <QMessageBox>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QFile>
 
 SyncManager::SyncManager(std::shared_ptr<ApiClient> apiClient,
                          std::shared_ptr<LocalStorage> localStorage,
@@ -60,8 +63,36 @@ void SyncManager::syncWithVersionSelection(const QJsonArray &serverWorkspaces)
 
 bool SyncManager::hasVersionConflicts(const QJsonArray &serverWorkspaces)
 {
-    // TODO: Implement version conflict detection logic
-    // For now, always return false
+    QDir userDir(localStorage->getWorkspacePath(false));
+    QStringList localWorkspaces = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+    for (const QString &workspaceName : localWorkspaces) {
+        QString localPath = userDir.filePath(workspaceName) + "/workspace.json";
+        QFile localFile(localPath);
+        
+        if (localFile.open(QIODevice::ReadOnly)) {
+            QJsonDocument localDoc = QJsonDocument::fromJson(localFile.readAll());
+            localFile.close();
+            
+            if (localDoc.isObject()) {
+                QJsonObject localWorkspace = localDoc.object();
+                QString localVersion = localWorkspace["version"].toString();
+                
+                // Find corresponding server workspace
+                for (const QJsonValue &serverValue : serverWorkspaces) {
+                    QJsonObject serverWorkspace = serverValue.toObject();
+                    if (serverWorkspace["name"].toString() == workspaceName) {
+                        QString serverVersion = serverWorkspace["version"].toString();
+                        if (localVersion != serverVersion) {
+                            return true;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
     return false;
 }
 
@@ -81,7 +112,32 @@ void SyncManager::onWorkspacesFetched(const QJsonArray &workspaces)
 
 void SyncManager::onItemsFetched(const QString &workspaceId, const QJsonArray &items)
 {
-    // TODO: Implement workspace items synchronization
+    // Update workspace items in local storage
+    QDir userDir(localStorage->getWorkspacePath(false));
+    QStringList workspaces = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    
+    for (const QString &workspaceName : workspaces) {
+        QString workspacePath = userDir.filePath(workspaceName) + "/workspace.json";
+        QFile workspaceFile(workspacePath);
+        
+        if (workspaceFile.open(QIODevice::ReadOnly)) {
+            QJsonDocument doc = QJsonDocument::fromJson(workspaceFile.readAll());
+            workspaceFile.close();
+            
+            if (doc.isObject()) {
+                QJsonObject workspace = doc.object();
+                if (workspace["id"].toString() == workspaceId) {
+                    workspace["items"] = items;
+                    
+                    if (workspaceFile.open(QIODevice::WriteOnly)) {
+                        workspaceFile.write(QJsonDocument(workspace).toJson());
+                        workspaceFile.close();
+                    }
+                    break;
+                }
+            }
+        }
+    }
 }
 
 void SyncManager::onSyncCompleted(const QJsonObject &response)
@@ -111,6 +167,25 @@ void SyncManager::syncLocalChanges()
 QJsonObject SyncManager::collectLocalChanges()
 {
     QJsonObject changes;
-    // TODO: Implement local changes collection
+    QJsonArray workspaces;
+    
+    QDir userDir(localStorage->getWorkspacePath(false));
+    QStringList workspaceNames = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    
+    for (const QString &workspaceName : workspaceNames) {
+        QString workspacePath = userDir.filePath(workspaceName) + "/workspace.json";
+        QFile workspaceFile(workspacePath);
+        
+        if (workspaceFile.open(QIODevice::ReadOnly)) {
+            QJsonDocument doc = QJsonDocument::fromJson(workspaceFile.readAll());
+            workspaceFile.close();
+            
+            if (doc.isObject()) {
+                workspaces.append(doc.object());
+            }
+        }
+    }
+    
+    changes["workspaces"] = workspaces;
     return changes;
 }

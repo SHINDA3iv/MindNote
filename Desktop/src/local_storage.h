@@ -16,14 +16,20 @@ public:
     void deleteWorkspace(const QString &workspaceName, bool isGuest = false);
     void syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepLocal = false);
     QString getWorkspacePath(bool isGuest = false) const;
+    void setCurrentUser(const QString &username);
+    QString getCurrentUser() const;
+    void clearUserData();
+    QString getWorkspaceOwnerPath(const QString &ownerUsername) const;
 
 private:
     QString storagePath;
     QString guestPath;
     QString userPath;
+    QString currentUser;
     void saveWorkspaceRecursive(Workspace *workspace, QJsonObject &json);
     Workspace *loadWorkspaceRecursive(const QJsonObject &json, QWidget *parent = nullptr);
     void initializePaths();
+    QString getUserWorkspacePath() const;
 };
 
 #endif // LOCALSTORAGE_H

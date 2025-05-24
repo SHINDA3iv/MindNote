@@ -61,7 +61,6 @@ signals:
 public slots:
     void updateWorkspaceList();
 
-private slots:
     void onLogout();
     void onLoginRequested();
     void onAuthStateChanged();

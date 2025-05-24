@@ -249,24 +249,43 @@ void WorkspaceController::loadFromFile(const QString &filePath)
 
 void WorkspaceController::saveWorkspaces()
 {
+    QString currentUser = _localStorage->getCurrentUser();
+    bool isGuest = currentUser.isEmpty();
+    
     for (Workspace *workspace : _workspaces) {
         if (!workspace->getParentWorkspace()) {
-            _localStorage->saveWorkspace(workspace);
+            _localStorage->saveWorkspace(workspace, isGuest);
         }
     }
 }
 
 void WorkspaceController::loadWorkspaces(QWidget *parent)
 {
-    QDir workspacesDir(QApplication::applicationDirPath() + "/Workspaces/");
-    if (!workspacesDir.exists())
-        return;
-
-    QFileInfoList folders = workspacesDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QFileInfo &folder : folders) {
-        Workspace *workspace = _localStorage->loadWorkspace(folder.baseName(), parent);
-        if (workspace) {
-            _workspaces.append(workspace);
+    QString currentUser = _localStorage->getCurrentUser();
+    
+    if (currentUser.isEmpty()) {
+        // Load guest workspaces only if not authenticated
+        QDir guestDir(QApplication::applicationDirPath() + "/Workspaces/guest/");
+        if (guestDir.exists()) {
+            QFileInfoList folders = guestDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (const QFileInfo &folder : folders) {
+                Workspace *workspace = _localStorage->loadWorkspace(folder.baseName(), parent, true);
+                if (workspace) {
+                    _workspaces.append(workspace);
+                }
+            }
+        }
+    } else {
+        // Load user workspaces if authenticated
+        QDir userDir(QApplication::applicationDirPath() + "/Workspaces/users/" + currentUser + "/");
+        if (userDir.exists()) {
+            QFileInfoList folders = userDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (const QFileInfo &folder : folders) {
+                Workspace *workspace = _localStorage->loadWorkspace(folder.baseName(), parent, false);
+                if (workspace) {
+                    _workspaces.append(workspace);
+                }
+            }
         }
     }
 }

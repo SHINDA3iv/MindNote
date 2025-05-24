@@ -1,5 +1,6 @@
 #include "main_widget.h"
 #include "auth_dialog.h"
+#include "../error_handler.h"
 #include <qtoolbar.h>
 
 #include <QLayout>
@@ -66,9 +67,10 @@ void MainWidget::showAuthDialog()
     authDialog->setWindowModality(Qt::ApplicationModal);
 
     connect(authDialog, &AuthDialog::loginRequested, this,
-            [this, authDialog](const QString &email, const QString &password, bool rememberMe) {
-                qDebug() << "Login requested - email:" << email << "rememberMe:" << rememberMe;
-                _apiClient->login(email, password);
+            [this, authDialog](const QString &username, const QString &password, bool rememberMe) {
+                qDebug() << "Login requested - username:" << username
+                         << "rememberMe:" << rememberMe;
+                _apiClient->login(username, password);
                 _authManager->setRememberMe(rememberMe);
             });
     connect(authDialog, &AuthDialog::registerRequested, _apiClient.get(), &ApiClient::registerUser);
@@ -87,13 +89,16 @@ void MainWidget::showAuthDialog()
          initApplication();
      });
     connect(_apiClient.get(), &ApiClient::loginError, this, [authDialog](const QString &error) {
-        QMessageBox::warning(authDialog, "Ошибка входа", error);
+        authDialog->showLoginError(error);
+        ErrorHandler::instance().showError("Ошибка входа", error);
     });
     connect(_apiClient.get(), &ApiClient::registerSuccess, this, [authDialog]() {
-        QMessageBox::information(authDialog, "Успех", "Регистрация успешна");
+        ErrorHandler::instance().showInfo("Успех", "Регистрация успешна");
+        authDialog->accept();
     });
     connect(_apiClient.get(), &ApiClient::registerError, this, [authDialog](const QString &error) {
-        QMessageBox::warning(authDialog, "Ошибка регистрации", error);
+        authDialog->showRegisterError(error);
+        ErrorHandler::instance().showError("Ошибка регистрации", error);
     });
 
     // Handle workspace synchronization after login
@@ -124,8 +129,7 @@ void MainWidget::showAuthDialog()
     connect(authDialog, &QDialog::rejected, this, [this]() {
         // Если пользователь закрыл диалог, продолжаем как гость
         if (!_authManager->isAuthenticated() && !_isGuestMode) {
-            _isGuestMode = true;
-            initApplication();
+            QApplication::quit();
         }
     });
 
@@ -265,6 +269,7 @@ void MainWidget::onSyncCompleted()
 void MainWidget::onSyncError(const QString &error)
 {
     emit statusMessage(tr("Ошибка синхронизации: %1").arg(error));
+    ErrorHandler::instance().showError("Ошибка синхронизации", error);
 }
 
 void MainWidget::syncWorkspaces()

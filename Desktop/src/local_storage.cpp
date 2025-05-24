@@ -15,7 +15,7 @@ void LocalStorage::initializePaths()
 {
     storagePath = QApplication::applicationDirPath() + "/Workspaces/";
     guestPath = storagePath + "guest/";
-    userPath = storagePath + "user/";
+    userPath = storagePath + "users/";
     
     QDir().mkpath(guestPath);
     QDir().mkpath(userPath);
@@ -23,7 +23,42 @@ void LocalStorage::initializePaths()
 
 QString LocalStorage::getWorkspacePath(bool isGuest) const
 {
-    return isGuest ? guestPath : userPath;
+    return isGuest ? guestPath : getUserWorkspacePath();
+}
+
+QString LocalStorage::getUserWorkspacePath() const
+{
+    if (currentUser.isEmpty()) {
+        return userPath;
+    }
+    return userPath + currentUser + "/";
+}
+
+QString LocalStorage::getWorkspaceOwnerPath(const QString &ownerUsername) const
+{
+    return userPath + ownerUsername + "/";
+}
+
+void LocalStorage::setCurrentUser(const QString &username)
+{
+    currentUser = username;
+    QDir().mkpath(getUserWorkspacePath());
+}
+
+QString LocalStorage::getCurrentUser() const
+{
+    return currentUser;
+}
+
+void LocalStorage::clearUserData()
+{
+    if (!currentUser.isEmpty()) {
+        QDir userDir(getUserWorkspacePath());
+        if (userDir.exists()) {
+            userDir.removeRecursively();
+        }
+    }
+    currentUser.clear();
 }
 
 void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
@@ -31,7 +66,15 @@ void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
     if (!workspace)
         return;
 
-    QString workspacePath = getWorkspacePath(isGuest) + workspace->getName() + "/";
+    QString ownerUsername = workspace->getOwner();
+    QString workspacePath;
+    
+    if (isGuest) {
+        workspacePath = guestPath + workspace->getName() + "/";
+    } else {
+        workspacePath = getUserWorkspacePath() + workspace->getName() + "/";
+    }
+    
     QDir().mkpath(workspacePath);
 
     QFile file(workspacePath + "workspace.json");
@@ -177,7 +220,7 @@ void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepL
 {
     // Get list of local workspaces
     QDir guestDir(guestPath);
-    QDir userDir(userPath);
+    QDir userDir(getUserWorkspacePath());
     
     QStringList localWorkspaces;
     if (keepLocal) {
@@ -190,6 +233,7 @@ void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepL
         QString workspaceName = workspaceObj["name"].toString();
         QString workspaceId = workspaceObj["id"].toString();
         QString version = workspaceObj["version"].toString();
+        QString owner = workspaceObj["owner"].toString();
         
         // Check if workspace exists locally
         bool existsLocally = localWorkspaces.contains(workspaceName);
@@ -203,18 +247,15 @@ void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepL
         Workspace *workspace = new Workspace(workspaceName);
         workspace->setId(workspaceId);
         workspace->setVersion(version);
+        workspace->setOwner(owner);
         
         // Load workspace items if any
         if (workspaceObj.contains("items")) {
             QJsonArray items = workspaceObj["items"].toArray();
-            for (const QJsonValue &itemValue : items) {
-                QJsonObject itemObj = itemValue.toObject();
-                // Create and add workspace item
-                // TODO: Implement workspace item creation based on type
-            }
+            workspace->deserializeItems(items);
         }
         
-        // Save workspace to user directory
+        // Save workspace to user's directory
         saveWorkspace(workspace, false);
         delete workspace;
     }

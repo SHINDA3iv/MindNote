@@ -56,6 +56,10 @@ public:
     QString getVersion() const;
     void setVersion(const QString &version);
 
+    // Owner management
+    QString getOwner() const;
+    void setOwner(const QString &owner);
+
 public slots:
     Workspace *getRootWorkspace();
 signals:
@@ -67,6 +71,7 @@ private:
 
     QString _workspaceName;
     QString _version;
+    QString _owner;
 
     QPointer<QVBoxLayout> _layout;
     QPointer<QScrollArea> _scrollArea;

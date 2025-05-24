@@ -488,3 +488,11 @@ Workspace *Workspace::getRootWorkspace()
     }
     return root;
 }
+
+QString Workspace::getOwner() const {
+    return _owner;
+}
+
+void Workspace::setOwner(const QString &owner) {
+    _owner = owner;
+}

@@ -117,8 +117,8 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     loginLayout->setSpacing(15);
 
     // Поля входа
-    _loginEmail = new QLineEdit(this);
-    _loginEmail->setPlaceholderText("Email");
+    _loginUsername = new QLineEdit(this);
+    _loginUsername->setPlaceholderText("Логин");
 
     _loginPassword = new QLineEdit(this);
     _loginPassword->setPlaceholderText("Пароль");
@@ -130,10 +130,17 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     _loginButton = new QPushButton("Войти", this);
     _loginButton->setObjectName("loginButton");
 
-    loginLayout->addWidget(new QLabel("Email:", this));
-    loginLayout->addWidget(_loginEmail);
-    loginLayout->addWidget(new QLabel("Пароль:", this));
+    // Error label for login
+    _loginErrorLabel = new QLabel(this);
+    _loginErrorLabel->setStyleSheet("color: red;");
+    _loginErrorLabel->setWordWrap(true);
+    _loginErrorLabel->hide();
+
+    loginLayout->addWidget(new QLabel("Логин*:", this));
+    loginLayout->addWidget(_loginUsername);
+    loginLayout->addWidget(new QLabel("Пароль*:", this));
     loginLayout->addWidget(_loginPassword);
+    loginLayout->addWidget(_loginErrorLabel);
     loginLayout->addWidget(_rememberMe);
     loginLayout->addWidget(_loginButton);
     loginLayout->addStretch();
@@ -145,9 +152,6 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     registerLayout->setSpacing(15);
 
     // Поля регистрации
-    _registerEmail = new QLineEdit(this);
-    _registerEmail->setPlaceholderText("Email");
-
     _registerUsername = new QLineEdit(this);
     _registerUsername->setPlaceholderText("Имя пользователя");
 
@@ -155,15 +159,25 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     _registerPassword->setPlaceholderText("Пароль");
     _registerPassword->setEchoMode(QLineEdit::Password);
 
+    _registerEmail = new QLineEdit(this);
+    _registerEmail->setPlaceholderText("Email");
+
     _registerButton = new QPushButton("Зарегистрироваться", this);
     _registerButton->setObjectName("registerButton");
 
+    // Error label for registration
+    _registerErrorLabel = new QLabel(this);
+    _registerErrorLabel->setStyleSheet("color: red;");
+    _registerErrorLabel->setWordWrap(true);
+    _registerErrorLabel->hide();
+
+    registerLayout->addWidget(new QLabel("Имя пользователя*:", this));
+    registerLayout->addWidget(_registerUsername);
+    registerLayout->addWidget(new QLabel("Пароль*:", this));
+    registerLayout->addWidget(_registerPassword);
     registerLayout->addWidget(new QLabel("Email:", this));
     registerLayout->addWidget(_registerEmail);
-    registerLayout->addWidget(new QLabel("Имя пользователя:", this));
-    registerLayout->addWidget(_registerUsername);
-    registerLayout->addWidget(new QLabel("Пароль:", this));
-    registerLayout->addWidget(_registerPassword);
+    registerLayout->addWidget(_registerErrorLabel);
     registerLayout->addWidget(_registerButton);
 
     // Добавляем вкладки
@@ -200,11 +214,33 @@ void AuthDialog::closeEvent(QCloseEvent *event)
 
 void AuthDialog::onLoginClicked()
 {
-    emit loginRequested(_loginEmail->text(), _loginPassword->text(), _rememberMe->isChecked());
+    QString username = _loginUsername->text().trimmed();
+    QString password = _loginPassword->text();
+    bool rememberMe = _rememberMe->isChecked();
+
+    if (username.isEmpty() || password.isEmpty()) {
+        showLoginError("Пожалуйста, заполните все поля");
+        return;
+    }
+
+    emit loginRequested(username, password, rememberMe);
 }
 
 void AuthDialog::onRegisterClicked()
 {
+    _registerErrorLabel->hide();
     emit registerRequested(_registerEmail->text(), _registerPassword->text(),
                            _registerUsername->text());
+}
+
+void AuthDialog::showLoginError(const QString &error)
+{
+    _loginErrorLabel->setText(error);
+    _loginErrorLabel->show();
+}
+
+void AuthDialog::showRegisterError(const QString &error)
+{
+    _registerErrorLabel->setText(error);
+    _registerErrorLabel->show();
 }
