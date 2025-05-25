@@ -117,6 +117,12 @@ class Page(models.Model):
         auto_now_add=True,
         verbose_name=_("Дата создания")
     )
+    icon = models.ImageField(
+        upload_to='page_icons/',
+        blank=True,
+        null=True,
+        verbose_name=_("Иконка")
+    )
 
     class Meta:
         verbose_name = _("Страница")

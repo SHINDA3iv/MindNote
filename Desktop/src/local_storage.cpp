@@ -95,44 +95,7 @@ void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
 
 void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &json)
 {
-    json["title"] = workspace->getTitle();
-
-    qDebug() << "Saving workspace recursively:" << workspace->getTitle();
-
-    // Сохранение иконки
-    QIcon icon = workspace->getIcon();
-    if (!icon.isNull()) {
-        QByteArray iconData;
-        QBuffer buffer(&iconData);
-        buffer.open(QIODevice::WriteOnly);
-
-        // Сохраняем первую доступную pixmap
-        QPixmap pixmap = icon.pixmap(icon.availableSizes().first());
-        if (pixmap.save(&buffer, "PNG")) {
-            json["icon"] = QString::fromLatin1(iconData.toBase64().data());
-            qDebug() << "Saved icon for workspace:" << workspace->getTitle();
-        }
-    }
-
-    // Save workspace items
-    QJsonArray itemsArray;
-    for (const AbstractWorkspaceItem *item : workspace->getItems()) {
-        itemsArray.append(item->serialize());
-        qDebug() << "Saved item of type:" << item->type()
-                 << "in workspace:" << workspace->getTitle();
-    }
-    json["items"] = itemsArray;
-
-    // Save subspaces
-    QJsonArray subspaces;
-    for (Workspace *sub : workspace->getSubWorkspaces()) {
-        QJsonObject subJson;
-        saveWorkspaceRecursive(sub, subJson);
-        subspaces.append(subJson);
-        qDebug() << "Saved subspace:" << sub->getTitle()
-                 << "for workspace:" << workspace->getTitle();
-    }
-    json["subspaces"] = subspaces;
+    json = workspace->serializeBackend();
 }
 
 Workspace *LocalStorage::loadWorkspace(const QString &workspaceTitle, QWidget *parent, bool isGuest)
@@ -165,43 +128,7 @@ Workspace *LocalStorage::loadWorkspace(const QString &workspaceTitle, QWidget *p
 Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget *parent)
 {
     Workspace *workspace = new Workspace(json["title"].toString(), parent);
-
-    qDebug() << "Loading workspace recursively:" << workspace->getTitle();
-
-    // Загрузка иконки
-    if (json.contains("icon")) {
-        QByteArray iconData = QByteArray::fromBase64(json["icon"].toString().toLatin1());
-        QPixmap pixmap;
-        if (pixmap.loadFromData(iconData)) {
-            workspace->setIcon(QIcon(pixmap));
-            qDebug() << "Loaded icon for workspace:" << workspace->getTitle();
-        }
-    } else {
-        // Установка иконки по умолчанию если не задана пользовательская
-        workspace->setIcon(QIcon(":/icons/workspace.png"));
-    }
-
-    // Load workspace items
-    if (json.contains("items")) {
-        QJsonArray itemsArray = json["items"].toArray();
-        workspace->deserializeItems(itemsArray);
-        qDebug() << "Loaded" << itemsArray.size()
-                 << "items for workspace:" << workspace->getTitle();
-    }
-
-    // Load subspaces
-    if (json.contains("subspaces")) {
-        QJsonArray subspaceArray = json["subspaces"].toArray();
-        for (const QJsonValue &value : subspaceArray) {
-            Workspace *sub = loadWorkspaceRecursive(value.toObject(), workspace);
-            if (sub) {
-                workspace->addSubWorkspace(sub);
-                qDebug() << "Loaded subspace:" << sub->getTitle()
-                         << "for workspace:" << workspace->getTitle();
-            }
-        }
-    }
-
+    workspace->deserializeBackend(json);
     return workspace;
 }
 

@@ -15,10 +15,16 @@
 #include <QPushButton>
 #include <QDebug>
 #include <QBuffer>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QDateTime>
+#include <QJsonDocument>
 
-Workspace::Workspace(const QString &name, QWidget *parent) :
+Workspace::Workspace(const QString &title, QWidget *parent) :
     QWidget(parent),
-    _title(name),
+    _title(title),
+    _status(Status::NotStarted),
+    _createdAt(QDateTime::currentDateTime().toString(Qt::ISODate)),
     _iconLabel(new QLabel(this))
 {
     this->setStyleSheet(R"(
@@ -212,12 +218,57 @@ QString Workspace::getTitle() const
     return _title;
 }
 
-void Workspace::setTitle(const QString &name)
+void Workspace::setTitle(const QString &title)
 {
-    _title = name;
+    _title = title;
     if (_titleLabel) {
-        _titleLabel->setText(name);
+        _titleLabel->setText(title);
     }
+}
+
+Workspace::Status Workspace::getStatus() const
+{
+    return _status;
+}
+
+void Workspace::setStatus(Status status)
+{
+    _status = status;
+}
+
+QString Workspace::getStatusString() const
+{
+    switch (_status) {
+    case Status::NotStarted:
+        return "not_started";
+    case Status::InProgress:
+        return "in_progress";
+    case Status::Completed:
+        return "completed";
+    default:
+        return "not_started";
+    }
+}
+
+void Workspace::setStatusFromString(const QString &status)
+{
+    if (status == "not_started") {
+        _status = Status::NotStarted;
+    } else if (status == "in_progress") {
+        _status = Status::InProgress;
+    } else if (status == "completed") {
+        _status = Status::Completed;
+    }
+}
+
+QString Workspace::getCreatedAt() const
+{
+    return _createdAt;
+}
+
+void Workspace::setCreatedAt(const QString &createdAt)
+{
+    _createdAt = createdAt;
 }
 
 void Workspace::addItem(AbstractWorkspaceItem *item)
@@ -257,78 +308,54 @@ QJsonObject Workspace::serialize() const
 {
     QJsonObject json;
     json["title"] = _title;
-    json["version"] = _version;
-    json["parentId"] = _parentWorkspace ? _parentWorkspace->getTitle() : "";
+    json["status"] = getStatusString();
+    json["created_at"] = _createdAt;
 
-    qDebug() << "Starting serialization of workspace:" << _title;
-
-    // Save icon if it exists
-    if (!_iconLabel->pixmap().isNull()) {
-        QByteArray iconData;
-        QBuffer buffer(&iconData);
-        buffer.open(QIODevice::WriteOnly);
-        _iconLabel->pixmap().save(&buffer, "PNG");
-        json["icon"] = QString(iconData.toBase64());
-        qDebug() << "Saved icon for workspace:" << _title;
+    // Сериализация элементов
+    QJsonArray itemsArray;
+    for (const auto &item : _items) {
+        itemsArray.append(item->serialize());
     }
+    json["elements"] = itemsArray;
 
-    // Save items
-    QJsonArray itemArray;
-    for (const AbstractWorkspaceItem *item : _items) {
-        QJsonObject itemJson = item->serialize();
-        itemArray.append(itemJson);
-        qDebug() << "Serialized item of type:" << item->type() << "in workspace:" << _title;
+    // Сериализация подпространств
+    QJsonArray subWorkspacesArray;
+    for (const auto &subWorkspace : _subWorkspaces) {
+        subWorkspacesArray.append(subWorkspace->serialize());
     }
-    json["items"] = itemArray;
-
-    qDebug() << "Finished serializing workspace:"
-             << "Parent:" << (_parentWorkspace ? _parentWorkspace->getTitle() : "none")
-             << "Items:" << _items.size();
+    json["pages"] = subWorkspacesArray;
 
     return json;
 }
 
 void Workspace::deserialize(const QJsonObject &json)
 {
-    if (json.contains("name"))
-        setTitle(json["name"].toString());
-    if (json.contains("title"))
+    if (json.contains("title")) {
         setTitle(json["title"].toString());
-    // parentId и subWorkspaces обрабатываются в контроллере
-
-    // Load icon if it exists
-    if (json.contains("icon")) {
-        QByteArray iconData = QByteArray::fromBase64(json["icon"].toString().toUtf8());
-        QPixmap iconPixmap;
-        iconPixmap.loadFromData(iconData, "PNG");
-        if (!iconPixmap.isNull()) {
-            setIcon(QIcon(iconPixmap));
-        }
     }
 
-    if (json.contains("items")) {
-        QJsonArray itemArray = json["items"].toArray();
-        for (const QJsonValue &itemVal : itemArray) {
-            QJsonObject itemObj = itemVal.toObject();
-            QString type = itemObj["type"].toString();
-            AbstractWorkspaceItem *item = nullptr;
-            if (type == "TitleItem")
-                item = new TitleItem();
-            else if (type == "TextItem")
-                item = new TextItem();
-            else if (type == "OrderedListItem")
-                item = new ListItem(ListItem::Ordered);
-            else if (type == "UnorderedListItem")
-                item = new ListItem(ListItem::Unordered);
-            else if (type == "CheckboxItem")
-                item = new CheckboxItem();
-            else if (type == "ImageItem")
-                item = new ImageItem();
-            else if (type == "FileItem")
-                item = new FileItem();
-            if (item) {
-                item->deserialize(itemObj);
-                addItem(item);
+    if (json.contains("status")) {
+        setStatusFromString(json["status"].toString());
+    }
+
+    if (json.contains("created_at")) {
+        setCreatedAt(json["created_at"].toString());
+    }
+
+    // Десериализация элементов
+    if (json.contains("elements")) {
+        QJsonArray itemsArray = json["elements"].toArray();
+        deserializeItems(itemsArray);
+    }
+
+    // Десериализация подпространств
+    if (json.contains("pages")) {
+        QJsonArray pagesArray = json["pages"].toArray();
+        for (const QJsonValue &pageValue : pagesArray) {
+            if (pageValue.isObject()) {
+                Workspace *subWorkspace = new Workspace();
+                subWorkspace->deserialize(pageValue.toObject());
+                addSubWorkspace(subWorkspace);
             }
         }
     }
@@ -486,4 +513,90 @@ QString Workspace::getOwner() const
 void Workspace::setOwner(const QString &owner)
 {
     _owner = owner;
+}
+
+// --- BACKEND SERIALIZATION ---
+QJsonObject Workspace::serializeBackend(bool isMain) const
+{
+    QJsonObject json;
+    json["title"] = _title;
+    json["status"] = (_status == NotStarted   ? "not_started"
+                      : _status == InProgress ? "in_progress"
+                                              : "completed");
+    json["created_at"] = _createdAt;
+    json["is_main"] = isMain;
+
+    // --- ICON ---
+    if (_iconLabel) {
+        QPixmap pixmapPtr = _iconLabel->pixmap();
+        if (!pixmapPtr.isNull()) {
+            QByteArray iconData;
+            QBuffer buffer(&iconData);
+            buffer.open(QIODevice::WriteOnly);
+            pixmapPtr.save(&buffer, "PNG");
+            json["icon"] = QString(iconData.toBase64());
+        }
+    }
+
+    // Сериализация элементов (items) как elements
+    QJsonArray elementsArray;
+    for (const AbstractWorkspaceItem *item : _items) {
+        elementsArray.append(item->serialize());
+    }
+    json["elements"] = elementsArray;
+
+    // Сериализация вложенных страниц (subWorkspaces) как pages
+    QJsonArray pagesArray;
+    for (const Workspace *sub : _subWorkspaces) {
+        pagesArray.append(sub->serializeBackend(false));
+    }
+    json["pages"] = pagesArray;
+
+    return json;
+}
+
+void Workspace::deserializeBackend(const QJsonObject &json, bool isMain)
+{
+    if (json.contains("title"))
+        setTitle(json["title"].toString());
+    if (json.contains("status")) {
+        QString statusStr = json["status"].toString();
+        if (statusStr == "not_started")
+            _status = NotStarted;
+        else if (statusStr == "in_progress")
+            _status = InProgress;
+        else if (statusStr == "completed")
+            _status = Completed;
+    }
+    if (json.contains("created_at"))
+        _createdAt = json["created_at"].toString();
+
+    // --- ICON ---
+    if (json.contains("icon")) {
+        QByteArray iconData = QByteArray::fromBase64(json["icon"].toString().toUtf8());
+        QPixmap iconPixmap;
+        iconPixmap.loadFromData(iconData, "PNG");
+        if (!iconPixmap.isNull()) {
+            setIcon(QIcon(iconPixmap));
+        }
+    }
+
+    // is_main можно использовать для логики, если нужно
+
+    // Десериализация элементов
+    if (json.contains("elements")) {
+        QJsonArray elementsArray = json["elements"].toArray();
+        deserializeItems(elementsArray);
+    }
+
+    // Десериализация вложенных страниц
+    if (json.contains("pages")) {
+        QJsonArray pagesArray = json["pages"].toArray();
+        for (const QJsonValue &pageVal : pagesArray) {
+            QJsonObject pageObj = pageVal.toObject();
+            Workspace *sub = new Workspace();
+            sub->deserializeBackend(pageObj, false);
+            addSubWorkspace(sub);
+        }
+    }
 }

@@ -18,51 +18,74 @@ public:
     explicit ApiClient(QObject *parent = nullptr);
     ~ApiClient();
 
-    // Базовые методы для работы с API
+    // Базовые методы
     void setBaseUrl(const QString &url);
     void setAuthToken(const QString &token);
     bool isAuthenticated() const;
     QString getUsername() const;
 
-    // Методы для работы с API
+    // Аутентификация
     void login(const QString &username, const QString &password);
     void registerUser(const QString &email, const QString &password, const QString &username);
+    void logout();
+
+    // Рабочие пространства
     void getWorkspaces();
-    void createWorkspace(const QString &name, const QString &description);
-    void updateWorkspace(int id, const QString &name, const QString &description);
-    void deleteWorkspace(int id);
+    void createWorkspace(const QJsonObject &workspaceData);
+    void updateWorkspace(const QString &title, const QJsonObject &workspaceData);
+    void deleteWorkspace(const QString &title);
 
-    void getWorkspaceItems(const QString &workspaceId);
-    void createWorkspaceItem(const QString &workspaceId, const QJsonObject &data);
-    void
-    updateWorkspaceItem(const QString &workspaceId, const QString &itemId, const QJsonObject &data);
-    void deleteWorkspaceItem(const QString &workspaceId, const QString &itemId);
+    // Страницы
+    void getPages(const QString &workspaceTitle);
+    void createPage(const QString &workspaceTitle, const QString &title, bool isMain = false);
+    void updatePage(const QString &workspaceTitle, const QString &title, const QString &newTitle, bool isMain);
+    void deletePage(const QString &workspaceTitle, const QString &title);
 
-    void syncChanges(const QJsonObject &changes);
+    // Элементы страниц
+    void addElement(const QString &workspaceTitle, const QString &pageTitle, const QJsonObject &element);
+    void updateElement(const QString &workspaceTitle, const QString &pageTitle, const QString &elementId, const QJsonObject &element);
+    void removeElement(const QString &workspaceTitle, const QString &pageTitle, const QString &elementId);
+
+    // Синхронизация
+    void syncWorkspace(const QString &workspaceTitle, const QJsonObject &changes);
+    void syncUserWorkspaces();
+
+    // Пользователь
     void getCurrentUser();
     void updateUser(const QJsonObject &userData);
     void deleteUser();
-    void validateToken();
 
 signals:
+    // Аутентификация
     void loginSuccess(const QString &token);
     void loginError(const QString &error);
     void registerSuccess();
     void registerError(const QString &error);
+    void logoutSuccess();
+
+    // Рабочие пространства
     void workspacesReceived(const QJsonArray &workspaces);
     void workspaceCreated(const QJsonObject &workspace);
     void workspaceUpdated(const QJsonObject &workspace);
-    void workspaceDeleted(int id);
-    void error(const QString &error);
-    void tokenValid();
-    void tokenInvalid();
+    void workspaceDeleted(const QString &title);
 
-    void itemsReceived(const QString &workspaceId, const QJsonArray &items);
-    void itemCreated(const QString &workspaceId, const QJsonObject &item);
-    void itemUpdated(const QString &workspaceId, const QJsonObject &item);
-    void itemDeleted(const QString &workspaceId, const QString &itemId);
+    // Страницы
+    void pagesReceived(const QString &workspaceTitle, const QJsonArray &pages);
+    void pageCreated(const QString &workspaceTitle, const QJsonObject &page);
+    void pageUpdated(const QString &workspaceTitle, const QJsonObject &page);
+    void pageDeleted(const QString &workspaceTitle, const QString &title);
 
+    // Элементы
+    void elementAdded(const QString &workspaceTitle, const QString &pageTitle, const QJsonObject &element);
+    void elementUpdated(const QString &workspaceTitle, const QString &pageTitle, const QJsonObject &element);
+    void elementRemoved(const QString &workspaceTitle, const QString &pageTitle, const QString &elementId);
+
+    // Синхронизация
     void syncCompleted(const QJsonObject &response);
+    void syncError(const QString &error);
+
+    // Общие
+    void error(const QString &error);
 
 private:
     QNetworkAccessManager *networkManager;
@@ -71,8 +94,7 @@ private:
     QString _username;
 
     QNetworkRequest createRequest(const QString &endpoint);
-    void handleResponse(QNetworkReply *reply,
-                        const std::function<void(const QJsonDocument &)> &successCallback);
+    void handleResponse(QNetworkReply *reply, const std::function<void(const QJsonDocument &)> &successCallback);
 };
 
 #endif // API_CLIENT_H

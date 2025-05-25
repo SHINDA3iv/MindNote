@@ -16,7 +16,7 @@ SyncManager::SyncManager(std::shared_ptr<ApiClient> apiClient,
 {
     connect(apiClient.get(), &ApiClient::workspacesReceived, this,
             &SyncManager::onWorkspacesFetched);
-    connect(apiClient.get(), &ApiClient::itemsReceived, this, &SyncManager::onItemsFetched);
+    connect(apiClient.get(), &ApiClient::pagesReceived, this, &SyncManager::onPagesFetched);
     connect(apiClient.get(), &ApiClient::syncCompleted, this, &SyncManager::onSyncCompleted);
     connect(apiClient.get(), &ApiClient::error, this, &SyncManager::onError);
     connect(&_syncTimer, &QTimer::timeout, this, &SyncManager::syncLocalChanges);
@@ -105,36 +105,26 @@ void SyncManager::onWorkspacesFetched(const QJsonArray &workspaces)
 
     localStorage->syncWorkspaces(workspaces, false);
     for (const QJsonValue &workspace : workspaces) {
-        QString workspaceId = workspace.toObject()["id"].toString();
-        apiClient->getWorkspaceItems(workspaceId);
+        QString workspaceTitle = workspace.toObject()["title"].toString();
+        apiClient->getPages(workspaceTitle);
     }
 }
 
-void SyncManager::onItemsFetched(const QString &workspaceId, const QJsonArray &items)
+void SyncManager::onPagesFetched(const QString &workspaceTitle, const QJsonArray &pages)
 {
     // Update workspace items in local storage
     QDir userDir(localStorage->getWorkspacePath(false));
-    QStringList workspaces = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    
-    for (const QString &workspaceName : workspaces) {
-        QString workspacePath = userDir.filePath(workspaceName) + "/workspace.json";
-        QFile workspaceFile(workspacePath);
-        
-        if (workspaceFile.open(QIODevice::ReadOnly)) {
-            QJsonDocument doc = QJsonDocument::fromJson(workspaceFile.readAll());
-            workspaceFile.close();
-            
-            if (doc.isObject()) {
-                QJsonObject workspace = doc.object();
-                if (workspace["id"].toString() == workspaceId) {
-                    workspace["items"] = items;
-                    
-                    if (workspaceFile.open(QIODevice::WriteOnly)) {
-                        workspaceFile.write(QJsonDocument(workspace).toJson());
-                        workspaceFile.close();
-                    }
-                    break;
-                }
+    QString workspacePath = userDir.filePath(workspaceTitle) + "/workspace.json";
+    QFile workspaceFile(workspacePath);
+    if (workspaceFile.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(workspaceFile.readAll());
+        workspaceFile.close();
+        if (doc.isObject()) {
+            QJsonObject workspace = doc.object();
+            workspace["pages"] = pages;
+            if (workspaceFile.open(QIODevice::WriteOnly)) {
+                workspaceFile.write(QJsonDocument(workspace).toJson());
+                workspaceFile.close();
             }
         }
     }
@@ -161,7 +151,11 @@ void SyncManager::syncLocalChanges()
     _isSyncing = true;
     emit syncStarted();
     QJsonObject changes = collectLocalChanges();
-    apiClient->syncChanges(changes);
+    QDir userDir(localStorage->getWorkspacePath(false));
+    QStringList workspaceNames = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &workspaceName : workspaceNames) {
+        apiClient->syncWorkspace(workspaceName, changes);
+    }
 }
 
 QJsonObject SyncManager::collectLocalChanges()

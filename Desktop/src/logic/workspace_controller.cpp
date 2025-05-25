@@ -152,10 +152,10 @@ QJsonObject WorkspaceController::serialize() const
 {
     QJsonObject json;
     QJsonArray workspacesArray;
-
-    // Save all workspaces
     for (const Workspace *ws : _workspaces) {
-        workspacesArray.append(ws->serialize());
+        if (!ws->getParentWorkspace()) {
+            workspacesArray.append(ws->serializeBackend(true));
+        }
     }
     json["workspaces"] = workspacesArray;
     return json;
@@ -165,60 +165,13 @@ void WorkspaceController::deserialize(const QJsonObject &json)
 {
     qDeleteAll(_workspaces);
     _workspaces.clear();
-    QMap<QString, Workspace *> titleMap;
-    QList<QPair<SubspaceLinkItem *, QString>> linkItemsToFix;
-
     if (json.contains("workspaces")) {
         QJsonArray arr = json["workspaces"].toArray();
-
-        // First pass: Create all workspaces
         for (const QJsonValue &val : arr) {
             QJsonObject obj = val.toObject();
-            QString title = obj["title"].toString();
-
-            Workspace *ws = new Workspace(title);
-            titleMap[title] = ws;
+            Workspace *ws = new Workspace();
+            ws->deserializeBackend(obj, true);
             _workspaces.append(ws);
-
-            qDebug() << "Created workspace:" << title;
-        }
-
-        // Second pass: Set up parent-child relationships and deserialize content
-        for (const QJsonValue &val : arr) {
-            QJsonObject obj = val.toObject();
-            QString title = obj["title"].toString();
-            QString parentTitle = obj["parentId"].toString();
-
-            Workspace *ws = titleMap[title];
-            if (!parentTitle.isEmpty() && titleMap.contains(parentTitle)) {
-                Workspace *parent = titleMap[parentTitle];
-                ws->setParentWorkspace(parent);
-                parent->addSubWorkspace(ws);
-
-                qDebug() << "Setting up relationship:"
-                         << "Child:" << ws->getTitle() << "Parent:" << parent->getTitle();
-            }
-
-            // Deserialize workspace content
-            ws->deserialize(obj);
-
-            // Handle SubspaceLinkItem connections
-            for (const AbstractWorkspaceItem *item : ws->getItems()) {
-                if (item->type() == "SubspaceLinkItem") {
-                    auto *link =
-                     static_cast<SubspaceLinkItem *>(const_cast<AbstractWorkspaceItem *>(item));
-                    QString subspaceTitle = link->serialize()["subspaceTitle"].toString();
-                    if (titleMap.contains(subspaceTitle)) {
-                        link->setLinkedWorkspace(titleMap[subspaceTitle]);
-                        QObject::connect(link, &SubspaceLinkItem::subspaceLinkClicked, ws,
-                                         &Workspace::subWorkspaceClicked);
-
-                        qDebug() << "Setting up link:"
-                                 << "From:" << ws->getTitle()
-                                 << "To:" << titleMap[subspaceTitle]->getTitle();
-                    }
-                }
-            }
         }
     }
 }

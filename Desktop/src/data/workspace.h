@@ -58,6 +58,19 @@ public:
     QString getOwner() const;
     void setOwner(const QString &owner);
 
+    // --- BACKEND FIELDS ---
+    enum Status { NotStarted, InProgress, Completed };
+    void setStatus(Status status);
+    Status getStatus() const;
+    void setCreatedAt(const QString &createdAt);
+    QString getCreatedAt() const;
+    QString getStatusString() const;
+    void setStatusFromString(const QString &status);
+
+    // Сериализация в стиле backend
+    QJsonObject serializeBackend(bool isMain = false) const;
+    void deserializeBackend(const QJsonObject &json, bool isMain = false);
+
 public slots:
     Workspace *getRootWorkspace();
 signals:
@@ -83,6 +96,9 @@ private:
 
     Workspace *_parentWorkspace { nullptr };
     QList<Workspace *> _subWorkspaces;
+
+    Status _status = NotStarted;
+    QString _createdAt;
 };
 
 #endif // WORKSPACE_H

@@ -150,22 +150,22 @@ void MainWidget::initApplication()
         _apiClient->setAuthToken(_authManager->getAuthToken());
 
         // Проверяем токен на сервере при запуске
-        _apiClient->validateToken();
+        _apiClient->getCurrentUser();
 
         // Обработка результата проверки токена
-        connect(_apiClient.get(), &ApiClient::tokenValid, this, [this]() {
-            _syncManager->startAutoSync(5 * 60 * 1000); // Синхронизация только для авторизованных
-
-            // Настройка периодической проверки токена
-            connect(&_tokenCheckTimer, &QTimer::timeout, this, &MainWidget::checkToken);
-            _tokenCheckTimer.start(5 * 60 * 1000); // Проверка каждые 5 минут
-        });
-
-        connect(_apiClient.get(), &ApiClient::tokenInvalid, this, [this]() {
+        connect(_apiClient.get(), &ApiClient::error, this, [this](const QString &err) {
             QMessageBox::warning(this, "Сессия истекла",
                                  "Ваша сессия истекла. Пожалуйста, войдите снова.");
             _authManager->logout();
             showAuthDialog();
+        });
+
+        connect(_apiClient.get(), &ApiClient::loginSuccess, this, [this](const QString &token) {
+            _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
+
+            // Get server workspaces after successful login
+            _apiClient->getWorkspaces();
+            initApplication();
         });
     }
 }
@@ -173,7 +173,7 @@ void MainWidget::initApplication()
 void MainWidget::checkToken()
 {
     if (_authManager->isAuthenticated()) {
-        _apiClient->validateToken();
+        _apiClient->getCurrentUser();
     }
 }
 
@@ -205,7 +205,7 @@ void MainWidget::initConnections()
     connect(_authManager.get(), &AuthManager::logoutRequested, this, &MainWidget::onLogout);
 
     // Token validation connections
-    connect(_apiClient.get(), &ApiClient::tokenInvalid, this, [this]() {
+    connect(_apiClient.get(), &ApiClient::error, this, [this](const QString &err) {
         QMessageBox::warning(this, "Сессия истекла",
                              "Ваша сессия истекла. Пожалуйста, войдите снова.");
         _authManager->logout();

@@ -31,7 +31,7 @@ signals:
 
 private slots:
     void onWorkspacesFetched(const QJsonArray &workspaces);
-    void onItemsFetched(const QString &workspaceId, const QJsonArray &items);
+    void onPagesFetched(const QString &workspaceTitle, const QJsonArray &pages);
     void onSyncCompleted(const QJsonObject &response);
     void onError(const QString &message);
     void syncLocalChanges();
