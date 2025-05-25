@@ -147,20 +147,18 @@ class MainActivity : AppCompatActivity() {
 
         // Добавляем только те рабочие пространства, которые не являются вложенными страницами
         workspaces.filter { workspace -> !nestedPageIds.contains(workspace.id) }.forEach { workspace ->
-            if (workspace.items.any { it is ContentItem.NestedPageItem }) {
-                // Create expandable menu item for workspaces with nested pages
-                val menuItem = menu.add(ws_group, workspace.id.hashCode(), Menu.NONE, workspace.name)
-                val expandableItem = ExpandableMenuItem(this)
-                expandableItem.setWorkspace(workspace)
-                expandableItem.setOnItemClickListener { ws ->
-                    openWorkspace(ws.name)
-                    drawerLayout.closeDrawer(GravityCompat.START)
-                }
-                menuItem.actionView = expandableItem
-            } else {
-                // Regular menu item for workspaces without nested pages
-                addMenuItem(workspace.name, workspace)
+            // Create menu item with custom layout
+            val menuItem = menu.add(ws_group, workspace.id.hashCode(), Menu.NONE, "")
+            val customView = layoutInflater.inflate(R.layout.nav_menu_item, null)
+            val expandableItem = customView.findViewById<ExpandableMenuItem>(R.id.expandable_menu_item)
+            
+            expandableItem.setWorkspace(workspace)
+            expandableItem.setOnItemClickListener { ws ->
+                openWorkspace(ws.name)
+                drawerLayout.closeDrawer(GravityCompat.START)
             }
+            
+            menuItem.actionView = customView
         }
     }
 

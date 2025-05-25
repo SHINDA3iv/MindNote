@@ -30,6 +30,7 @@ class ExpandableMenuItem @JvmOverloads constructor(
 
     init {
         orientation = VERTICAL
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         LayoutInflater.from(context).inflate(R.layout.expandable_menu_item, this, true)
 
         headerView = findViewById(R.id.menu_item_header)
@@ -37,6 +38,9 @@ class ExpandableMenuItem @JvmOverloads constructor(
         titleView = findViewById(R.id.menu_item_title)
         expandButton = findViewById(R.id.expand_button)
         nestedContainer = findViewById(R.id.nested_items_container)
+
+        // Устанавливаем параметры для headerView
+        headerView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
 
         setupClickListeners()
     }
@@ -87,32 +91,44 @@ class ExpandableMenuItem @JvmOverloads constructor(
     }
 
     private fun addNestedItem(nestedItem: com.example.mindnote.data.ContentItem.NestedPageItem) {
-        val nestedView = LayoutInflater.from(context).inflate(R.layout.nested_page_item, null)
-        val nestedIcon = nestedView.findViewById<ImageView>(R.id.pageIcon)
-        val nestedTitle = nestedView.findViewById<TextView>(R.id.pageName)
-
-        nestedTitle.text = nestedItem.pageName
-        nestedItem.iconUri?.let { uri ->
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
-                nestedIcon.setImageBitmap(bitmap)
-            } catch (e: Exception) {
-                nestedIcon.setImageResource(android.R.drawable.ic_menu_agenda)
-            }
-        } ?: run {
-            nestedIcon.setImageResource(android.R.drawable.ic_menu_agenda)
-        }
-
-        nestedView.setOnClickListener {
-            val mainActivity = context as? MainActivity
-            val targetWorkspace = mainActivity?.getWorkspaceById(nestedItem.pageId)
-            targetWorkspace?.let { ws ->
+        val mainActivity = context as? MainActivity
+        val targetWorkspace = mainActivity?.getWorkspaceById(nestedItem.pageId)
+        
+        if (targetWorkspace != null && targetWorkspace.items.any { it is com.example.mindnote.data.ContentItem.NestedPageItem }) {
+            // Если у вложенной страницы есть свои дочерние страницы, создаем новый ExpandableMenuItem
+            val nestedExpandableItem = ExpandableMenuItem(context)
+            nestedExpandableItem.setWorkspace(targetWorkspace)
+            nestedExpandableItem.setOnItemClickListener { ws ->
                 onItemClickListener?.invoke(ws)
             }
-        }
+            nestedContainer.addView(nestedExpandableItem)
+        } else {
+            // Если нет дочерних страниц, создаем обычный элемент
+            val nestedView = LayoutInflater.from(context).inflate(R.layout.nested_page_item, null)
+            val nestedIcon = nestedView.findViewById<ImageView>(R.id.pageIcon)
+            val nestedTitle = nestedView.findViewById<TextView>(R.id.pageName)
 
-        nestedContainer.addView(nestedView)
+            nestedTitle.text = nestedItem.pageName
+            nestedItem.iconUri?.let { uri ->
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                    nestedIcon.setImageBitmap(bitmap)
+                } catch (e: Exception) {
+                    nestedIcon.setImageResource(android.R.drawable.ic_menu_agenda)
+                }
+            } ?: run {
+                nestedIcon.setImageResource(android.R.drawable.ic_menu_agenda)
+            }
+
+            nestedView.setOnClickListener {
+                targetWorkspace?.let { ws ->
+                    onItemClickListener?.invoke(ws)
+                }
+            }
+
+            nestedContainer.addView(nestedView)
+        }
     }
 
     fun setOnItemClickListener(listener: (Workspace) -> Unit) {

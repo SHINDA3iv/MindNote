@@ -1,22 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+    android:layout_width="600dp"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:layout_gravity="fill_horizontal"
+    android:fillViewport="true">
 
     <LinearLayout
         android:id="@+id/menu_item_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp"
-        android:background="?attr/selectableItemBackground">
+        android:padding="8dp"
+        android:background="?attr/selectableItemBackground"
+        android:gravity="center_vertical"
+        android:layout_gravity="fill_horizontal">
+
+        <ImageButton
+            android:id="@+id/expand_button"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/arrow_down_float"
+            android:rotation="0"
+            android:padding="2dp" />
 
         <ImageView
             android:id="@+id/menu_item_icon"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:layout_gravity="center_vertical"
+            android:layout_marginStart="4dp"
             android:src="@android:drawable/ic_menu_agenda"
             android:tint="@color/design_default_color_primary" />
 
@@ -25,20 +38,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="16dp"
-            android:layout_gravity="center_vertical"
+            android:layout_marginStart="8dp"
             android:textSize="16sp"
             android:textColor="@color/design_default_color_primary" />
 
-        <ImageButton
-            android:id="@+id/expand_button"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_gravity="center_vertical"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/arrow_down_float"
-            android:rotation="0"
-            android:padding="4dp" />
     </LinearLayout>
 
     <LinearLayout
