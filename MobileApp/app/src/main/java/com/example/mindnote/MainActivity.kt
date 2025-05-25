@@ -26,6 +26,7 @@ import com.example.mindnote.R.id.nav_header_add_button
 import com.example.mindnote.R.id.ws_group
 import com.example.mindnote.data.ContentItem
 import com.example.mindnote.data.Workspace
+import com.example.mindnote.views.ExpandableMenuItem
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.Dispatchers
@@ -131,11 +132,34 @@ class MainActivity : AppCompatActivity() {
         // Подписываемся на обновления
         viewModel.workspaces.observe(this) { workspaces ->
             Log.d("MindNote", "MainActivity: Observed ${workspaces.size} workspaces")
-            val menu = navigationView.menu
-            menu.removeGroup(ws_group)
-            workspaces.forEach { workspace ->
+            updateNavigationMenu(workspaces)
+        }
+    }
+
+    private fun updateNavigationMenu(workspaces: List<Workspace>) {
+        val menu = navigationView.menu
+        menu.removeGroup(ws_group)
+
+        // Получаем список ID всех вложенных страниц
+        val nestedPageIds = workspaces.flatMap { workspace ->
+            workspace.items.filterIsInstance<ContentItem.NestedPageItem>().map { it.pageId }
+        }.toSet()
+
+        // Добавляем только те рабочие пространства, которые не являются вложенными страницами
+        workspaces.filter { workspace -> !nestedPageIds.contains(workspace.id) }.forEach { workspace ->
+            if (workspace.items.any { it is ContentItem.NestedPageItem }) {
+                // Create expandable menu item for workspaces with nested pages
+                val menuItem = menu.add(ws_group, workspace.id.hashCode(), Menu.NONE, workspace.name)
+                val expandableItem = ExpandableMenuItem(this)
+                expandableItem.setWorkspace(workspace)
+                expandableItem.setOnItemClickListener { ws ->
+                    openWorkspace(ws.name)
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                }
+                menuItem.actionView = expandableItem
+            } else {
+                // Regular menu item for workspaces without nested pages
                 addMenuItem(workspace.name, workspace)
-                Log.d("MindNote", "MainActivity: Added menu item for '${workspace.name}' with ${workspace.items.size} items")
             }
         }
     }
@@ -804,5 +828,10 @@ class MainActivity : AppCompatActivity() {
                 item.icon = getDrawable(android.R.drawable.ic_menu_agenda)
             }
         }
+    }
+
+    // Добавляем публичный метод для получения рабочего пространства по ID
+    fun getWorkspaceById(id: String): Workspace? {
+        return viewModel.getWorkspaceById(id)
     }
 }
