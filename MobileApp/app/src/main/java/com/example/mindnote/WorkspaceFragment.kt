@@ -1,6 +1,6 @@
 package com.example.mindnote
 
-import android.app.ProgressDialog
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -26,6 +26,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
 
 class WorkspaceFragment : Fragment() {
     private lateinit var workspaceName: String
@@ -35,6 +37,15 @@ class WorkspaceFragment : Fragment() {
     private val imageCache = ConcurrentHashMap<String, Bitmap>()
     private var isDestroyed = false
     private var isContentLoaded = false
+
+    private val pickIconLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                // Handle the selected icon URI
+                Log.d("MindNote", "Selected custom icon URI: $uri")
+            }
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -128,12 +139,12 @@ class WorkspaceFragment : Fragment() {
             imageCache[uriString]?.let { return@withContext it }
 
             val uri = Uri.parse(uriString)
-            context?.contentResolver?.openInputStream(uri)?.use { input ->
+            context?.contentResolver?.openInputStream(uri)?.use { inputStream ->
                 // Сначала получаем размеры изображения
                 val options = BitmapFactory.Options().apply {
                     inJustDecodeBounds = true
                 }
-                BitmapFactory.decodeStream(input, null, options)
+                BitmapFactory.decodeStream(inputStream, null, options)
 
                 // Вычисляем коэффициент масштабирования
                 val maxWidth = resources.displayMetrics.widthPixels
@@ -151,8 +162,8 @@ class WorkspaceFragment : Fragment() {
                     inSampleSize = sampleSize
                 }
 
-                context?.contentResolver?.openInputStream(uri)?.use { input ->
-                    val bitmap = BitmapFactory.decodeStream(input, null, loadOptions)
+                context?.contentResolver?.openInputStream(uri)?.use { inputStream2 ->
+                    val bitmap = BitmapFactory.decodeStream(inputStream2, null, loadOptions)
                     if (bitmap != null) {
                         // Сохраняем в кэш
                         imageCache[uriString] = bitmap
@@ -236,7 +247,17 @@ class WorkspaceFragment : Fragment() {
             false
         }
 
-        container.addView(textItemView)
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(textItemView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item?.id ?: "")
+                container.removeView(swipeContainer)
+            }
+        }
+
+        container.addView(swipeContainer)
     }
 
     private fun applyFormat(editText: EditText, startTag: String, endTag: String) {
@@ -262,7 +283,11 @@ class WorkspaceFragment : Fragment() {
                         spannedLine.toString()
                     } else {
                         // Добавляем тег, не трогая другие
-                        val wrapped = "$startTag$line$endTag"
+                        val wrapped = StringBuilder()
+                            .append(startTag)
+                            .append(line)
+                            .append(endTag)
+                            .toString()
                         val combined = SpannableStringBuilder(Html.fromHtml(wrapped, Html.FROM_HTML_MODE_COMPACT))
                         combined
                     }
@@ -491,15 +516,20 @@ class WorkspaceFragment : Fragment() {
             }
         })
 
-        checkboxItemView.setOnLongClickListener {
-            showPopupMenuForItem(checkboxItemView, currentItem)
-            true
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(checkboxItemView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item?.id ?: "")
+                container.removeView(swipeContainer)
+            }
         }
 
-        container.addView(checkboxItemView)
+        container.addView(swipeContainer)
     }
 
-    fun addImageView(item: ContentItem.ImageItem? = null, preloadedBitmap: Bitmap? = null) {
+    fun addImageView(item: ContentItem.ImageItem? = null) {
         if (item == null) return
 
         val imageView = ImageView(context)
@@ -514,9 +544,6 @@ class WorkspaceFragment : Fragment() {
 
         // Сначала показываем плейсхолдер
         imageView.setImageResource(android.R.drawable.ic_menu_report_image)
-
-        // Добавляем ImageView в контейнер сразу
-        container.addView(imageView)
 
         // Загружаем изображение в фоновом потоке
         viewLifecycleOwner.lifecycleScope.launch {
@@ -540,10 +567,17 @@ class WorkspaceFragment : Fragment() {
             }
         }
 
-        imageView.setOnLongClickListener {
-            showPopupMenuForItem(imageView, item)
-            true
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(imageView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item.id)
+                container.removeView(swipeContainer)
+            }
         }
+
+        container.addView(swipeContainer)
     }
 
     fun addFileItem(item: ContentItem.FileItem? = null) {
@@ -570,20 +604,24 @@ class WorkspaceFragment : Fragment() {
                 }
             }
 
-            // Обработка долгого нажатия для контекстного меню
-            fileButton.setOnLongClickListener {
-                showPopupMenuForItem(fileButton, item)
-                true
+            // Create swipe container
+            val swipeContainer = SwipeContainer(requireContext())
+            swipeContainer.addItemView(fileButtonView)
+            swipeContainer.setOnDeleteListener {
+                currentWorkspace?.let { workspace ->
+                    viewModel.removeContentItem(workspace, item.id)
+                    container.removeView(swipeContainer)
+                }
             }
 
-            container.addView(fileButtonView)
+            container.addView(swipeContainer)
         } catch (e: Exception) {
             Log.e("MindNote", "Error adding file item", e)
             Toast.makeText(context, "Ошибка при добавлении файла: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun addNestedPageItem(item: ContentItem.NestedPageItem? = null) {
+    private fun addNestedPageItem(item: ContentItem.NestedPageItem? = null) {
         if (item == null) return
 
         val nestedPageView = layoutInflater.inflate(R.layout.nested_page_item, null)
@@ -618,12 +656,17 @@ class WorkspaceFragment : Fragment() {
                 .commit()
         }
 
-        nestedPageView.setOnLongClickListener {
-            showPopupMenuForItem(nestedPageView, item)
-            true
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(nestedPageView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item.id)
+                container.removeView(swipeContainer)
+            }
         }
 
-        container.addView(nestedPageView)
+        container.addView(swipeContainer)
     }
 
     fun showCreateNestedPageDialog() {
@@ -698,40 +741,11 @@ class WorkspaceFragment : Fragment() {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = "image/*"
             }
-            startActivityForResult(intent, PICK_ICON_REQUEST_CODE)
+            pickIconLauncher.launch(intent)
             dialog.dismiss()
         }
 
         dialog.show()
-    }
-
-    private fun showPopupMenuForItem(view: View, item: ContentItem?) {
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.menuInflater.inflate(R.menu.item_popup_menu, popupMenu.menu)
-
-        popupMenu.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.menu_delete -> {
-                    item?.let {
-                        currentWorkspace?.let { workspace ->
-                            val itemId = when (it) {
-                                is ContentItem.TextItem -> it.id
-                                is ContentItem.CheckboxItem -> it.id
-                                is ContentItem.ImageItem -> it.id
-                                is ContentItem.FileItem -> it.id
-                                is ContentItem.NestedPageItem -> it.id
-                            }
-                            viewModel.removeContentItem(workspace, itemId)
-                            container.removeView(view)
-                        }
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-
-        popupMenu.show()
     }
 
     private fun formatFileSize(size: Long): String {
@@ -790,5 +804,15 @@ class WorkspaceFragment : Fragment() {
             fragment.arguments = args
             return fragment
         }
+    }
+
+    private fun showLoadingDialog(): AlertDialog {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_loading, null)
+        val dialog = AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+        dialog.show()
+        return dialog
     }
 }

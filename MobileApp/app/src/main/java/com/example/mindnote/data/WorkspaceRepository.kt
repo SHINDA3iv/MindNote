@@ -25,6 +25,10 @@ class WorkspaceRepository private constructor(private val context: Context) {
     private val _workspaces = MutableLiveData<List<Workspace>>(emptyList())
     val workspaces: LiveData<List<Workspace>> = _workspaces
 
+    init {
+        loadWorkspaces()  // Загружаем сохраненные рабочие пространства при инициализации
+    }
+
     companion object {
         @Volatile
         private var INSTANCE: WorkspaceRepository? = null
@@ -98,6 +102,27 @@ class WorkspaceRepository private constructor(private val context: Context) {
             is ContentItem.NestedPageItem -> workspace.updateItem(item)
         }
         updateWorkspace(workspace)
+    }
+
+    // Загрузка сохраненных рабочих пространств
+    private fun loadWorkspaces() {
+        val gson = GsonBuilder()
+            .registerTypeAdapter(Uri::class.java, UriTypeAdapter())
+            .registerTypeAdapter(ContentItem::class.java, ContentItemTypeAdapter())
+            .create()
+
+        try {
+            val file = File(context.filesDir, "workspaces.json")
+            if (file.exists()) {
+                val json = file.readText()
+                val type = object : TypeToken<List<Workspace>>() {}.type
+                val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type)
+                _workspaces.value = loadedWorkspaces
+                Log.d("MindNote", "Workspaces loaded successfully: ${loadedWorkspaces.size} workspaces")
+            }
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error loading workspaces", e)
+        }
     }
 
     // Сохранение всех рабочих пространств
