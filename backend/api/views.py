@@ -41,6 +41,13 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
         storage.delete_workspace(instance.title)
         instance.delete()
 
+    @action(detail=True, methods=['get'], url_path='pages')
+    def pages(self, request, title=None):
+        workspace = self.get_object()
+        pages = workspace.pages.all()
+        serializer = PageSerializer(pages, many=True)
+        return Response(serializer.data)
+
 
 class PageViewSet(viewsets.ModelViewSet):
     queryset = Page.objects.all()
@@ -309,67 +316,119 @@ class UserWorkspaceSyncView(APIView):
 
     def post(self, request):
         """
-        Синхронизация рабочих пространств гостя с пользователем
+        Синхронизация рабочих пространств гостя с пользователем.
+        Ожидает: {"local_workspaces": [ ... ]}
+        Возвращает: {"new": [...], "conflicts": [...], "server_only": [...]}
         """
         try:
-            should_copy = request.data.get('copy_guest_workspaces', False)
-            storage = LocalStorageManager(request.user)
+            local_workspaces = request.data.get('local_workspaces', [])
+            user = request.user
 
-            if should_copy:
-                # Копируем рабочие пространства гостя в папку пользователя
-                storage.copy_guest_workspaces_to_user()
+            # Получаем все workspaces пользователя с сервера
+            server_workspaces_qs = Workspace.objects.filter(author=user)
+            server_workspaces = {ws.title: ws for ws in server_workspaces_qs}
+            server_titles = set(server_workspaces.keys())
+            local_titles = set(ws['title'] for ws in local_workspaces)
 
-                # Получаем список всех рабочих пространств пользователя
-                workspaces = storage.list_workspaces()
-                server_workspaces = Workspace.objects.filter(author=request.user)
-                conflicts = []
+            # Новые локальные workspaces (есть только локально)
+            new_workspaces = [ws for ws in local_workspaces if ws['title'] not in server_titles]
 
-                for workspace in workspaces:
-                    server_workspace = server_workspaces.filter(title=workspace['title']).first()
-                    if server_workspace:
+            # Только серверные workspaces (есть только на сервере)
+            server_only = [WorkspaceSerializer(server_workspaces[title]).data for title in (server_titles - local_titles)]
+
+            # Конфликты (есть и там, и там, но содержимое отличается)
+            conflicts = []
+            for ws in local_workspaces:
+                title = ws['title']
+                if title in server_workspaces:
+                    server_ws_data = WorkspaceSerializer(server_workspaces[title]).data
+                    # Сравниваем содержимое (можно по hash, можно по сериализованному json)
+                    if ws != server_ws_data:
                         conflicts.append({
-                            'local': workspace,
-                            'server': WorkspaceSerializer(server_workspace).data
+                            'title': title,
+                            'local': ws,
+                            'server': server_ws_data
                         })
-                    else:
-                        # Если пространства нет на сервере, создаем его
-                        workspace_data = storage.load_workspace(workspace['title'])
-                        if workspace_data:
-                            workspace_obj = Workspace.objects.create(
-                                title=workspace_data['title'],
-                                author=request.user,
-                                status=workspace_data.get('status', 'not_started')
-                            )
-                            # Создаем страницы
-                            for page_data in workspace_data.get('pages', []):
-                                Page.objects.create(
-                                    title=page_data['title'],
-                                    space=workspace_obj,
-                                    is_main=page_data.get('is_main', False)
-                                )
 
-                response_data = {
-                    'workspaces': workspaces,
-                    'conflicts': conflicts
-                }
-                return Response(response_data)
-            else:
-                # Просто загружаем рабочие пространства с сервера
-                workspaces = Workspace.objects.filter(author=request.user)
-                serializer = WorkspaceSerializer(workspaces, many=True)
-                
-                # Сохраняем серверные пространства локально
-                for workspace in workspaces:
-                    workspace_data = serializer.data[workspaces.index(workspace)]
-                    storage.save_workspace(workspace_data)
-                
-                return Response(serializer.data)
+            response_data = {
+                'new': new_workspaces,
+                'conflicts': conflicts,
+                'server_only': server_only,
+            }
+            return Response(response_data)
 
         except Exception as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def patch(self, request):
+        """
+        Применение решения пользователя по конфликтам и новым workspaces.
+        Ожидает: {"resolve": [{"title": ..., "use": "local"/"server", "data": {...}}], "new": [ ... ]}
+        Возвращает: итоговый список workspaces пользователя.
+        """
+        try:
+            user = request.user
+            resolve = request.data.get('resolve', [])
+            new_workspaces = request.data.get('new', [])
+
+            # Применяем решения по конфликтам
+            for item in resolve:
+                title = item['title']
+                use = item['use']
+                data = item.get('data')
+                ws_obj = Workspace.objects.filter(author=user, title=title).first()
+                if use == 'local' and data:
+                    # Обновить серверную версию локальными данными
+                    if ws_obj:
+                        ws_obj.status = data.get('status', ws_obj.status)
+                        ws_obj.save()
+                        # Удалить старые страницы
+                        ws_obj.pages.all().delete()
+                        # Создать новые страницы
+                        for page_data in data.get('pages', []):
+                            Page.objects.create(
+                                title=page_data['title'],
+                                space=ws_obj,
+                                is_main=page_data.get('is_main', False)
+                            )
+                    else:
+                        ws_obj = Workspace.objects.create(
+                            title=title,
+                            author=user,
+                            status=data.get('status', 'not_started')
+                        )
+                        for page_data in data.get('pages', []):
+                            Page.objects.create(
+                                title=page_data['title'],
+                                space=ws_obj,
+                                is_main=page_data.get('is_main', False)
+                            )
+                elif use == 'server':
+                    # Оставить серверную версию — ничего не делать
+                    pass
+
+            # Добавляем новые workspaces
+            for ws in new_workspaces:
+                if not Workspace.objects.filter(author=user, title=ws['title']).exists():
+                    ws_obj = Workspace.objects.create(
+                        title=ws['title'],
+                        author=user,
+                        status=ws.get('status', 'not_started')
+                    )
+                    for page_data in ws.get('pages', []):
+                        Page.objects.create(
+                            title=page_data['title'],
+                            space=ws_obj,
+                            is_main=page_data.get('is_main', False)
+                        )
+
+            # Возвращаем итоговый список workspaces пользователя
+            workspaces = Workspace.objects.filter(author=user)
+            serializer = WorkspaceSerializer(workspaces, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LogoutView(APIView):

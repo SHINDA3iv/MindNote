@@ -22,12 +22,16 @@ public:
     void stopAutoSync();
     void performFullSync();
     void syncWithVersionSelection(const QJsonArray &serverWorkspaces);
+    void startUserSync();
+    void applyUserSyncResolution(const QJsonArray &resolve, const QJsonArray &newWorkspaces);
 
 signals:
     void syncStarted();
     void syncCompleted();
     void syncError(const QString &error);
     void versionConflictDetected(const QJsonArray &serverWorkspaces);
+    void userSyncDiffReceived(const QJsonObject &diff);
+    void userSyncFinalReceived(const QJsonArray &finalWorkspaces);
 
 private slots:
     void onWorkspacesFetched(const QJsonArray &workspaces);
@@ -35,6 +39,8 @@ private slots:
     void onSyncCompleted(const QJsonObject &response);
     void onError(const QString &message);
     void syncLocalChanges();
+    void onUserSyncDiffReceived(const QJsonObject &diff);
+    void onUserSyncFinalReceived(const QJsonArray &finalWorkspaces);
 
 private:
     QJsonObject collectLocalChanges();

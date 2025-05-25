@@ -332,3 +332,30 @@ void ApiClient::registerUser(const QString &email, const QString &password, cons
         }
     });
 }
+
+void ApiClient::postUserSync(const QJsonArray &localWorkspaces)
+{
+    QJsonObject data;
+    data["local_workspaces"] = localWorkspaces;
+    QNetworkRequest request = createRequest("/user-sync/");
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit userSyncDiffReceived(response.object());
+        }
+    });
+}
+
+void ApiClient::patchUserSync(const QJsonArray &resolve, const QJsonArray &newWorkspaces)
+{
+    QJsonObject data;
+    data["resolve"] = resolve;
+    data["new"] = newWorkspaces;
+    QNetworkRequest request = createRequest("/user-sync/");
+    QNetworkReply *reply = networkManager->sendCustomRequest(request, "PATCH", QJsonDocument(data).toJson());
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isArray()) {
+            emit userSyncFinalReceived(response.array());
+        }
+    });
+}

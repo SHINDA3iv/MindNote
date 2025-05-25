@@ -55,6 +55,10 @@ public:
     void updateUser(const QJsonObject &userData);
     void deleteUser();
 
+    // User sync (гостевые -> пользовательские)
+    void postUserSync(const QJsonArray &localWorkspaces);
+    void patchUserSync(const QJsonArray &resolve, const QJsonArray &newWorkspaces);
+
 signals:
     // Аутентификация
     void loginSuccess(const QString &token);
@@ -86,6 +90,10 @@ signals:
 
     // Общие
     void error(const QString &error);
+
+    // User sync
+    void userSyncDiffReceived(const QJsonObject &diff);
+    void userSyncFinalReceived(const QJsonArray &finalWorkspaces);
 
 private:
     QNetworkAccessManager *networkManager;

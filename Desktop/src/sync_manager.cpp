@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QFile>
+#include "user_sync_dialog.h"
 
 SyncManager::SyncManager(std::shared_ptr<ApiClient> apiClient,
                          std::shared_ptr<LocalStorage> localStorage,
@@ -20,6 +21,8 @@ SyncManager::SyncManager(std::shared_ptr<ApiClient> apiClient,
     connect(apiClient.get(), &ApiClient::syncCompleted, this, &SyncManager::onSyncCompleted);
     connect(apiClient.get(), &ApiClient::error, this, &SyncManager::onError);
     connect(&_syncTimer, &QTimer::timeout, this, &SyncManager::syncLocalChanges);
+    connect(apiClient.get(), &ApiClient::userSyncDiffReceived, this, &SyncManager::onUserSyncDiffReceived);
+    connect(apiClient.get(), &ApiClient::userSyncFinalReceived, this, &SyncManager::onUserSyncFinalReceived);
 }
 
 void SyncManager::startAutoSync(int intervalMs)
@@ -182,4 +185,61 @@ QJsonObject SyncManager::collectLocalChanges()
     
     changes["workspaces"] = workspaces;
     return changes;
+}
+
+void SyncManager::startUserSync()
+{
+    // Собрать все локальные guest workspaces
+    QJsonArray localWorkspaces;
+    QDir guestDir(localStorage->getWorkspacePath(true));
+    QStringList workspaceNames = guestDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &workspaceName : workspaceNames) {
+        QString workspacePath = guestDir.filePath(workspaceName) + "/workspace.json";
+        QFile workspaceFile(workspacePath);
+        if (workspaceFile.open(QIODevice::ReadOnly)) {
+            QJsonDocument doc = QJsonDocument::fromJson(workspaceFile.readAll());
+            workspaceFile.close();
+            if (doc.isObject()) {
+                localWorkspaces.append(doc.object());
+            }
+        }
+    }
+    apiClient->postUserSync(localWorkspaces);
+}
+
+void SyncManager::applyUserSyncResolution(const QJsonArray &resolve, const QJsonArray &newWorkspaces)
+{
+    apiClient->patchUserSync(resolve, newWorkspaces);
+}
+
+void SyncManager::onUserSyncDiffReceived(const QJsonObject &diff)
+{
+    UserSyncDialog dlg(diff);
+    if (dlg.exec() == QDialog::Accepted) {
+        QJsonArray resolve = dlg.getResolve();
+        QJsonArray newWorkspaces = dlg.getNewWorkspaces();
+        applyUserSyncResolution(resolve, newWorkspaces);
+    }
+}
+
+void SyncManager::onUserSyncFinalReceived(const QJsonArray &finalWorkspaces)
+{
+    // 1. Сохраняем все workspaces пользователя локально (очищаем старые)
+    localStorage->syncWorkspaces(finalWorkspaces, true); // true = полная замена
+
+    // 2. Очищаем guest workspaces
+    QDir guestDir(localStorage->getWorkspacePath(true));
+    QStringList guestWorkspaces = guestDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &ws : guestWorkspaces) {
+        guestDir.rmdir(ws);
+    }
+
+    // 3. Загружаем страницы для каждого workspace с сервера
+    for (const QJsonValue &wsVal : finalWorkspaces) {
+        QJsonObject ws = wsVal.toObject();
+        QString title = ws["title"].toString();
+        apiClient->getPages(title);
+    }
+
+    emit syncCompleted();
 }

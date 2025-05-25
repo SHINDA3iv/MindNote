@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QDebug>
 #include <QTimer>
+#include <QProgressDialog>
 
 MainWidget::MainWidget(QWidget *parent) :
     QWidget(parent),
@@ -83,10 +84,32 @@ void MainWidget::showAuthDialog()
      _apiClient.get(), &ApiClient::loginSuccess, this, [this, authDialog](const QString &token) {
          _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
 
-         // Get server workspaces after successful login
-         _apiClient->getWorkspaces();
-         authDialog->accept();
-         initApplication();
+         // Устанавливаем пользователя для LocalStorage
+         _localStorage->setCurrentUser(_authManager->getUsername());
+
+         // --- СИНХРОНИЗАЦИЯ ГОСТЕВЫХ ПРОСТРАНСТВ ---
+         QProgressDialog progress("Синхронизация рабочих пространств...", QString(), 0, 0, this);
+         progress.setWindowModality(Qt::ApplicationModal);
+         progress.setCancelButton(nullptr);
+         progress.setMinimumDuration(0);
+         progress.show();
+
+         connect(_syncManager.get(), &SyncManager::syncCompleted, &progress,
+                 &QProgressDialog::close);
+         connect(_syncManager.get(), &SyncManager::syncError, &progress, &QProgressDialog::close);
+
+         _syncManager->startUserSync();
+
+         // После syncCompleted/initApplication
+         connect(_syncManager.get(), &SyncManager::syncCompleted, this, [this, authDialog]() {
+             initApplication();
+             authDialog->accept();
+         });
+         connect(_syncManager.get(), &SyncManager::syncError, this,
+                 [authDialog](const QString &err) {
+                     ErrorHandler::instance().showError("Ошибка синхронизации", err);
+                     authDialog->accept();
+                 });
      });
     connect(_apiClient.get(), &ApiClient::loginError, this, [authDialog](const QString &error) {
         authDialog->showLoginError(error);
@@ -141,10 +164,16 @@ void MainWidget::showAuthDialog()
 
 void MainWidget::initApplication()
 {
+    // Устанавливаем пользователя для LocalStorage, если не гость
+    if (!_isGuestMode) {
+        _localStorage->setCurrentUser(_authManager->getUsername());
+    }
     // Инициализация остального приложения
     initWindow();
     initConnections();
     restoreSettings();
+    _workspaceController->loadWorkspaces();
+    updateWorkspaceList();
 
     if (!_isGuestMode) {
         _apiClient->setAuthToken(_authManager->getAuthToken());
@@ -160,13 +189,7 @@ void MainWidget::initApplication()
             showAuthDialog();
         });
 
-        connect(_apiClient.get(), &ApiClient::loginSuccess, this, [this](const QString &token) {
-            _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
-
-            // Get server workspaces after successful login
-            _apiClient->getWorkspaces();
-            initApplication();
-        });
+        _leftPanel->refreshWorkspaceList();
     }
 }
 
