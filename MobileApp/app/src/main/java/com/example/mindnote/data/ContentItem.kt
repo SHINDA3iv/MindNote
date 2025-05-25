@@ -31,6 +31,7 @@ sealed class ContentItem {
     data class NestedPageItem(
         var pageName: String,
         var pageId: String = java.util.UUID.randomUUID().toString(),
+        var iconUri: Uri? = null,
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()
 } 

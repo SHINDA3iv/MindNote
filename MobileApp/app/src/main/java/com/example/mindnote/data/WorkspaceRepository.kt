@@ -141,6 +141,18 @@ class WorkspaceRepository private constructor(private val context: Context) {
             Log.e("MindNote", "Error saving workspaces", e)
         }
     }
+
+    // Удаление рабочего пространства
+    fun removeWorkspace(workspace: Workspace) {
+        val currentWorkspaces = _workspaces.value?.toMutableList() ?: mutableListOf()
+        val index = currentWorkspaces.indexOfFirst { it.id == workspace.id }
+        if (index != -1) {
+            currentWorkspaces.removeAt(index)
+            _workspaces.value = currentWorkspaces
+            saveWorkspaces()
+            Log.d("MindNote", "WorkspaceRepository: Removed workspace ${workspace.name}")
+        }
+    }
 }
 
 // Адаптеры для сериализации
@@ -197,6 +209,7 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("pageName", src.pageName)
                 jsonObject.addProperty("pageId", src.pageId)
                 jsonObject.addProperty("id", src.id)
+                src.iconUri?.let { jsonObject.addProperty("iconUri", it.toString()) }
             }
             null -> return JsonObject()
         }
@@ -230,6 +243,7 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
             "NestedPageItem" -> ContentItem.NestedPageItem(
                 pageName = jsonObject.get("pageName")?.asString ?: "",
                 pageId = jsonObject.get("pageId")?.asString ?: java.util.UUID.randomUUID().toString(),
+                iconUri = jsonObject.get("iconUri")?.asString?.let { Uri.parse(it) },
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             else -> ContentItem.TextItem("")

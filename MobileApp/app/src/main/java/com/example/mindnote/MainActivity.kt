@@ -5,6 +5,7 @@ import android.app.ProgressDialog
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -45,6 +46,11 @@ class MainActivity : AppCompatActivity() {
     private var selectedIconUri: Uri? = null
     private var isLoggedIn = false
     private var currentUserName = "Гость"
+    private lateinit var toolbarTitle: TextView
+    private lateinit var pathContainer: LinearLayout
+    private lateinit var pathScroll: HorizontalScrollView
+    private val workspacePath = mutableListOf<Workspace>()
+    private lateinit var toolbar: Toolbar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,8 +63,16 @@ class MainActivity : AppCompatActivity() {
         // Инициализируем ViewModel
         viewModel.init(applicationContext)
         
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
+
+        // Настраиваем кастомный layout для toolbar
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        val customView = layoutInflater.inflate(R.layout.toolbar_with_path, toolbar, false)
+        toolbar.addView(customView)
+        toolbarTitle = customView.findViewById(R.id.toolbar_title)
+        pathContainer = customView.findViewById(R.id.path_container)
+        pathScroll = customView.findViewById(R.id.path_scroll)
 
         // Навигация
         val toggle = ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close)
@@ -413,6 +427,65 @@ class MainActivity : AppCompatActivity() {
         return 0L
     }
 
+    fun updateToolbarWithPath(workspace: Workspace) {
+        // Обновляем заголовок
+        toolbarTitle.text = workspace.name
+
+        // Очищаем текущий путь
+        pathContainer.removeAllViews()
+        workspacePath.clear()
+
+        // Собираем путь
+        var currentWorkspace = workspace
+        while (true) {
+            workspacePath.add(0, currentWorkspace)
+            val parentWorkspace = findParentWorkspace(currentWorkspace)
+            if (parentWorkspace == null) break
+            currentWorkspace = parentWorkspace
+        }
+
+        // Добавляем элементы пути
+        workspacePath.forEachIndexed { index, ws ->
+            // Добавляем разделитель, если это не первый элемент
+            if (index > 0) {
+                val separator = TextView(this).apply {
+                    text = " / "
+                    textSize = 14f
+                    setTextColor(resources.getColor(android.R.color.darker_gray, theme))
+                }
+                pathContainer.addView(separator)
+            }
+
+            // Добавляем элемент пути
+            val pathItem = TextView(this).apply {
+                text = ws.name
+                textSize = 14f
+                setTextColor(resources.getColor(android.R.color.darker_gray, theme))
+                isClickable = true
+                isFocusable = true
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.START
+                setOnClickListener {
+                    openWorkspace(ws.name)
+                }
+            }
+            pathContainer.addView(pathItem)
+        }
+
+        // Прокручиваем к концу пути
+        pathScroll.post {
+            pathScroll.fullScroll(HorizontalScrollView.FOCUS_RIGHT)
+        }
+    }
+
+    private fun findParentWorkspace(workspace: Workspace): Workspace? {
+        return viewModel.workspaces.value?.find { parent ->
+            parent.items.any { item ->
+                item is ContentItem.NestedPageItem && item.pageId == workspace.id
+            }
+        }
+    }
+
     private fun openWorkspace(workspaceName: String) {
         val workspace = viewModel.workspaces.value?.find { it.name == workspaceName }
         workspace?.let {
@@ -429,9 +502,8 @@ class MainActivity : AppCompatActivity() {
             // Показываем кнопку меню
             toolbarAddButton.isVisible = true
 
-            // Обновляем заголовок и иконку в toolbar
-            val toolbar = findViewById<Toolbar>(R.id.toolbar)
-            toolbar.title = workspaceName
+            // Обновляем заголовок и путь
+            updateToolbarWithPath(workspace)
             
             // Устанавливаем иконку в toolbar
             workspace.iconUri?.let { uri ->
@@ -484,7 +556,7 @@ class MainActivity : AppCompatActivity() {
         builder.show()
     }
 
-    private fun showIconSelectionDialog() {
+    private fun showIconSelectionDialog(onIconSelected: ((Uri?) -> Unit)? = null) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_select_icon, null)
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
@@ -544,11 +616,14 @@ class MainActivity : AppCompatActivity() {
                     bitmap.recycle()
 
                     // Создаем URI через FileProvider
-                    selectedIconUri = androidx.core.content.FileProvider.getUriForFile(
+                    val iconUri = androidx.core.content.FileProvider.getUriForFile(
                         this,
                         "${packageName}.fileprovider",
                         file
                     )
+
+                    // Вызываем callback если он предоставлен
+                    onIconSelected?.invoke(iconUri)
 
                     // Показываем уведомление об успешном выборе
                     Toast.makeText(this, "Иконка выбрана", Toast.LENGTH_SHORT).show()
@@ -589,6 +664,71 @@ class MainActivity : AppCompatActivity() {
                 menuItem.icon = android.graphics.drawable.BitmapDrawable(resources, scaledIcon)
             }
         }
+
+        // Добавляем обработчик долгого нажатия
+        val menuItemView = navigationView.findViewById<View>(itemId)
+        menuItemView?.setOnLongClickListener { view ->
+            showWorkspaceContextMenu(view, workspace)
+            true
+        }
+    }
+
+    private fun showWorkspaceContextMenu(view: View, workspace: Workspace) {
+        val popupMenu = PopupMenu(this, view)
+        popupMenu.menuInflater.inflate(R.menu.workspace_context_menu, popupMenu.menu)
+        
+        popupMenu.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_rename -> {
+                    showRenameWorkspaceDialog(workspace)
+                    true
+                }
+                R.id.menu_change_icon -> {
+                    showIconSelectionDialog { selectedIconUri ->
+                        selectedIconUri?.let { uri ->
+                            viewModel.updateWorkspaceIcon(workspace, uri)
+                            updateWorkspaceMenuItem(workspace.name, uri)
+                        }
+                    }
+                    true
+                }
+                R.id.menu_delete -> {
+                    showDeleteWorkspaceConfirmation(workspace)
+                    true
+                }
+                else -> false
+            }
+        }
+        popupMenu.show()
+    }
+
+    private fun showRenameWorkspaceDialog(workspace: Workspace) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_rename_workspace, null)
+        val editText = dialogView.findViewById<EditText>(R.id.editTextWorkspaceName)
+        editText.setText(workspace.name)
+
+        AlertDialog.Builder(this)
+            .setTitle("Переименовать рабочее пространство")
+            .setView(dialogView)
+            .setPositiveButton("Сохранить") { _, _ ->
+                val newName = editText.text.toString()
+                if (newName.isNotEmpty() && newName != workspace.name) {
+                    viewModel.renameWorkspace(workspace, newName)
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun showDeleteWorkspaceConfirmation(workspace: Workspace) {
+        AlertDialog.Builder(this)
+            .setTitle("Удалить рабочее пространство")
+            .setMessage("Вы уверены, что хотите удалить '${workspace.name}'? Это действие нельзя отменить.")
+            .setPositiveButton("Удалить") { _, _ ->
+                viewModel.deleteWorkspace(workspace)
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 
     private fun updateWorkspaceMenuItem(workspaceName: String, iconUri: Uri) {
@@ -642,5 +782,27 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+    }
+
+    fun updateWorkspaceIcon(workspace: Workspace) {
+        // Находим элемент в боковом меню
+        val menu = navigationView.menu
+        val targetItem = menu.findItem(workspace.id.hashCode())
+        
+        targetItem?.let { item ->
+            // Обновляем иконку
+            workspace.iconUri?.let { uri ->
+                try {
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    item.icon = BitmapDrawable(resources, bitmap)
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error updating workspace icon in menu", e)
+                    item.icon = getDrawable(android.R.drawable.ic_menu_agenda)
+                }
+            } ?: run {
+                item.icon = getDrawable(android.R.drawable.ic_menu_agenda)
+            }
+        }
     }
 }

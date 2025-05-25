@@ -24,6 +24,10 @@ class SwipeContainer @JvmOverloads constructor(
     private var onDeleteListener: (() -> Unit)? = null
     private var isDeleteButtonVisible = false
 
+    companion object {
+        private const val SWIPE_THRESHOLD = 100f // Пороговое значение для начала свайпа
+    }
+
     init {
         inflate(context, R.layout.swipe_container, this)
         deleteButton = findViewById(R.id.delete_button)
@@ -44,6 +48,10 @@ class SwipeContainer @JvmOverloads constructor(
             LayoutParams.MATCH_PARENT,
             LayoutParams.WRAP_CONTENT
         ))
+        
+        // Делаем view кликабельным и фокусируемым для корректной обработки касаний
+        view.isClickable = true
+        view.isFocusable = true
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -55,7 +63,7 @@ class SwipeContainer @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 val deltaX = ev.x - initialX
-                if (abs(deltaX) > 10) { // Уменьшаем порог для начала свайпа
+                if (abs(deltaX) > SWIPE_THRESHOLD) {
                     isSwiping = true
                 }
             }
@@ -69,12 +77,14 @@ class SwipeContainer @JvmOverloads constructor(
                 if (isSwiping) {
                     val deltaX = event.x - initialX
                     if (isDeleteButtonVisible) {
-                        // Если кнопка уже видна, позволяем свайп в обе стороны
+                        // Если кнопка видна, позволяем свайп в обе стороны
                         currentX = (deleteButton.width + deltaX).coerceIn(0f, deleteButton.width.toFloat())
                     } else {
                         // Если кнопка скрыта, позволяем только свайп вправо
                         if (deltaX > 0) {
                             currentX = deltaX.coerceAtMost(deleteButton.width.toFloat())
+                        } else {
+                            currentX = 0f
                         }
                     }
                     itemContainer.translationX = currentX

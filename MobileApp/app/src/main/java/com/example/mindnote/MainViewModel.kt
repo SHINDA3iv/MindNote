@@ -115,6 +115,69 @@ class MainViewModel : ViewModel() {
     private fun saveWorkspaces() {
         repository.saveWorkspaces()
     }
+
+    // Переименование рабочего пространства
+    fun renameWorkspace(workspace: Workspace, newName: String) {
+        workspace.name = newName
+        repository.updateWorkspace(workspace)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = workspace
+        }
+    }
+
+    // Обновление иконки рабочего пространства
+    fun updateWorkspaceIcon(workspace: Workspace, iconUri: Uri) {
+        workspace.iconUri = iconUri
+        repository.updateWorkspace(workspace)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = workspace
+        }
+    }
+
+    // Удаление рабочего пространства
+    fun deleteWorkspace(workspace: Workspace) {
+        repository.removeWorkspace(workspace)
+        // Если удаляемое рабочее пространство было текущим, очищаем текущее
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = null
+        }
+    }
+
+    // Переименование ссылки
+    fun renameLink(workspace: Workspace, linkId: String, newName: String) {
+        val link = workspace.items.find { it.id == linkId } as? ContentItem.NestedPageItem
+        link?.let {
+            it.pageName = newName
+            repository.updateContentItem(workspace, it)
+            
+            // Обновляем название в самом рабочем пространстве
+            val targetWorkspace = getWorkspaceById(it.pageId)
+            targetWorkspace?.let { target ->
+                target.name = newName
+                repository.updateWorkspace(target)
+            }
+            
+            // Если это текущее рабочее пространство, обновляем его
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+        }
+    }
+
+    // Обновление иконки ссылки
+    fun updateLinkIcon(workspace: Workspace, linkId: String, iconUri: Uri) {
+        val link = workspace.items.find { it.id == linkId } as? ContentItem.NestedPageItem
+        link?.let {
+            it.iconUri = iconUri
+            repository.updateContentItem(workspace, it)
+            // Если это текущее рабочее пространство, обновляем его
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+        }
+    }
 }
 
 class UriTypeAdapter : JsonSerializer<Uri>, JsonDeserializer<Uri> {

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -541,6 +542,9 @@ class WorkspaceFragment : Fragment() {
         }
         imageView.adjustViewBounds = true
         imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+        imageView.isClickable = true
+        imageView.isFocusable = true
+        imageView.isFocusableInTouchMode = true
 
         // Сначала показываем плейсхолдер
         imageView.setImageResource(android.R.drawable.ic_menu_report_image)
@@ -630,30 +634,56 @@ class WorkspaceFragment : Fragment() {
         
         pageNameView.text = item.pageName
         
-        // Устанавливаем иконку из рабочего пространства
-        val workspace = viewModel.getWorkspaceById(item.pageId)
-        workspace?.iconUri?.let { uri ->
+        // Устанавливаем иконку из самой ссылки
+        item.iconUri?.let { uri ->
             try {
                 val inputStream = requireContext().contentResolver.openInputStream(uri)
                 val bitmap = BitmapFactory.decodeStream(inputStream)
                 pageIconView.setImageBitmap(bitmap)
             } catch (e: Exception) {
                 Log.e("MindNote", "Error loading icon: ${uri}", e)
-                // Если не удалось загрузить иконку, используем стандартную
                 pageIconView.setImageResource(android.R.drawable.ic_menu_agenda)
             }
         } ?: run {
-            // Если иконка не установлена, используем стандартную
-            pageIconView.setImageResource(android.R.drawable.ic_menu_agenda)
+            // Если иконка не установлена, используем иконку из рабочего пространства
+            val workspace = viewModel.getWorkspaceById(item.pageId)
+            workspace?.iconUri?.let { uri ->
+                try {
+                    val inputStream = requireContext().contentResolver.openInputStream(uri)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    pageIconView.setImageBitmap(bitmap)
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error loading workspace icon: ${uri}", e)
+                    pageIconView.setImageResource(android.R.drawable.ic_menu_agenda)
+                }
+            } ?: run {
+                pageIconView.setImageResource(android.R.drawable.ic_menu_agenda)
+            }
+        }
+
+        // Добавляем обработчик долгого нажатия для контекстного меню
+        nestedPageView.setOnLongClickListener { view ->
+            showLinkContextMenu(view, item)
+            true
         }
 
         nestedPageView.setOnClickListener {
             // Navigate to the nested page
-            val fragment = WorkspaceFragment.newInstance(item.pageId)
-            parentFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, fragment)
-                .addToBackStack(null)
-                .commit()
+            val targetWorkspace = viewModel.getWorkspaceById(item.pageId)
+            targetWorkspace?.let { workspace ->
+                // Обновляем текущее рабочее пространство
+                viewModel.setCurrentWorkspace(workspace)
+                
+                // Открываем фрагмент
+                val fragment = WorkspaceFragment.newInstance(workspace.id)
+                parentFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, fragment)
+                    .addToBackStack(null)
+                    .commit()
+                
+                // Обновляем путь в toolbar
+                (activity as? MainActivity)?.updateToolbarWithPath(workspace)
+            }
         }
 
         // Create swipe container
@@ -674,11 +704,24 @@ class WorkspaceFragment : Fragment() {
         val editText = dialogView.findViewById<EditText>(R.id.editTextMenuItem)
         val buttonSelectIcon = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
         editText.hint = "Название страницы"
+        var selectedIconUri: Uri? = null
 
         buttonSelectIcon.setOnClickListener {
-            showIconSelectionDialog { selectedIconUri ->
-                // Здесь можно сохранить выбранную иконку, если нужно
-                Log.d("MindNote", "Selected icon URI: $selectedIconUri")
+            showIconSelectionDialog { uri ->
+                selectedIconUri = uri
+                // Показываем предпросмотр выбранной иконки
+                uri?.let { previewUri ->
+                    try {
+                        val inputStream = requireContext().contentResolver.openInputStream(previewUri)
+                        val bitmap = BitmapFactory.decodeStream(inputStream)
+                        buttonSelectIcon.setCompoundDrawablesWithIntrinsicBounds(
+                            BitmapDrawable(resources, bitmap),
+                            null, null, null
+                        )
+                    } catch (e: Exception) {
+                        Log.e("MindNote", "Error loading icon preview", e)
+                    }
+                }
             }
         }
 
@@ -689,11 +732,12 @@ class WorkspaceFragment : Fragment() {
                 val pageName = editText.text.toString()
                 if (pageName.isNotEmpty()) {
                     // Создаем новое рабочее пространство для вложенной страницы
-                    val nestedWorkspace = viewModel.createWorkspace(pageName)
+                    val nestedWorkspace = viewModel.createWorkspace(pageName, selectedIconUri)
                     // Создаем элемент вложенной страницы
                     val nestedPageItem = ContentItem.NestedPageItem(
                         pageName = pageName,
-                        pageId = nestedWorkspace.id
+                        pageId = nestedWorkspace.id,
+                        iconUri = selectedIconUri
                     )
                     // Добавляем элемент в текущее рабочее пространство
                     currentWorkspace?.let { workspace ->
@@ -706,7 +750,7 @@ class WorkspaceFragment : Fragment() {
             .show()
     }
 
-    private fun showIconSelectionDialog(onIconSelected: (Uri?) -> Unit) {
+    private fun showIconSelectionDialog(onIconSelected: ((Uri?) -> Unit)? = null) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_select_icon, null)
         val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Выберите иконку")
@@ -728,10 +772,68 @@ class WorkspaceFragment : Fragment() {
 
         iconButtons.forEachIndexed { index, button ->
             button.setOnClickListener {
-                val iconResId = resources.obtainTypedArray(R.array.workspace_icons).getResourceId(index, 0)
-                val iconUri = Uri.parse("android.resource://${requireContext().packageName}/$iconResId")
-                onIconSelected(iconUri)
-                dialog.dismiss()
+                try {
+                    // Получаем ID ресурса иконки
+                    val typedArray = resources.obtainTypedArray(R.array.workspace_icons)
+                    val iconResId = typedArray.getResourceId(index, 0)
+                    typedArray.recycle()
+
+                    if (iconResId == 0) {
+                        throw Exception("Не удалось получить ресурс иконки")
+                    }
+
+                    // Создаем директорию для иконок
+                    val iconsDir = File(requireContext().filesDir, "icons")
+                    if (!iconsDir.exists() && !iconsDir.mkdirs()) {
+                        throw Exception("Не удалось создать директорию для иконок")
+                    }
+
+                    // Сохраняем иконку
+                    val file = File(iconsDir, "icon_$index.png")
+                    
+                    // Получаем векторный drawable
+                    val drawable = resources.getDrawable(iconResId, requireContext().theme)
+                    
+                    // Создаем bitmap с поддержкой прозрачности
+                    val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bitmap)
+                    
+                    // Очищаем canvas прозрачным цветом
+                    canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+                    
+                    // Устанавливаем границы drawable
+                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                    
+                    // Рисуем drawable на canvas
+                    drawable.draw(canvas)
+
+                    // Сохраняем bitmap в файл
+                    file.outputStream().use { out ->
+                        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                            throw Exception("Не удалось сохранить иконку")
+                        }
+                    }
+
+                    // Освобождаем память
+                    bitmap.recycle()
+
+                    // Создаем URI через FileProvider
+                    val iconUri = androidx.core.content.FileProvider.getUriForFile(
+                        requireContext(),
+                        "${requireContext().packageName}.fileprovider",
+                        file
+                    )
+
+                    // Вызываем callback если он предоставлен
+                    onIconSelected?.invoke(iconUri)
+
+                    // Показываем уведомление об успешном выборе
+                    Toast.makeText(requireContext(), "Иконка выбрана", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error saving icon", e)
+                    Toast.makeText(requireContext(), "Ошибка при сохранении иконки: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -796,6 +898,7 @@ class WorkspaceFragment : Fragment() {
 
     companion object {
         private const val PICK_ICON_REQUEST_CODE = 1001
+        private const val PICK_ICON_REQUEST = 1002
 
         fun newInstance(workspaceName: String): WorkspaceFragment {
             val fragment = WorkspaceFragment()
@@ -814,5 +917,96 @@ class WorkspaceFragment : Fragment() {
             .create()
         dialog.show()
         return dialog
+    }
+
+    private fun showLinkContextMenu(view: View, link: ContentItem.NestedPageItem) {
+        val popupMenu = PopupMenu(requireContext(), view)
+        popupMenu.menuInflater.inflate(R.menu.link_context_menu, popupMenu.menu)
+        
+        popupMenu.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_rename_link -> {
+                    showRenameLinkDialog(link)
+                    true
+                }
+                R.id.menu_change_link_icon -> {
+                    showIconSelectionDialog { selectedIconUri ->
+                        selectedIconUri?.let { uri ->
+                            viewModel.updateLinkIcon(currentWorkspace!!, link.id, uri)
+                            // Сразу обновляем отображение иконки
+                            val updatedWorkspace = viewModel.getWorkspaceById(currentWorkspace!!.id)
+                            updatedWorkspace?.let { workspace ->
+                                val updatedLink = workspace.items.find { it.id == link.id } as? ContentItem.NestedPageItem
+                                updatedLink?.let { updated ->
+                                    // Находим и обновляем view ссылки
+                                    for (i in 0 until container.childCount) {
+                                        val swipeContainer = container.getChildAt(i) as? SwipeContainer
+                                        val nestedPageView = swipeContainer?.getChildAt(0) as? View
+                                        val pageIconView = nestedPageView?.findViewById<ImageView>(R.id.pageIcon)
+                                        if (pageIconView != null) {
+                                            try {
+                                                val inputStream = requireContext().contentResolver.openInputStream(uri)
+                                                val bitmap = BitmapFactory.decodeStream(inputStream)
+                                                pageIconView.setImageBitmap(bitmap)
+                                                break
+                                            } catch (e: Exception) {
+                                                Log.e("MindNote", "Error updating icon", e)
+                                            }
+                                        }
+                                    }
+
+                                    // Обновляем иконку в боковом меню
+                                    val targetWorkspace = viewModel.getWorkspaceById(updated.pageId)
+                                    targetWorkspace?.let { target ->
+                                        target.iconUri = uri
+                                        viewModel.updateWorkspace(target)
+                                        // Обновляем боковое меню
+                                        (activity as? MainActivity)?.updateWorkspaceIcon(target)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+        popupMenu.show()
+    }
+
+    private fun showRenameLinkDialog(link: ContentItem.NestedPageItem) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_rename_workspace, null)
+        val editText = dialogView.findViewById<EditText>(R.id.editTextWorkspaceName)
+        editText.setText(link.pageName)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Переименовать ссылку")
+            .setView(dialogView)
+            .setPositiveButton("Сохранить") { _, _ ->
+                val newName = editText.text.toString()
+                if (newName.isNotEmpty() && newName != link.pageName) {
+                    // Сначала обновляем название в UI
+                    for (i in 0 until container.childCount) {
+                        val swipeContainer = container.getChildAt(i) as? SwipeContainer
+                        val nestedPageView = swipeContainer?.getChildAt(0) as? View
+                        val pageNameView = nestedPageView?.findViewById<TextView>(R.id.pageName)
+                        if (pageNameView?.text == link.pageName) {
+                            pageNameView.text = newName
+                            break
+                        }
+                    }
+
+                    // Затем обновляем в модели данных
+                    viewModel.renameLink(currentWorkspace!!, link.id, newName)
+                    
+                    // Обновляем заголовок, если это текущее рабочее пространство
+                    if (currentWorkspace?.id == link.pageId) {
+                        (activity as MainActivity).supportActionBar?.title = newName
+                    }
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 }
