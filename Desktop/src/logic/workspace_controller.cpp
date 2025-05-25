@@ -27,19 +27,18 @@ void WorkspaceController::handleAddSubspaceRequest(Workspace *parent)
         return;
 
     bool ok;
-    QString name =
+    QString title =
      QInputDialog::getText(nullptr, "Новое подпространство",
                            "Введите название подпространства:", QLineEdit::Normal, "", &ok);
-    if (ok && !name.isEmpty()) {
-        createSubWorkspace(parent, name);
+    if (ok && !title.isEmpty()) {
+        createSubWorkspace(parent, title);
     }
 }
 
-Workspace *WorkspaceController::createWorkspace(const QString &name, const QString &id)
+Workspace *WorkspaceController::createWorkspace(const QString &title)
 {
-    QString workspaceId = id.isEmpty() ? QUuid::createUuid().toString() : id;
-    Workspace *workspace = new Workspace(name);
-    workspace->setProperty("id", workspaceId);
+    Workspace *workspace = new Workspace(title);
+    workspace->setProperty("title", title);
 
     // Устанавливаем иконку по умолчанию
     workspace->setIcon(QIcon(":/icons/workspace.png"));
@@ -77,7 +76,7 @@ void WorkspaceController::removeWorkspace(Workspace *workspace)
     }
 
     // Удаление физически
-    _localStorage->deleteWorkspace(workspace->title());
+    _localStorage->deleteWorkspace(workspace->getTitle());
 
     // Если есть родительское пространство - сохраняем его после изменений
     if (parent) {
@@ -98,22 +97,22 @@ QList<Workspace *> WorkspaceController::getAllWorkspaces() const
     return _workspaces;
 }
 
-Workspace *WorkspaceController::getWorkspaceById(const QString &id) const
+Workspace *WorkspaceController::getWorkspaceByTitle(const QString &title) const
 {
     for (Workspace *workspace : _workspaces) {
-        if (workspace->property("id").toString() == id) {
+        if (workspace->property("title").toString() == title) {
             return workspace;
         }
     }
     return nullptr;
 }
 
-Workspace *WorkspaceController::createSubWorkspace(Workspace *parent, const QString &name)
+Workspace *WorkspaceController::createSubWorkspace(Workspace *parent, const QString &title)
 {
     if (!parent)
         return nullptr;
 
-    Workspace *subspace = new Workspace(name, parent);
+    Workspace *subspace = new Workspace(title, parent);
     parent->addSubWorkspace(subspace);
 
     // Наследуем иконку от родителя или используем иконку по умолчанию
@@ -143,7 +142,7 @@ QList<Workspace *> WorkspaceController::getRootWorkspaces() const
 Workspace *WorkspaceController::findWorkspaceByTitle(const QString &title) const
 {
     for (Workspace *ws : _workspaces) {
-        if (ws->title() == title)
+        if (ws->getTitle() == title)
             return ws;
     }
     return nullptr;
@@ -178,7 +177,6 @@ void WorkspaceController::deserialize(const QJsonObject &json)
             QString title = obj["title"].toString();
 
             Workspace *ws = new Workspace(title);
-            ws->setTitle(title);
             titleMap[title] = ws;
             _workspaces.append(ws);
 
@@ -198,7 +196,7 @@ void WorkspaceController::deserialize(const QJsonObject &json)
                 parent->addSubWorkspace(ws);
 
                 qDebug() << "Setting up relationship:"
-                         << "Child:" << ws->title() << "Parent:" << parent->title();
+                         << "Child:" << ws->getTitle() << "Parent:" << parent->getTitle();
             }
 
             // Deserialize workspace content
@@ -209,15 +207,15 @@ void WorkspaceController::deserialize(const QJsonObject &json)
                 if (item->type() == "SubspaceLinkItem") {
                     auto *link =
                      static_cast<SubspaceLinkItem *>(const_cast<AbstractWorkspaceItem *>(item));
-                    QString subspaceId = link->serialize()["subspaceId"].toString();
-                    if (titleMap.contains(subspaceId)) {
-                        link->setLinkedWorkspace(titleMap[subspaceId]);
+                    QString subspaceTitle = link->serialize()["subspaceTitle"].toString();
+                    if (titleMap.contains(subspaceTitle)) {
+                        link->setLinkedWorkspace(titleMap[subspaceTitle]);
                         QObject::connect(link, &SubspaceLinkItem::subspaceLinkClicked, ws,
                                          &Workspace::subWorkspaceClicked);
 
                         qDebug() << "Setting up link:"
-                                 << "From:" << ws->title()
-                                 << "To:" << titleMap[subspaceId]->title();
+                                 << "From:" << ws->getTitle()
+                                 << "To:" << titleMap[subspaceTitle]->getTitle();
                     }
                 }
             }
@@ -277,7 +275,7 @@ void WorkspaceController::loadWorkspaces(QWidget *parent)
         }
     } else {
         // Load user workspaces if authenticated
-        QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
+        QDir userDir(QApplication::applicationDirPath() + "/Workspaces/users/" + currentUser + "/");
         if (userDir.exists()) {
             QFileInfoList folders = userDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
             for (const QFileInfo &folder : folders) {
@@ -288,67 +286,5 @@ void WorkspaceController::loadWorkspaces(QWidget *parent)
                 }
             }
         }
-    }
-}
-
-void WorkspaceController::syncWithServer(bool copyGuestWorkspaces)
-{
-    if (copyGuestWorkspaces) {
-        // Копируем гостевые пространства в папку пользователя
-        QDir guestDir(QApplication::applicationDirPath() + "/Workspaces/guest/");
-        QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
-
-        if (guestDir.exists() && userDir.exists()) {
-            QFileInfoList folders = guestDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-            for (const QFileInfo &folder : folders) {
-                QString workspaceName = folder.baseName();
-                QString sourcePath = guestDir.filePath(workspaceName);
-                QString destPath = userDir.filePath(workspaceName);
-
-                // Копируем директорию рабочего пространства
-                QDir().mkpath(destPath);
-                QFileInfoList files =
-                 QDir(sourcePath).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
-                for (const QFileInfo &file : files) {
-                    if (file.isDir()) {
-                        QDir().mkpath(destPath + "/" + file.fileName());
-                        QFileInfoList subFiles =
-                         QDir(file.filePath()).entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
-                        for (const QFileInfo &subFile : subFiles) {
-                            QFile::copy(subFile.filePath(), destPath + "/" + file.fileName() + "/"
-                                                             + subFile.fileName());
-                        }
-                    } else {
-                        QFile::copy(file.filePath(), destPath + "/" + file.fileName());
-                    }
-                }
-
-                // Загружаем рабочее пространство в память
-                Workspace *workspace = _localStorage->loadWorkspace(workspaceName, nullptr, false);
-                if (workspace) {
-                    _workspaces.append(workspace);
-                }
-            }
-        }
-    }
-
-    // Синхронизируем с сервером
-    emit syncRequested();
-}
-
-void WorkspaceController::handleLogout()
-{
-    // Сохраняем все рабочие пространства перед выходом
-    saveWorkspaces();
-
-    // Очищаем рабочие пространства из памяти
-    qDeleteAll(_workspaces);
-    _workspaces.clear();
-
-    // Очищаем пользовательскую директорию
-    QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
-    if (userDir.exists()) {
-        userDir.removeRecursively();
-        userDir.mkpath(".");
     }
 }

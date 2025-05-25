@@ -70,9 +70,9 @@ void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
     QString workspacePath;
 
     if (isGuest) {
-        workspacePath = guestPath + workspace->title() + "/";
+        workspacePath = guestPath + workspace->getTitle() + "/";
     } else {
-        workspacePath = getUserWorkspacePath() + workspace->title() + "/";
+        workspacePath = getUserWorkspacePath() + workspace->getTitle() + "/";
     }
 
     QDir().mkpath(workspacePath);
@@ -95,9 +95,9 @@ void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
 
 void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &json)
 {
-    json["title"] = workspace->title();
+    json["title"] = workspace->getTitle();
 
-    qDebug() << "Saving workspace recursively:" << workspace->title();
+    qDebug() << "Saving workspace recursively:" << workspace->getTitle();
 
     // Сохранение иконки
     QIcon icon = workspace->getIcon();
@@ -110,7 +110,7 @@ void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &jso
         QPixmap pixmap = icon.pixmap(icon.availableSizes().first());
         if (pixmap.save(&buffer, "PNG")) {
             json["icon"] = QString::fromLatin1(iconData.toBase64().data());
-            qDebug() << "Saved icon for workspace:" << workspace->title();
+            qDebug() << "Saved icon for workspace:" << workspace->getTitle();
         }
     }
 
@@ -118,7 +118,8 @@ void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &jso
     QJsonArray itemsArray;
     for (const AbstractWorkspaceItem *item : workspace->getItems()) {
         itemsArray.append(item->serialize());
-        qDebug() << "Saved item of type:" << item->type() << "in workspace:" << workspace->title();
+        qDebug() << "Saved item of type:" << item->type()
+                 << "in workspace:" << workspace->getTitle();
     }
     json["items"] = itemsArray;
 
@@ -128,14 +129,15 @@ void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &jso
         QJsonObject subJson;
         saveWorkspaceRecursive(sub, subJson);
         subspaces.append(subJson);
-        qDebug() << "Saved subspace:" << sub->title() << "for workspace:" << workspace->title();
+        qDebug() << "Saved subspace:" << sub->getTitle()
+                 << "for workspace:" << workspace->getTitle();
     }
     json["subspaces"] = subspaces;
 }
 
-Workspace *LocalStorage::loadWorkspace(const QString &workspaceName, QWidget *parent, bool isGuest)
+Workspace *LocalStorage::loadWorkspace(const QString &workspaceTitle, QWidget *parent, bool isGuest)
 {
-    QString workspacePath = getWorkspacePath(isGuest) + workspaceName + "/workspace.json";
+    QString workspacePath = getWorkspacePath(isGuest) + workspaceTitle + "/workspace.json";
     QFile file(workspacePath);
 
     if (!file.exists()) {
@@ -153,7 +155,7 @@ Workspace *LocalStorage::loadWorkspace(const QString &workspaceName, QWidget *pa
 
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull() || !doc.isObject()) {
-        qWarning() << "Invaltitle JSON in workspace file:" << workspacePath;
+        qWarning() << "Invalid JSON in workspace file:" << workspacePath;
         return nullptr;
     }
 
@@ -162,10 +164,9 @@ Workspace *LocalStorage::loadWorkspace(const QString &workspaceName, QWidget *pa
 
 Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget *parent)
 {
-    Workspace *workspace = new Workspace(json["name"].toString(), parent);
-    workspace->setTitle(json["title"].toString());
+    Workspace *workspace = new Workspace(json["title"].toString(), parent);
 
-    qDebug() << "Loading workspace recursively:" << workspace->title();
+    qDebug() << "Loading workspace recursively:" << workspace->getTitle();
 
     // Загрузка иконки
     if (json.contains("icon")) {
@@ -173,7 +174,7 @@ Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget
         QPixmap pixmap;
         if (pixmap.loadFromData(iconData)) {
             workspace->setIcon(QIcon(pixmap));
-            qDebug() << "Loaded icon for workspace:" << workspace->title();
+            qDebug() << "Loaded icon for workspace:" << workspace->getTitle();
         }
     } else {
         // Установка иконки по умолчанию если не задана пользовательская
@@ -184,7 +185,8 @@ Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget
     if (json.contains("items")) {
         QJsonArray itemsArray = json["items"].toArray();
         workspace->deserializeItems(itemsArray);
-        qDebug() << "Loaded" << itemsArray.size() << "items for workspace:" << workspace->title();
+        qDebug() << "Loaded" << itemsArray.size()
+                 << "items for workspace:" << workspace->getTitle();
     }
 
     // Load subspaces
@@ -194,8 +196,8 @@ Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget
             Workspace *sub = loadWorkspaceRecursive(value.toObject(), workspace);
             if (sub) {
                 workspace->addSubWorkspace(sub);
-                qDebug() << "Loaded subspace:" << sub->title()
-                         << "for workspace:" << workspace->title();
+                qDebug() << "Loaded subspace:" << sub->getTitle()
+                         << "for workspace:" << workspace->getTitle();
             }
         }
     }
@@ -203,9 +205,9 @@ Workspace *LocalStorage::loadWorkspaceRecursive(const QJsonObject &json, QWidget
     return workspace;
 }
 
-void LocalStorage::deleteWorkspace(const QString &workspaceName, bool isGuest)
+void LocalStorage::deleteWorkspace(const QString &workspaceTitle, bool isGuest)
 {
-    QString workspacePath = getWorkspacePath(isGuest) + workspaceName;
+    QString workspacePath = getWorkspacePath(isGuest) + workspaceTitle;
     QDir dir(workspacePath);
     if (dir.exists()) {
         dir.removeRecursively();
@@ -226,13 +228,12 @@ void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepL
     // Process server workspaces
     for (const QJsonValue &workspaceValue : serverWorkspaces) {
         QJsonObject workspaceObj = workspaceValue.toObject();
-        QString workspaceName = workspaceObj["name"].toString();
-        QString workspacetitle = workspaceObj["title"].toString();
+        QString workspaceTitle = workspaceObj["title"].toString();
         QString version = workspaceObj["version"].toString();
         QString owner = workspaceObj["owner"].toString();
 
         // Check if workspace exists locally
-        bool existsLocally = localWorkspaces.contains(workspaceName);
+        bool existsLocally = localWorkspaces.contains(workspaceTitle);
 
         if (existsLocally && keepLocal) {
             // Keep local version
@@ -240,8 +241,7 @@ void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepL
         }
 
         // Create or update workspace
-        Workspace *workspace = new Workspace(workspaceName);
-        workspace->setTitle(workspacetitle);
+        Workspace *workspace = new Workspace(workspaceTitle);
         workspace->setVersion(version);
         workspace->setOwner(owner);
 
@@ -258,16 +258,16 @@ void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepL
 
     // Remove workspaces that don't exist on server
     if (!keepLocal) {
-        QStringList serverWorkspaceNames;
+        QStringList serverWorkspaceTitles;
         for (const QJsonValue &workspaceValue : serverWorkspaces) {
             QJsonObject workspaceObj = workspaceValue.toObject();
-            serverWorkspaceNames.append(workspaceObj["name"].toString());
+            serverWorkspaceTitles.append(workspaceObj["title"].toString());
         }
 
-        QStringList localWorkspaceNames = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (const QString &workspaceName : localWorkspaceNames) {
-            if (!serverWorkspaceNames.contains(workspaceName)) {
-                deleteWorkspace(workspaceName, false);
+        QStringList localWorkspaceTitles = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &workspaceTitle : localWorkspaceTitles) {
+            if (!serverWorkspaceTitles.contains(workspaceTitle)) {
+                deleteWorkspace(workspaceTitle, false);
             }
         }
     }

@@ -17,7 +17,6 @@ public:
     QString getUsername() const;
     QString getAuthToken() const;
     bool isRememberMeEnabled() const;
-    bool validateToken() const;
 
     void login(const QString &token, const QString &username, bool rememberMe = false);
     void setRememberMe(bool enabled);

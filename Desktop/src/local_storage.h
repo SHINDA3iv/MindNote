@@ -12,8 +12,9 @@ public:
     explicit LocalStorage(QObject *parent = nullptr);
 
     void saveWorkspace(Workspace *workspace, bool isGuest = false);
-    Workspace *loadWorkspace(const QString &workspaceName, QWidget *parent = nullptr, bool isGuest = false);
-    void deleteWorkspace(const QString &workspaceName, bool isGuest = false);
+    Workspace *
+    loadWorkspace(const QString &workspaceTitle, QWidget *parent = nullptr, bool isGuest = false);
+    void deleteWorkspace(const QString &workspaceTitle, bool isGuest = false);
     void syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepLocal = false);
     QString getWorkspacePath(bool isGuest = false) const;
     void setCurrentUser(const QString &username);

@@ -19,7 +19,6 @@ public:
     ~EditorWidget() = default;
 
     void setCurrentWorkspace(Workspace *workspace);
-    void setGuestMode(bool isGuest);
 
     Workspace *currentWorkspace() const;
 

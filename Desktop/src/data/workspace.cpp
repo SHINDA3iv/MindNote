@@ -16,9 +16,9 @@
 #include <QDebug>
 #include <QBuffer>
 
-Workspace::Workspace(const QString &title, QWidget *parent) :
+Workspace::Workspace(const QString &name, QWidget *parent) :
     QWidget(parent),
-    _title(title),
+    _title(name),
     _iconLabel(new QLabel(this))
 {
     this->setStyleSheet(R"(
@@ -114,7 +114,7 @@ Workspace::Workspace(const QString &title, QWidget *parent) :
         QHBoxLayout *subLinksLayout = new QHBoxLayout(sublinkWidget);
         sublinkWidget->setLayout(subLinksLayout);
         for (Workspace *sub : _subWorkspaces) {
-            QPushButton *subBtn = new QPushButton(sub->title(), this);
+            QPushButton *subBtn = new QPushButton(sub->getTitle(), this);
             subBtn->setFlat(true);
             subBtn->setStyleSheet(
              "color: #0078d7; text-decoration: underline; background: transparent; border: none;");
@@ -207,16 +207,16 @@ void Workspace::addItemByType(const QString &type)
     }
 }
 
-QString Workspace::title() const
+QString Workspace::getTitle() const
 {
     return _title;
 }
 
-void Workspace::setTitle(const QString &title)
+void Workspace::setTitle(const QString &name)
 {
-    _title = title;
+    _title = name;
     if (_titleLabel) {
-        _titleLabel->setText(title);
+        _titleLabel->setText(name);
     }
 }
 
@@ -258,7 +258,7 @@ QJsonObject Workspace::serialize() const
     QJsonObject json;
     json["title"] = _title;
     json["version"] = _version;
-    json["parentId"] = _parentWorkspace ? _parentWorkspace->title() : "";
+    json["parentId"] = _parentWorkspace ? _parentWorkspace->getTitle() : "";
 
     qDebug() << "Starting serialization of workspace:" << _title;
 
@@ -281,8 +281,8 @@ QJsonObject Workspace::serialize() const
     }
     json["items"] = itemArray;
 
-    qDebug() << "Finished serializing workspace:" << _title
-             << "Parent:" << (_parentWorkspace ? _parentWorkspace->title() : "none")
+    qDebug() << "Finished serializing workspace:"
+             << "Parent:" << (_parentWorkspace ? _parentWorkspace->getTitle() : "none")
              << "Items:" << _items.size();
 
     return json;
@@ -290,6 +290,8 @@ QJsonObject Workspace::serialize() const
 
 void Workspace::deserialize(const QJsonObject &json)
 {
+    if (json.contains("name"))
+        setTitle(json["name"].toString());
     if (json.contains("title"))
         setTitle(json["title"].toString());
     // parentId и subWorkspaces обрабатываются в контроллере
@@ -424,18 +426,16 @@ void Workspace::addSubWorkspace(Workspace *sub)
         }
     }
 }
-
 void Workspace::removeSubWorkspace(Workspace *sub)
 {
     _subWorkspaces.removeOne(sub);
     if (sub->getParentWorkspace() == this)
         sub->setParentWorkspace(nullptr);
 }
-
 bool Workspace::hasSubWorkspaceWithTitle(const QString &title) const
 {
     for (auto *ws : _subWorkspaces)
-        if (ws->title() == title)
+        if (ws->getTitle() == title)
             return true;
     return false;
 }
@@ -454,9 +454,9 @@ QList<Workspace *> Workspace::getPathChain() const
 QString Workspace::getPath() const
 {
     auto chain = getPathChain();
-    QStringList titles;
-    for (auto *ws : chain) titles << ws->title();
-    return titles.join("/");
+    QStringList names;
+    for (auto *ws : chain) names << ws->getTitle();
+    return names.join("/");
 }
 
 QString Workspace::getVersion() const

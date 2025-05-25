@@ -53,7 +53,7 @@ void EditorWidget::updateBreadcrumb()
     int n = chain.size();
     for (int i = 0; i < n; ++i) {
         Workspace *ws = chain[i];
-        QPushButton *btn = new QPushButton(ws->title(), this);
+        QPushButton *btn = new QPushButton(ws->getTitle(), this);
         btn->setFlat(true);
         btn->setFixedHeight(24);
         btn->setStyleSheet(R"(
@@ -105,12 +105,4 @@ void EditorWidget::onWorkspaceRemoved(Workspace *workspace)
 Workspace *EditorWidget::currentWorkspace() const
 {
     return _currentWorkspace;
-}
-
-void EditorWidget::setGuestMode(bool isGuest)
-{
-    // Disable editing in guest mode
-    if (_currentWorkspace) {
-        _currentWorkspace->setEnabled(!isGuest);
-    }
 }

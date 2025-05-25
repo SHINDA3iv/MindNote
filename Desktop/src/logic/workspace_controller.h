@@ -23,11 +23,10 @@ signals:
     void workspaceAdded(Workspace *workspace);
     void workspaceRemoved(Workspace *workspace);
     void pathUpdated(Workspace *workspace);
-    void syncRequested();
 
 public:
     // Создание нового рабочего пространства
-    Workspace *createWorkspace(const QString &name, const QString &id = QString());
+    Workspace *createWorkspace(const QString &title);
     // Удаление рабочего пространства
     void removeWorkspace(Workspace *workspace);
 
@@ -36,7 +35,7 @@ public:
     // Получение всех рабочих пространств
     QList<Workspace *> getAllWorkspaces() const;
 
-    Workspace *getWorkspaceById(const QString &id) const;
+    Workspace *getWorkspaceByTitle(const QString &title) const;
 
     // Сериализация всех рабочих пространств в JSON
     QJsonObject serialize() const;
@@ -53,15 +52,10 @@ public:
     // Загрузка рабочих пространств
     void loadWorkspaces(QWidget *parent = nullptr);
 
-    // Синхронизация с сервером
-    void syncWithServer(bool copyGuestWorkspaces);
-    // Обработка выхода пользователя
-    void handleLogout();
-
     // --- ВЛОЖЕННОСТЬ ---
-    Workspace *createSubWorkspace(Workspace *parent, const QString &name);
+    Workspace *createSubWorkspace(Workspace *parent, const QString &title);
     QList<Workspace *> getRootWorkspaces() const;
-    Workspace *findWorkspaceByTitle(const QString &id) const;
+    Workspace *findWorkspaceByTitle(const QString &title) const;
 
 private slots:
     void handleAddSubspaceRequest(Workspace *parent);

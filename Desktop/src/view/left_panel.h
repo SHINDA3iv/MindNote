@@ -18,7 +18,6 @@ public:
 
     void setWorkspaceController(WorkspaceController *controller);
     void refreshWorkspaceList();
-    void setGuestMode(bool isGuest);
 
 signals:
     void workspaceSelected(Workspace *workspace);
