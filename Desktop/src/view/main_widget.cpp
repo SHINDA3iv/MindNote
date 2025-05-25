@@ -141,7 +141,6 @@ void MainWidget::showAuthDialog()
 
 void MainWidget::initApplication()
 {
-    // Инициализация остального приложения
     initWindow();
     initConnections();
     restoreSettings();
@@ -150,7 +149,7 @@ void MainWidget::initApplication()
         _apiClient->setAuthToken(_authManager->getAuthToken());
 
         // Проверяем токен на сервере при запуске
-        _apiClient->validateToken();
+        checkToken();
 
         // Обработка результата проверки токена
         connect(_apiClient.get(), &ApiClient::tokenValid, this, [this]() {
@@ -168,12 +167,30 @@ void MainWidget::initApplication()
             showAuthDialog();
         });
     }
+
+    // Initialize workspace controller
+    if (_workspaceController) {
+        _workspaceController->loadWorkspaces(this);
+    }
+    
+    // Start auto-sync if authenticated
+    if (_authManager->isAuthenticated()) {
+        _syncManager->startAutoSync(300000); // Sync every 5 minutes
+    }
+    
+    // Update UI
+    updateWorkspaceList();
+    updateAuthUI();
 }
 
 void MainWidget::checkToken()
 {
     if (_authManager->isAuthenticated()) {
-        _apiClient->validateToken();
+        // Check if token is still valid
+        if (!_authManager->validateToken()) {
+            // Token is invalid, logout
+            onLogout();
+        }
     }
 }
 
@@ -184,8 +201,13 @@ void MainWidget::onLoginRequested()
 
 void MainWidget::onLogout()
 {
+    if (_workspaceController) {
+        _workspaceController->handleLogout();
+    }
+    
     _authManager->logout();
     updateAuthUI();
+    showAuthDialog();
 }
 
 void MainWidget::initConnections()
@@ -221,55 +243,66 @@ void MainWidget::initConnections()
 
 void MainWidget::onAuthStateChanged()
 {
+    if (_authManager->isAuthenticated()) {
+        initApplication();
+    } else {
+        // Clear user data
+        if (_workspaceController) {
+            _workspaceController->handleLogout();
+        }
+    }
     updateAuthUI();
-    emit authStateChanged();
 }
 
 void MainWidget::updateAuthUI()
 {
     bool isAuthenticated = _authManager->isAuthenticated();
-    QString username = _authManager->getUsername();
-
-    qDebug() << "Updating auth UI - isAuthenticated:" << isAuthenticated << "username:" << username;
-
-    // Update status message
-    if (isAuthenticated) {
-        emit statusMessage(tr("Logged in as: %1").arg(username));
-    } else {
-        emit statusMessage(tr("Not logged in"));
+    _isGuestMode = !isAuthenticated;
+    
+    if (_leftPanel) {
+        _leftPanel->setGuestMode(_isGuestMode);
     }
-
-    // Emit auth state changed to update main window UI
-    emit authStateChanged();
+    
+    if (_editorWidget) {
+        _editorWidget->setGuestMode(_isGuestMode);
+    }
 }
 
 void MainWidget::onVersionConflictDetected(const QJsonArray &serverWorkspaces)
 {
-    QMessageBox::StandardButton reply =
-     QMessageBox::question(this, "Конфликт версий",
-                           "Обнаружены различия между локальными и серверными пространствами. "
-                           "Хотите сохранить локальные версии?",
-                           QMessageBox::Yes | QMessageBox::No);
-
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this,
+        tr("Конфликт версий"),
+        tr("Обнаружены конфликты версий рабочих пространств. Хотите сохранить локальные изменения?"),
+        QMessageBox::Yes | QMessageBox::No
+    );
+    
     if (reply == QMessageBox::Yes) {
-        // Keep local versions
-        _localStorage->syncWorkspaces(serverWorkspaces, true);
+        _syncManager->syncWithVersionSelection(serverWorkspaces);
     } else {
-        // Use server versions
-        _localStorage->syncWorkspaces(serverWorkspaces, false);
+        // Load server workspaces
+        _syncManager->syncWithVersionSelection(serverWorkspaces);
     }
 }
 
 void MainWidget::onSyncCompleted()
 {
-    emit statusMessage(tr("Синхронизация завершена"));
+    // Reload workspaces
+    if (_workspaceController) {
+        _workspaceController->loadWorkspaces(this);
+    }
+    
+    // Update UI
     updateWorkspaceList();
 }
 
 void MainWidget::onSyncError(const QString &error)
 {
-    emit statusMessage(tr("Ошибка синхронизации: %1").arg(error));
-    ErrorHandler::instance().showError("Ошибка синхронизации", error);
+    QMessageBox::warning(
+        this,
+        tr("Ошибка синхронизации"),
+        tr("Произошла ошибка при синхронизации: %1").arg(error)
+    );
 }
 
 void MainWidget::syncWorkspaces()

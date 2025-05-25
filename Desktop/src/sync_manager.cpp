@@ -67,7 +67,7 @@ bool SyncManager::hasVersionConflicts(const QJsonArray &serverWorkspaces)
     QStringList localWorkspaces = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
     for (const QString &workspaceName : localWorkspaces) {
-        QString localPath = userDir.filePath(workspaceName) + "/workspace.json";
+        QString localPath = userDir.filePath(workspaceName) + "/metadata.json";
         QFile localFile(localPath);
         
         if (localFile.open(QIODevice::ReadOnly)) {
@@ -76,14 +76,20 @@ bool SyncManager::hasVersionConflicts(const QJsonArray &serverWorkspaces)
             
             if (localDoc.isObject()) {
                 QJsonObject localWorkspace = localDoc.object();
-                QString localVersion = localWorkspace["version"].toString();
+                QString localTitle = localWorkspace["title"].toString();
                 
                 // Find corresponding server workspace
                 for (const QJsonValue &serverValue : serverWorkspaces) {
                     QJsonObject serverWorkspace = serverValue.toObject();
-                    if (serverWorkspace["name"].toString() == workspaceName) {
-                        QString serverVersion = serverWorkspace["version"].toString();
-                        if (localVersion != serverVersion) {
+                    if (serverWorkspace["title"].toString() == localTitle) {
+                        // Check if workspace has been modified
+                        QDateTime localModified = QFileInfo(localPath).lastModified();
+                        QDateTime serverModified = QDateTime::fromString(
+                            serverWorkspace["updated_at"].toString(),
+                            Qt::ISODate
+                        );
+                        
+                        if (localModified > serverModified) {
                             return true;
                         }
                         break;
@@ -105,19 +111,19 @@ void SyncManager::onWorkspacesFetched(const QJsonArray &workspaces)
 
     localStorage->syncWorkspaces(workspaces, false);
     for (const QJsonValue &workspace : workspaces) {
-        QString workspaceId = workspace.toObject()["id"].toString();
-        apiClient->getWorkspaceItems(workspaceId);
+        QString workspaceTitle = workspace.toObject()["title"].toString();
+        apiClient->getWorkspaceItems(workspaceTitle);
     }
 }
 
-void SyncManager::onItemsFetched(const QString &workspaceId, const QJsonArray &items)
+void SyncManager::onItemsFetched(const QString &workspaceTitle, const QJsonArray &items)
 {
     // Update workspace items in local storage
     QDir userDir(localStorage->getWorkspacePath(false));
     QStringList workspaces = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
     
     for (const QString &workspaceName : workspaces) {
-        QString workspacePath = userDir.filePath(workspaceName) + "/workspace.json";
+        QString workspacePath = userDir.filePath(workspaceName) + "/metadata.json";
         QFile workspaceFile(workspacePath);
         
         if (workspaceFile.open(QIODevice::ReadOnly)) {
@@ -126,7 +132,7 @@ void SyncManager::onItemsFetched(const QString &workspaceId, const QJsonArray &i
             
             if (doc.isObject()) {
                 QJsonObject workspace = doc.object();
-                if (workspace["id"].toString() == workspaceId) {
+                if (workspace["title"].toString() == workspaceTitle) {
                     workspace["items"] = items;
                     
                     if (workspaceFile.open(QIODevice::WriteOnly)) {
@@ -173,7 +179,7 @@ QJsonObject SyncManager::collectLocalChanges()
     QStringList workspaceNames = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
     
     for (const QString &workspaceName : workspaceNames) {
-        QString workspacePath = userDir.filePath(workspaceName) + "/workspace.json";
+        QString workspacePath = userDir.filePath(workspaceName) + "/metadata.json";
         QFile workspaceFile(workspacePath);
         
         if (workspaceFile.open(QIODevice::ReadOnly)) {
@@ -181,7 +187,9 @@ QJsonObject SyncManager::collectLocalChanges()
             workspaceFile.close();
             
             if (doc.isObject()) {
-                workspaces.append(doc.object());
+                QJsonObject workspace = doc.object();
+                workspace["updated_at"] = QFileInfo(workspacePath).lastModified().toString(Qt::ISODate);
+                workspaces.append(workspace);
             }
         }
     }

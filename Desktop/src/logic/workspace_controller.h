@@ -23,6 +23,7 @@ signals:
     void workspaceAdded(Workspace *workspace);
     void workspaceRemoved(Workspace *workspace);
     void pathUpdated(Workspace *workspace);
+    void syncRequested();
 
 public:
     // Создание нового рабочего пространства
@@ -51,6 +52,11 @@ public:
     void saveWorkspaces();
     // Загрузка рабочих пространств
     void loadWorkspaces(QWidget *parent = nullptr);
+
+    // Синхронизация с сервером
+    void syncWithServer(bool copyGuestWorkspaces);
+    // Обработка выхода пользователя
+    void handleLogout();
 
     // --- ВЛОЖЕННОСТЬ ---
     Workspace *createSubWorkspace(Workspace *parent, const QString &name);

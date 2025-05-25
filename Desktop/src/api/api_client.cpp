@@ -1,8 +1,8 @@
 #include "api_client.h"
-#include <QJsonArray>
+#include <QNetworkRequest>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QNetworkReply>
+#include <QJsonArray>
 #include <QUrlQuery>
 #include "../error_handler.h"
 
@@ -37,7 +37,7 @@ QString ApiClient::getUsername() const
     return _username;
 }
 
-QNetworkRequest ApiClient::createRequest(const QString &endpoint)
+QNetworkRequest ApiClient::createRequest(const QString &endpoint) const
 {
     QNetworkRequest request(QUrl(baseUrl + endpoint));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -50,7 +50,7 @@ QNetworkRequest ApiClient::createRequest(const QString &endpoint)
 }
 
 void ApiClient::handleResponse(QNetworkReply *reply,
-                               const std::function<void(const QJsonDocument &)> &successCallback)
+                               std::function<void(const QJsonDocument &)> callback)
 {
     connect(reply, &QNetworkReply::finished, this, [=]() {
         reply->deleteLater();
@@ -58,7 +58,7 @@ void ApiClient::handleResponse(QNetworkReply *reply,
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray response = reply->readAll();
             QJsonDocument jsonResponse = QJsonDocument::fromJson(response);
-            successCallback(jsonResponse);
+            callback(jsonResponse);
         } else {
             QByteArray response = reply->readAll();
             QJsonDocument jsonResponse = QJsonDocument::fromJson(response);
@@ -238,8 +238,6 @@ void ApiClient::registerUser(const QString &email, const QString &password, cons
         if (response.isObject() && response.object().contains("username")) {
             emit registerSuccess();
         } else {
-            // Generic error handling is now in handleResponse,
-            // but we can add specific checks if needed later
             emit registerError("Invalid response format");
         }
     });
@@ -397,18 +395,17 @@ void ApiClient::validateToken()
     });
 }
 
-void ApiClient::getWorkspaceItems(const QString &workspaceId)
+void ApiClient::getWorkspaceItems(const QString &workspaceTitle)
 {
     if (!isAuthenticated()) {
         emit error("Not authenticated");
         return;
     }
 
-    // First get the main page of the workspace
-    QNetworkRequest request = createRequest(QString("workspaces/%1").arg(workspaceId));
+    QNetworkRequest request = createRequest(QString("workspaces/%1").arg(workspaceTitle));
     QNetworkReply *reply = networkManager->get(request);
 
-    handleResponse(reply, [this, workspaceId](const QJsonDocument &response) {
+    handleResponse(reply, [this, workspaceTitle](const QJsonDocument &response) {
         if (response.isObject()) {
             QJsonObject workspace = response.object();
             if (workspace.contains("pages") && workspace["pages"].isArray()) {
@@ -417,7 +414,7 @@ void ApiClient::getWorkspaceItems(const QString &workspaceId)
                 for (const QJsonValue &pageValue : pages) {
                     QJsonObject page = pageValue.toObject();
                     if (page["is_main"].toBool()) {
-                        emit itemsReceived(workspaceId, page["elements"].toArray());
+                        emit itemsReceived(workspaceTitle, page["elements"].toArray());
                         break;
                     }
                 }
@@ -437,90 +434,31 @@ void ApiClient::createWorkspaceItem(const QString &workspaceId, const QJsonObjec
         return;
     }
 
-    // First get the main page ID
-    QNetworkRequest request = createRequest(QString("workspaces/%1/").arg(workspaceId));
-    QNetworkReply *reply = networkManager->get(request);
+    QNetworkRequest request = createRequest(QString("workspaces/%1/items/").arg(workspaceId));
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
 
-    handleResponse(reply, [this, workspaceId, data](const QJsonDocument &response) {
+    handleResponse(reply, [this, workspaceId](const QJsonDocument &response) {
         if (response.isObject()) {
-            QJsonObject workspace = response.object();
-            if (workspace.contains("pages") && workspace["pages"].isArray()) {
-                QJsonArray pages = workspace["pages"].toArray();
-                // Find the main page
-                for (const QJsonValue &pageValue : pages) {
-                    QJsonObject page = pageValue.toObject();
-                    if (page["is_main"].toBool()) {
-                        QString pageId = page["id"].toString();
-                        // Add element to the main page
-                        QNetworkRequest addRequest = createRequest(
-                         QString("workspaces/%1/pages/%2/elements/").arg(workspaceId, pageId));
-                        QNetworkReply *addReply =
-                         networkManager->post(addRequest, QJsonDocument(data).toJson());
-
-                        handleResponse(addReply,
-                                       [this, workspaceId](const QJsonDocument &response) {
-                                           if (response.isObject()) {
-                                               emit itemCreated(workspaceId, response.object());
-                                           } else {
-                                               emit error("Invalid response format");
-                                           }
-                                       });
-                        break;
-                    }
-                }
-            } else {
-                emit error("Invalid response format");
-            }
+            emit itemCreated(workspaceId, response.object());
         } else {
             emit error("Invalid response format");
         }
     });
 }
 
-void ApiClient::updateWorkspaceItem(const QString &workspaceId,
-                                    const QString &itemId,
-                                    const QJsonObject &data)
+void ApiClient::updateWorkspaceItem(const QString &workspaceId, const QString &itemId, const QJsonObject &data)
 {
     if (!isAuthenticated()) {
         emit error("Not authenticated");
         return;
     }
 
-    // First get the main page ID
-    QNetworkRequest request = createRequest(QString("workspaces/%1/").arg(workspaceId));
-    QNetworkReply *reply = networkManager->get(request);
+    QNetworkRequest request = createRequest(QString("workspaces/%1/items/%2").arg(workspaceId, itemId));
+    QNetworkReply *reply = networkManager->put(request, QJsonDocument(data).toJson());
 
-    handleResponse(reply, [this, workspaceId, itemId, data](const QJsonDocument &response) {
+    handleResponse(reply, [this, workspaceId](const QJsonDocument &response) {
         if (response.isObject()) {
-            QJsonObject workspace = response.object();
-            if (workspace.contains("pages") && workspace["pages"].isArray()) {
-                QJsonArray pages = workspace["pages"].toArray();
-                // Find the main page
-                for (const QJsonValue &pageValue : pages) {
-                    QJsonObject page = pageValue.toObject();
-                    if (page["is_main"].toBool()) {
-                        QString pageId = page["id"].toString();
-                        // Update element in the main page
-                        QNetworkRequest updateRequest =
-                         createRequest(QString("workspaces/%1/pages/%2/elements/%3/")
-                                        .arg(workspaceId, pageId, itemId));
-                        QNetworkReply *updateReply = networkManager->sendCustomRequest(
-                         updateRequest, "PATCH", QJsonDocument(data).toJson());
-
-                        handleResponse(updateReply,
-                                       [this, workspaceId](const QJsonDocument &response) {
-                                           if (response.isObject()) {
-                                               emit itemUpdated(workspaceId, response.object());
-                                           } else {
-                                               emit error("Invalid response format");
-                                           }
-                                       });
-                        break;
-                    }
-                }
-            } else {
-                emit error("Invalid response format");
-            }
+            emit itemUpdated(workspaceId, response.object());
         } else {
             emit error("Invalid response format");
         }
@@ -534,39 +472,11 @@ void ApiClient::deleteWorkspaceItem(const QString &workspaceId, const QString &i
         return;
     }
 
-    // First get the main page ID
-    QNetworkRequest request = createRequest(QString("workspaces/%1/").arg(workspaceId));
-    QNetworkReply *reply = networkManager->get(request);
+    QNetworkRequest request = createRequest(QString("workspaces/%1/items/%2").arg(workspaceId, itemId));
+    QNetworkReply *reply = networkManager->deleteResource(request);
 
-    handleResponse(reply, [this, workspaceId, itemId](const QJsonDocument &response) {
-        if (response.isObject()) {
-            QJsonObject workspace = response.object();
-            if (workspace.contains("pages") && workspace["pages"].isArray()) {
-                QJsonArray pages = workspace["pages"].toArray();
-                // Find the main page
-                for (const QJsonValue &pageValue : pages) {
-                    QJsonObject page = pageValue.toObject();
-                    if (page["is_main"].toBool()) {
-                        QString pageId = page["id"].toString();
-                        // Remove element from the main page
-                        QNetworkRequest deleteRequest =
-                         createRequest(QString("workspaces/%1/pages/%2/elements/%3/")
-                                        .arg(workspaceId, pageId, itemId));
-                        QNetworkReply *deleteReply = networkManager->deleteResource(deleteRequest);
-
-                        handleResponse(deleteReply,
-                                       [this, workspaceId, itemId](const QJsonDocument &) {
-                                           emit itemDeleted(workspaceId, itemId);
-                                       });
-                        break;
-                    }
-                }
-            } else {
-                emit error("Invalid response format");
-            }
-        } else {
-            emit error("Invalid response format");
-        }
+    handleResponse(reply, [this, workspaceId, itemId](const QJsonDocument &) {
+        emit itemDeleted(workspaceId, itemId);
     });
 }
 

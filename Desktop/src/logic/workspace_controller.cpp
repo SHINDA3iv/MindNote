@@ -277,7 +277,7 @@ void WorkspaceController::loadWorkspaces(QWidget *parent)
         }
     } else {
         // Load user workspaces if authenticated
-        QDir userDir(QApplication::applicationDirPath() + "/Workspaces/users/" + currentUser + "/");
+        QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
         if (userDir.exists()) {
             QFileInfoList folders = userDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
             for (const QFileInfo &folder : folders) {
@@ -287,5 +287,64 @@ void WorkspaceController::loadWorkspaces(QWidget *parent)
                 }
             }
         }
+    }
+}
+
+void WorkspaceController::syncWithServer(bool copyGuestWorkspaces)
+{
+    if (copyGuestWorkspaces) {
+        // Копируем гостевые пространства в папку пользователя
+        QDir guestDir(QApplication::applicationDirPath() + "/Workspaces/guest/");
+        QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
+        
+        if (guestDir.exists() && userDir.exists()) {
+            QFileInfoList folders = guestDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (const QFileInfo &folder : folders) {
+                QString workspaceName = folder.baseName();
+                QString sourcePath = guestDir.filePath(workspaceName);
+                QString destPath = userDir.filePath(workspaceName);
+                
+                // Копируем директорию рабочего пространства
+                QDir().mkpath(destPath);
+                QFileInfoList files = QDir(sourcePath).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+                for (const QFileInfo &file : files) {
+                    if (file.isDir()) {
+                        QDir().mkpath(destPath + "/" + file.fileName());
+                        QFileInfoList subFiles = QDir(file.filePath()).entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+                        for (const QFileInfo &subFile : subFiles) {
+                            QFile::copy(subFile.filePath(), destPath + "/" + file.fileName() + "/" + subFile.fileName());
+                        }
+                    } else {
+                        QFile::copy(file.filePath(), destPath + "/" + file.fileName());
+                    }
+                }
+                
+                // Загружаем рабочее пространство в память
+                Workspace *workspace = _localStorage->loadWorkspace(workspaceName, nullptr, false);
+                if (workspace) {
+                    _workspaces.append(workspace);
+                }
+            }
+        }
+    }
+    
+    // Синхронизируем с сервером
+    emit syncRequested();
+}
+
+void WorkspaceController::handleLogout()
+{
+    // Сохраняем все рабочие пространства перед выходом
+    saveWorkspaces();
+    
+    // Очищаем рабочие пространства из памяти
+    qDeleteAll(_workspaces);
+    _workspaces.clear();
+    
+    // Очищаем пользовательскую директорию
+    QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
+    if (userDir.exists()) {
+        userDir.removeRecursively();
+        userDir.mkpath(".");
     }
 }

@@ -378,3 +378,11 @@ void LeftPanel::addSubWorkspacesToTree(QTreeWidgetItem *parentItem, Workspace *p
         addSubWorkspacesToTree(item, sub);
     }
 }
+
+void LeftPanel::setGuestMode(bool isGuest)
+{
+    // Disable workspace creation in guest mode
+    if (_workspaceTree) {
+        _workspaceTree->setEnabled(!isGuest);
+    }
+}

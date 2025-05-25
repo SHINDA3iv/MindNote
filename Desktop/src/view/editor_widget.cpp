@@ -106,3 +106,11 @@ Workspace *EditorWidget::currentWorkspace() const
 {
     return _currentWorkspace;
 }
+
+void EditorWidget::setGuestMode(bool isGuest)
+{
+    // Disable editing in guest mode
+    if (_currentWorkspace) {
+        _currentWorkspace->setEnabled(!isGuest);
+    }
+}
