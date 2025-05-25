@@ -40,8 +40,7 @@ class LinkElementInline(admin.StackedInline):
 class PageInline(admin.StackedInline):
     model = Page
     extra = 0
-    fields = ['title', 'link', 'is_main']
-    readonly_fields = ['link']
+    fields = ['title', 'is_main']
     inlines = [
         ImageElementInline,
         FileElementInline,
@@ -75,10 +74,10 @@ class WorkspaceAdmin(admin.ModelAdmin):
 
 @admin.register(Page)
 class PageAdmin(admin.ModelAdmin):
-    list_display = ['title', 'space', 'link', 'is_main', 'created_at']
+    list_display = ['title', 'space', 'is_main', 'created_at']
     list_filter = ['is_main', 'created_at']
     search_fields = ['title', 'space__title']
-    readonly_fields = ['link', 'created_at']
+    readonly_fields = ['created_at']
     inlines = [
         ImageElementInline,
         FileElementInline,
@@ -88,7 +87,7 @@ class PageAdmin(admin.ModelAdmin):
     ]
     fieldsets = (
         (None, {
-            'fields': ('space', 'title', 'link', 'is_main', 'created_at')
+            'fields': ('space', 'title', 'is_main', 'created_at')
         }),
     )
 

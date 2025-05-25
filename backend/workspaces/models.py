@@ -5,6 +5,8 @@ from django.conf import settings
 from django.utils.text import slugify
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.auth.models import User
 
 
 class Workspace(models.Model):
@@ -19,13 +21,16 @@ class Workspace(models.Model):
 
     title = models.CharField(
         max_length=255,
+        primary_key=True,
         verbose_name=_("Название")
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='spaces',
-        verbose_name=_("Автор")
+        verbose_name=_("Автор"),
+        null=True,
+        blank=True
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -70,11 +75,16 @@ class Workspace(models.Model):
         default='not_started',
         verbose_name=_("Статус")
     )
+    is_guest = models.BooleanField(
+        default=False,
+        verbose_name=_("Гостевое пространство")
+    )
 
     class Meta:
         verbose_name = _("Пространство")
         verbose_name_plural = _("Пространства")
         ordering = ["-created_at"]
+        unique_together = ['title', 'author']
 
     def __str__(self):
         return self.title
@@ -99,9 +109,6 @@ class Page(models.Model):
         max_length=255,
         verbose_name=_("Название")
     )
-    link = models.SlugField(
-        verbose_name=_("Ссылка")
-    )
     is_main = models.BooleanField(
         default=False,
         verbose_name=_("Главная страница")
@@ -115,21 +122,12 @@ class Page(models.Model):
         verbose_name = _("Страница")
         verbose_name_plural = _("Страницы")
         ordering = ["-created_at"]
-        unique_together = ['space', 'link']
+        unique_together = ['space', 'title']
 
     def __str__(self):
-        return self.title
+        return f"{self.space.title} - {self.title}"
 
     def save(self, *args, **kwargs):
-        if not self.link:
-            base_slug = slugify(self.title)
-            slug = base_slug
-            counter = 1
-            while Page.objects.filter(space=self.space, link=slug).exists():
-                slug = f"{base_slug}-{counter}"
-                counter += 1
-            self.link = slug
-
         if self.is_main:
             Page.objects.filter(
                 space=self.space, is_main=True).update(is_main=False)
@@ -146,9 +144,23 @@ class Element(models.Model):
     """
     Базовая модель для всех типов элементов.
     """
+    ELEMENT_TYPES = (
+        ('image', 'Image'),
+        ('file', 'File'),
+        ('checkbox', 'Checkbox'),
+        ('text', 'Text'),
+        ('link', 'Link'),
+    )
+
+    element_type = models.CharField(
+        max_length=20,
+        choices=ELEMENT_TYPES,
+        default='text'
+    )
     page = models.ForeignKey(
         'Page',
         on_delete=models.CASCADE,
+        related_name='%(class)s_elements',
         verbose_name=_("Страница")
     )
     created_at = models.DateTimeField(
@@ -173,6 +185,10 @@ class ImageElement(Element):
         verbose_name=_("Изображение")
     )
 
+    def save(self, *args, **kwargs):
+        self.element_type = 'image'
+        super().save(*args, **kwargs)
+
     class Meta:
         verbose_name = _("Изображение")
         verbose_name_plural = _("Изображения")
@@ -186,6 +202,10 @@ class FileElement(Element):
         upload_to='element_files/',
         verbose_name=_("Файл")
     )
+
+    def save(self, *args, **kwargs):
+        self.element_type = 'file'
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("Файл")
@@ -205,6 +225,10 @@ class CheckboxElement(Element):
         verbose_name=_("Отмечено")
     )
 
+    def save(self, *args, **kwargs):
+        self.element_type = 'checkbox'
+        super().save(*args, **kwargs)
+
     class Meta:
         verbose_name = _("Чекбокс")
         verbose_name_plural = _("Чекбоксы")
@@ -217,6 +241,10 @@ class TextElement(Element):
     content = models.TextField(
         verbose_name=_("Содержимое")
     )
+
+    def save(self, *args, **kwargs):
+        self.element_type = 'text'
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("Текстовое поле")
@@ -233,6 +261,10 @@ class LinkElement(Element):
         related_name='linked_elements',
         verbose_name=_("Связанная страница")
     )
+
+    def save(self, *args, **kwargs):
+        self.element_type = 'link'
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("Ссылка на страницу")
@@ -253,6 +285,5 @@ def create_main_page(sender, instance, created, **kwargs):
         Page.objects.create(
             space=instance,
             title="Главная",
-            link="main",
             is_main=True
         )

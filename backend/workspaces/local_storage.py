@@ -5,6 +5,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.files.storage import default_storage
 from .models import Workspace, Page
+from django.utils.text import slugify
 
 class LocalStorageManager:
     def __init__(self, user=None):
@@ -12,24 +13,27 @@ class LocalStorageManager:
         self.user = user
         self.is_guest = user is None
         self.workspace_dir = self.base_dir / ('guest' if self.is_guest else 'user')
+        self.ensure_directories()
 
     def ensure_directories(self):
         """Создает необходимые директории, если они не существуют"""
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_workspace_path(self, workspace_id):
+    def get_workspace_path(self, title):
         """Возвращает путь к директории рабочего пространства"""
-        return self.workspace_dir / str(workspace_id)
+        # Используем slugify для безопасного имени файла
+        safe_title = slugify(title)
+        return self.workspace_dir / safe_title
 
     def save_workspace(self, workspace_data):
         """Сохраняет рабочее пространство локально"""
-        workspace_id = workspace_data.get('id')
-        workspace_path = self.get_workspace_path(workspace_id)
+        title = workspace_data.get('title')
+        workspace_path = self.get_workspace_path(title)
         workspace_path.mkdir(exist_ok=True)
 
         # Сохраняем метаданные рабочего пространства
         metadata = {
-            'title': workspace_data.get('title'),
+            'title': title,
             'created_at': workspace_data.get('created_at'),
             'status': workspace_data.get('status'),
             'pages': []
@@ -37,21 +41,21 @@ class LocalStorageManager:
 
         # Сохраняем страницы
         for page_data in workspace_data.get('pages', []):
-            page_id = page_data.get('id')
-            page_path = workspace_path / str(page_id)
+            page_title = page_data.get('title')
+            page_path = workspace_path / slugify(page_title)
             page_path.mkdir(exist_ok=True)
 
             # Сохраняем метаданные страницы
             page_metadata = {
-                'title': page_data.get('title'),
+                'title': page_title,
                 'is_main': page_data.get('is_main', False),
                 'elements': []
             }
 
             # Сохраняем элементы страницы
             for element in page_data.get('elements', []):
-                element_id = element.get('id')
-                element_path = page_path / str(element_id)
+                element_type = element.get('type')
+                element_path = page_path / element_type
                 element_path.mkdir(exist_ok=True)
 
                 # Сохраняем данные элемента
@@ -59,8 +63,7 @@ class LocalStorageManager:
                     json.dump(element, f, ensure_ascii=False)
 
                 page_metadata['elements'].append({
-                    'id': element_id,
-                    'type': element.get('type')
+                    'type': element_type
                 })
 
             metadata['pages'].append(page_metadata)
@@ -73,9 +76,9 @@ class LocalStorageManager:
         with open(workspace_path / 'metadata.json', 'w', encoding='utf-8') as f:
             json.dump(metadata, f, ensure_ascii=False)
 
-    def load_workspace(self, workspace_id):
+    def load_workspace(self, title):
         """Загружает рабочее пространство из локального хранилища"""
-        workspace_path = self.get_workspace_path(workspace_id)
+        workspace_path = self.get_workspace_path(title)
         if not workspace_path.exists():
             return None
 
@@ -84,7 +87,6 @@ class LocalStorageManager:
             metadata = json.load(f)
 
         workspace_data = {
-            'id': workspace_id,
             'title': metadata['title'],
             'created_at': metadata['created_at'],
             'status': metadata['status'],
@@ -93,20 +95,19 @@ class LocalStorageManager:
 
         # Загружаем страницы
         for page_metadata in metadata['pages']:
-            page_id = page_metadata['id']
-            page_path = workspace_path / str(page_id)
+            page_title = page_metadata['title']
+            page_path = workspace_path / slugify(page_title)
             
             page_data = {
-                'id': page_id,
-                'title': page_metadata['title'],
+                'title': page_title,
                 'is_main': page_metadata['is_main'],
                 'elements': []
             }
 
             # Загружаем элементы страницы
             for element_metadata in page_metadata['elements']:
-                element_id = element_metadata['id']
-                element_path = page_path / str(element_id)
+                element_type = element_metadata['type']
+                element_path = page_path / element_type
 
                 with open(element_path / 'data.json', 'r', encoding='utf-8') as f:
                     element_data = json.load(f)
@@ -119,14 +120,13 @@ class LocalStorageManager:
     def list_workspaces(self):
         """Возвращает список всех локальных рабочих пространств"""
         workspaces = []
-        for workspace_id in os.listdir(self.workspace_dir):
-            workspace_path = self.get_workspace_path(workspace_id)
+        for workspace_dir in os.listdir(self.workspace_dir):
+            workspace_path = self.workspace_dir / workspace_dir
             if workspace_path.is_dir():
                 try:
                     with open(workspace_path / 'metadata.json', 'r', encoding='utf-8') as f:
                         metadata = json.load(f)
                         workspaces.append({
-                            'id': workspace_id,
                             'title': metadata['title'],
                             'created_at': metadata['created_at'],
                             'status': metadata['status']
@@ -135,9 +135,9 @@ class LocalStorageManager:
                     continue
         return workspaces
 
-    def delete_workspace(self, workspace_id):
+    def delete_workspace(self, title):
         """Удаляет рабочее пространство из локального хранилища"""
-        workspace_path = self.get_workspace_path(workspace_id)
+        workspace_path = self.get_workspace_path(title)
         if workspace_path.exists():
             shutil.rmtree(workspace_path)
 
@@ -150,12 +150,17 @@ class LocalStorageManager:
         if not guest_dir.exists():
             return
 
-        for workspace_id in os.listdir(guest_dir):
-            guest_workspace_path = guest_dir / workspace_id
-            user_workspace_path = self.get_workspace_path(workspace_id)
-            
+        for workspace_dir in os.listdir(guest_dir):
+            guest_workspace_path = guest_dir / workspace_dir
             if guest_workspace_path.is_dir():
-                shutil.copytree(guest_workspace_path, user_workspace_path, dirs_exist_ok=True)
+                try:
+                    with open(guest_workspace_path / 'metadata.json', 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                        title = metadata['title']
+                        user_workspace_path = self.get_workspace_path(title)
+                        shutil.copytree(guest_workspace_path, user_workspace_path, dirs_exist_ok=True)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    continue
 
     def clear_user_workspaces(self):
         """Очищает все рабочие пространства пользователя"""
@@ -164,40 +169,4 @@ class LocalStorageManager:
 
         if self.workspace_dir.exists():
             shutil.rmtree(self.workspace_dir)
-            self.workspace_dir.mkdir()
-
-    def validate_user_workspaces(self):
-        """
-        Проверяет валидность рабочих пространств пользователя.
-        Возвращает True, если все в порядке, False если есть проблемы.
-        """
-        if self.is_guest:
-            return True
-
-        try:
-            # Проверяем структуру директорий
-            if not self.workspace_dir.exists():
-                return False
-
-            # Проверяем каждое рабочее пространство
-            for workspace_id in os.listdir(self.workspace_dir):
-                workspace_path = self.get_workspace_path(workspace_id)
-                if not workspace_path.is_dir():
-                    return False
-
-                # Проверяем метаданные
-                metadata_path = workspace_path / 'metadata.json'
-                if not metadata_path.exists():
-                    return False
-
-                try:
-                    with open(metadata_path, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                        if not all(key in metadata for key in ['title', 'created_at', 'status', 'pages']):
-                            return False
-                except (json.JSONDecodeError, KeyError):
-                    return False
-
-            return True
-        except Exception:
-            return False 
+            self.workspace_dir.mkdir() 

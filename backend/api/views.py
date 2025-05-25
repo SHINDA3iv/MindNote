@@ -18,6 +18,7 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
     queryset = Workspace.objects.all()
     serializer_class = WorkspaceSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'title'
 
     def get_queryset(self):
         return Workspace.objects.filter(author=self.request.user)
@@ -37,7 +38,7 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         # Удаляем из локального хранилища
         storage = LocalStorageManager(self.request.user)
-        storage.delete_workspace(instance.id)
+        storage.delete_workspace(instance.title)
         instance.delete()
 
 
@@ -45,6 +46,7 @@ class PageViewSet(viewsets.ModelViewSet):
     queryset = Page.objects.all()
     serializer_class = PageSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'title'
 
     def get_queryset(self):
         return Page.objects.filter(space__author=self.request.user)
@@ -73,7 +75,7 @@ class PageViewSet(viewsets.ModelViewSet):
         instance.delete()
 
     @action(detail=True, methods=['post'])
-    def add_element(self, request, pk=None):
+    def add_element(self, request, title=None):
         page = self.get_object()
         element_type = request.data.get('element_type')
         
@@ -118,7 +120,7 @@ class PageViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=['patch'], url_path='update-element/(?P<element_id>[^/.]+)')
-    def update_element(self, request, pk=None, element_id=None):
+    def update_element(self, request, title=None, element_id=None):
         page = self.get_object()
         element_type = request.data.get('element_type')
         
@@ -158,7 +160,7 @@ class PageViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=['delete'], url_path='remove-element/(?P<element_id>[^/.]+)')
-    def remove_element(self, request, pk=None, element_id=None):
+    def remove_element(self, request, title=None, element_id=None):
         page = self.get_object()
         element_type = request.data.get('element_type')
         
@@ -198,44 +200,64 @@ class SyncView(APIView):
         Обработка синхронизации данных рабочего пространства между клиентом и сервером
         """
         try:
+            print("Received data:", request.data)  # Отладочный вывод
+            
             # Получаем данные рабочего пространства из запроса
-            workspace_data = request.data.get('workspace')
+            workspace_data = request.data
             if not workspace_data:
                 return Response(
                     {"detail": "No workspace data provided"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Проверяем наличие обязательных полей
+            if 'title' not in workspace_data:
+                return Response(
+                    {"detail": "Workspace title is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            print("Processing workspace:", workspace_data['title'])  # Отладочный вывод
+
             # Получаем или создаем рабочее пространство
             workspace, created = Workspace.objects.get_or_create(
-                id=workspace_data.get('id'),
+                title=workspace_data['title'],
                 defaults={
-                    'title': workspace_data.get('title'),
-                    'author': request.user
+                    'author': request.user,
+                    'status': workspace_data.get('status', 'not_started')
                 }
             )
 
+            print(f"Workspace {'created' if created else 'updated'}:", workspace.title)  # Отладочный вывод
+
             # Обновляем рабочее пространство, если оно существует
             if not created:
-                workspace.title = workspace_data.get('title', workspace.title)
+                workspace.status = workspace_data.get('status', workspace.status)
                 workspace.save()
 
             # Синхронизируем страницы
             pages_data = workspace_data.get('pages', [])
-            for page_data in pages_data:
-                page, created = Page.objects.get_or_create(
-                    id=page_data.get('id'),
-                    defaults={
-                        'title': page_data.get('title'),
-                        'space': workspace,
-                        'is_main': page_data.get('is_main', False)
-                    }
-                )
+            existing_pages = {page.title: page for page in workspace.pages.all()}
 
-                if not created:
-                    page.title = page_data.get('title', page.title)
+            print(f"Processing {len(pages_data)} pages")  # Отладочный вывод
+
+            for page_data in pages_data:
+                page_title = page_data.get('title')
+                if not page_title:
+                    continue
+
+                if page_title in existing_pages:
+                    page = existing_pages[page_title]
                     page.is_main = page_data.get('is_main', page.is_main)
                     page.save()
+                    print(f"Updated page: {page_title}")  # Отладочный вывод
+                else:
+                    page = Page.objects.create(
+                        title=page_title,
+                        space=workspace,
+                        is_main=page_data.get('is_main', False)
+                    )
+                    print(f"Created page: {page_title}")  # Отладочный вывод
 
             # Сохраняем в локальное хранилище
             storage = LocalStorageManager(request.user)
@@ -243,9 +265,12 @@ class SyncView(APIView):
 
             # Возвращаем обновленные данные рабочего пространства
             serializer = WorkspaceSerializer(workspace)
-            return Response(serializer.data)
+            response_data = serializer.data
+            print("Sending response:", response_data)  # Отладочный вывод
+            return Response(response_data)
 
         except Exception as e:
+            print("Error in sync:", str(e))  # Отладочный вывод
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -255,12 +280,13 @@ class SyncView(APIView):
 class GuestWorkspaceViewSet(viewsets.ModelViewSet):
     serializer_class = WorkspaceSerializer
     permission_classes = [permissions.AllowAny]
+    lookup_field = 'title'
 
     def get_queryset(self):
         return []
 
     def perform_create(self, serializer):
-        workspace = serializer.save()
+        workspace = serializer.save(is_guest=True)
         # Сохраняем рабочее пространство локально для гостя
         storage = LocalStorageManager()
         storage.save_workspace(serializer.data)
@@ -274,7 +300,7 @@ class GuestWorkspaceViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         # Удаляем из локального хранилища гостя
         storage = LocalStorageManager()
-        storage.delete_workspace(instance.id)
+        storage.delete_workspace(instance.title)
         instance.delete()
 
 
@@ -295,8 +321,6 @@ class UserWorkspaceSyncView(APIView):
 
                 # Получаем список всех рабочих пространств пользователя
                 workspaces = storage.list_workspaces()
-
-                # Проверяем конфликты с серверными рабочими пространствами
                 server_workspaces = Workspace.objects.filter(author=request.user)
                 conflicts = []
 
@@ -307,15 +331,38 @@ class UserWorkspaceSyncView(APIView):
                             'local': workspace,
                             'server': WorkspaceSerializer(server_workspace).data
                         })
+                    else:
+                        # Если пространства нет на сервере, создаем его
+                        workspace_data = storage.load_workspace(workspace['title'])
+                        if workspace_data:
+                            workspace_obj = Workspace.objects.create(
+                                title=workspace_data['title'],
+                                author=request.user,
+                                status=workspace_data.get('status', 'not_started')
+                            )
+                            # Создаем страницы
+                            for page_data in workspace_data.get('pages', []):
+                                Page.objects.create(
+                                    title=page_data['title'],
+                                    space=workspace_obj,
+                                    is_main=page_data.get('is_main', False)
+                                )
 
-                return Response({
+                response_data = {
                     'workspaces': workspaces,
                     'conflicts': conflicts
-                })
+                }
+                return Response(response_data)
             else:
                 # Просто загружаем рабочие пространства с сервера
                 workspaces = Workspace.objects.filter(author=request.user)
                 serializer = WorkspaceSerializer(workspaces, many=True)
+                
+                # Сохраняем серверные пространства локально
+                for workspace in workspaces:
+                    workspace_data = serializer.data[workspaces.index(workspace)]
+                    storage.save_workspace(workspace_data)
+                
                 return Response(serializer.data)
 
         except Exception as e:
@@ -338,48 +385,39 @@ class LogoutView(APIView):
             workspaces = storage.list_workspaces()
 
             for workspace in workspaces:
-                workspace_data = storage.load_workspace(workspace['id'])
+                workspace_data = storage.load_workspace(workspace['title'])
                 if workspace_data:
                     # Создаем или обновляем рабочее пространство на сервере
                     workspace_obj, created = Workspace.objects.get_or_create(
-                        id=workspace_data['id'],
+                        title=workspace_data['title'],
                         defaults={
-                            'title': workspace_data['title'],
-                            'author': request.user
+                            'author': request.user,
+                            'status': workspace_data.get('status', 'not_started')
                         }
                     )
 
                     if not created:
-                        workspace_obj.title = workspace_data['title']
+                        workspace_obj.status = workspace_data.get('status', workspace_obj.status)
                         workspace_obj.save()
 
+                    # Синхронизируем страницы
+                    existing_pages = {page.title: page for page in workspace_obj.pages.all()}
+                    for page_data in workspace_data.get('pages', []):
+                        if page_data['title'] in existing_pages:
+                            page = existing_pages[page_data['title']]
+                            page.is_main = page_data.get('is_main', page.is_main)
+                            page.save()
+                        else:
+                            Page.objects.create(
+                                title=page_data['title'],
+                                space=workspace_obj,
+                                is_main=page_data.get('is_main', False)
+                            )
+
             # Очищаем локальное хранилище пользователя
             storage.clear_user_workspaces()
 
-            return Response(status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-class UserValidationView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        """
-        Обработка ошибки валидации пользователя
-        """
-        try:
-            # Очищаем локальное хранилище пользователя
-            storage = LocalStorageManager(request.user)
-            storage.clear_user_workspaces()
-
-            return Response({
-                'detail': 'User validation failed. Please login again.'
-            }, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         except Exception as e:
             return Response(

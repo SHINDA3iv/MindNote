@@ -4,8 +4,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     WorkspaceViewSet, PageViewSet, SyncView,
-    GuestWorkspaceViewSet, UserWorkspaceSyncView, LogoutView,
-    UserValidationView
+    GuestWorkspaceViewSet, UserWorkspaceSyncView, LogoutView
 )
 
 app_name = "api"
@@ -23,5 +22,4 @@ urlpatterns = [
     path('sync/', SyncView.as_view(), name='sync'),
     path('user-sync/', UserWorkspaceSyncView.as_view(), name='user-sync'),
     path('logout/', LogoutView.as_view(), name='logout'),
-    path('user-validation/', UserValidationView.as_view(), name='user-validation'),
 ]
