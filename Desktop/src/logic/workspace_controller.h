@@ -61,7 +61,7 @@ public:
     // --- ВЛОЖЕННОСТЬ ---
     Workspace *createSubWorkspace(Workspace *parent, const QString &name);
     QList<Workspace *> getRootWorkspaces() const;
-    Workspace *findWorkspaceById(const QString &id) const;
+    Workspace *findWorkspaceByTitle(const QString &id) const;
 
 private slots:
     void handleAddSubspaceRequest(Workspace *parent);

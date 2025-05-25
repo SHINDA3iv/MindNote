@@ -363,12 +363,12 @@ bool MainWidget::saveCurrentWorkspace()
         return false;
     }
 
-    qDebug() << "Saving current workspace:" << currentWorkspace->getName();
+    qDebug() << "Saving current workspace:" << currentWorkspace->title();
 
     if (_workspaceController) {
         _workspaceController->saveWorkspaces();
         _hasUnsavedChanges = false;
-        emit statusMessage("Workspace saved: " + currentWorkspace->getName());
+        emit statusMessage("Workspace saved: " + currentWorkspace->title());
         return true;
     }
 

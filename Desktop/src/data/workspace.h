@@ -19,9 +19,6 @@ class Workspace : public QWidget
 public:
     explicit Workspace(const QString &name = "Новое пространство", QWidget *parent = nullptr);
 
-    QString getName() const;
-    void setName(const QString &name);
-
     void addItem(AbstractWorkspaceItem *item);
     void removeItem(AbstractWorkspaceItem *item);
 
@@ -44,10 +41,7 @@ public:
     QList<Workspace *> getSubWorkspaces() const;
     void addSubWorkspace(Workspace *sub);
     void removeSubWorkspace(Workspace *sub);
-    bool hasSubWorkspaceWithName(const QString &name) const;
-    QString getId() const;
-    void setId(const QString &id);
-    QString getFullPathName() const;
+    bool hasSubWorkspaceWithTitle(const QString &name) const;
     QList<Workspace *> getPathChain() const;
 
     QString getPath() const;
@@ -60,6 +54,9 @@ public:
     QString getOwner() const;
     void setOwner(const QString &owner);
 
+    QString title() const;
+    void setTitle(const QString &newTitle);
+
 public slots:
     Workspace *getRootWorkspace();
 signals:
@@ -69,7 +66,7 @@ signals:
 private:
     void updateContentSize();
 
-    QString _workspaceName;
+    QString _title;
     QString _version;
     QString _owner;
 
@@ -83,7 +80,6 @@ private:
     QList<AbstractWorkspaceItem *> _items;
     QSpacerItem *_spacerItem { nullptr };
 
-    QString _id;
     Workspace *_parentWorkspace { nullptr };
     QList<Workspace *> _subWorkspaces;
 };

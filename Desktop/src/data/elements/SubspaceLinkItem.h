@@ -24,7 +24,7 @@ signals:
 
 private:
     QPointer<QPushButton> _linkButton;
-    QString _subspaceId;
+    QString _subspaceTitle;
     Workspace* _linkedWorkspace { nullptr };
 };
 

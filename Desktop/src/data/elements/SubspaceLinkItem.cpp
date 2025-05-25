@@ -8,7 +8,7 @@ SubspaceLinkItem::SubspaceLinkItem(Workspace *subspace, Workspace *parent) :
     _linkedWorkspace(subspace)
 {
     if (subspace)
-        _subspaceId = subspace->getId();
+        _subspaceTitle = subspace->title();
 
     // Create horizontal layout
     QHBoxLayout *layout = new QHBoxLayout(this);
@@ -44,7 +44,7 @@ SubspaceLinkItem::SubspaceLinkItem(Workspace *subspace, Workspace *parent) :
     layout->addWidget(iconContainer, 0, Qt::AlignTop);
 
     // Create button
-    _linkButton = new QPushButton(subspace ? subspace->getName() : "[Подпространство]", this);
+    _linkButton = new QPushButton(subspace ? subspace->title() : "[Подпространство]", this);
     _linkButton->setFlat(true);
     _linkButton->setStyleSheet(R"(
         QPushButton {
@@ -79,15 +79,14 @@ QJsonObject SubspaceLinkItem::serialize() const
 {
     QJsonObject json;
     json["type"] = type();
-    json["subspaceId"] = _linkedWorkspace ? _linkedWorkspace->getId() : _subspaceId;
-    json["subspaceName"] = _linkedWorkspace ? _linkedWorkspace->getName() : "[Подпространство]";
+    json["subspaceName"] = _linkedWorkspace ? _linkedWorkspace->title() : "[Подпространство]";
     return json;
 }
 
 void SubspaceLinkItem::deserialize(const QJsonObject &json)
 {
-    if (json.contains("subspaceId")) {
-        _subspaceId = json["subspaceId"].toString();
+    if (json.contains("subspaceTitle")) {
+        _subspaceTitle = json["subspaceTitle"].toString();
         QString name =
          json.contains("subspaceName") ? json["subspaceName"].toString() : "[Подпространство]";
         _linkButton->setText(name);
@@ -103,8 +102,8 @@ void SubspaceLinkItem::setLinkedWorkspace(Workspace *newLinkedWorkspace)
 {
     _linkedWorkspace = newLinkedWorkspace;
     if (_linkedWorkspace) {
-        _subspaceId = _linkedWorkspace->getId();
-        _linkButton->setText(_linkedWorkspace->getName());
+        _subspaceTitle = _linkedWorkspace->title();
+        _linkButton->setText(_linkedWorkspace->title());
 
         // Update icon
         QLabel *iconLabel =

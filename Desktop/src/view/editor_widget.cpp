@@ -53,7 +53,7 @@ void EditorWidget::updateBreadcrumb()
     int n = chain.size();
     for (int i = 0; i < n; ++i) {
         Workspace *ws = chain[i];
-        QPushButton *btn = new QPushButton(ws->getName(), this);
+        QPushButton *btn = new QPushButton(ws->title(), this);
         btn->setFlat(true);
         btn->setFixedHeight(24);
         btn->setStyleSheet(R"(

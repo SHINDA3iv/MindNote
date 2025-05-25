@@ -16,9 +16,9 @@
 #include <QDebug>
 #include <QBuffer>
 
-Workspace::Workspace(const QString &name, QWidget *parent) :
+Workspace::Workspace(const QString &title, QWidget *parent) :
     QWidget(parent),
-    _workspaceName(name),
+    _title(title),
     _iconLabel(new QLabel(this))
 {
     this->setStyleSheet(R"(
@@ -59,7 +59,7 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
     QHBoxLayout *headerLayout = new QHBoxLayout(headerWidget);
     headerWidget->setLayout(headerLayout);
 
-    _titleLabel = new QLabel(_workspaceName, this);
+    _titleLabel = new QLabel(_title, this);
     _titleLabel->setAlignment(Qt::AlignCenter);
 
     QFont titleFont = _titleLabel->font();
@@ -114,7 +114,7 @@ Workspace::Workspace(const QString &name, QWidget *parent) :
         QHBoxLayout *subLinksLayout = new QHBoxLayout(sublinkWidget);
         sublinkWidget->setLayout(subLinksLayout);
         for (Workspace *sub : _subWorkspaces) {
-            QPushButton *subBtn = new QPushButton(sub->getName(), this);
+            QPushButton *subBtn = new QPushButton(sub->title(), this);
             subBtn->setFlat(true);
             subBtn->setStyleSheet(
              "color: #0078d7; text-decoration: underline; background: transparent; border: none;");
@@ -207,16 +207,16 @@ void Workspace::addItemByType(const QString &type)
     }
 }
 
-QString Workspace::getName() const
+QString Workspace::title() const
 {
-    return _workspaceName;
+    return _title;
 }
 
-void Workspace::setName(const QString &name)
+void Workspace::setTitle(const QString &title)
 {
-    _workspaceName = name;
+    _title = title;
     if (_titleLabel) {
-        _titleLabel->setText(name);
+        _titleLabel->setText(title);
     }
 }
 
@@ -256,12 +256,11 @@ void Workspace::removeItem(AbstractWorkspaceItem *item)
 QJsonObject Workspace::serialize() const
 {
     QJsonObject json;
-    json["name"] = _workspaceName;
-    json["id"] = _id;
+    json["title"] = _title;
     json["version"] = _version;
-    json["parentId"] = _parentWorkspace ? _parentWorkspace->getId() : "";
+    json["parentId"] = _parentWorkspace ? _parentWorkspace->title() : "";
 
-    qDebug() << "Starting serialization of workspace:" << _workspaceName << "ID:" << _id;
+    qDebug() << "Starting serialization of workspace:" << _title;
 
     // Save icon if it exists
     if (!_iconLabel->pixmap().isNull()) {
@@ -270,7 +269,7 @@ QJsonObject Workspace::serialize() const
         buffer.open(QIODevice::WriteOnly);
         _iconLabel->pixmap().save(&buffer, "PNG");
         json["icon"] = QString(iconData.toBase64());
-        qDebug() << "Saved icon for workspace:" << _workspaceName;
+        qDebug() << "Saved icon for workspace:" << _title;
     }
 
     // Save items
@@ -278,12 +277,12 @@ QJsonObject Workspace::serialize() const
     for (const AbstractWorkspaceItem *item : _items) {
         QJsonObject itemJson = item->serialize();
         itemArray.append(itemJson);
-        qDebug() << "Serialized item of type:" << item->type() << "in workspace:" << _workspaceName;
+        qDebug() << "Serialized item of type:" << item->type() << "in workspace:" << _title;
     }
     json["items"] = itemArray;
 
-    qDebug() << "Finished serializing workspace:" << _workspaceName << "ID:" << _id
-             << "Parent:" << (_parentWorkspace ? _parentWorkspace->getId() : "none")
+    qDebug() << "Finished serializing workspace:" << _title
+             << "Parent:" << (_parentWorkspace ? _parentWorkspace->title() : "none")
              << "Items:" << _items.size();
 
     return json;
@@ -291,10 +290,8 @@ QJsonObject Workspace::serialize() const
 
 void Workspace::deserialize(const QJsonObject &json)
 {
-    if (json.contains("name"))
-        setName(json["name"].toString());
-    if (json.contains("id"))
-        setId(json["id"].toString());
+    if (json.contains("title"))
+        setTitle(json["title"].toString());
     // parentId и subWorkspaces обрабатываются в контроллере
 
     // Load icon if it exists
@@ -427,27 +424,22 @@ void Workspace::addSubWorkspace(Workspace *sub)
         }
     }
 }
+
 void Workspace::removeSubWorkspace(Workspace *sub)
 {
     _subWorkspaces.removeOne(sub);
     if (sub->getParentWorkspace() == this)
         sub->setParentWorkspace(nullptr);
 }
-bool Workspace::hasSubWorkspaceWithName(const QString &name) const
+
+bool Workspace::hasSubWorkspaceWithTitle(const QString &title) const
 {
     for (auto *ws : _subWorkspaces)
-        if (ws->getName() == name)
+        if (ws->title() == title)
             return true;
     return false;
 }
-QString Workspace::getId() const
-{
-    return _id;
-}
-void Workspace::setId(const QString &id)
-{
-    _id = id;
-}
+
 QList<Workspace *> Workspace::getPathChain() const
 {
     QList<Workspace *> chain;
@@ -458,16 +450,13 @@ QList<Workspace *> Workspace::getPathChain() const
     }
     return chain;
 }
-QString Workspace::getFullPathName() const
-{
-    auto chain = getPathChain();
-    QStringList names;
-    for (auto *ws : chain) names << ws->getName();
-    return names.join("/");
-}
+
 QString Workspace::getPath() const
 {
-    return getFullPathName();
+    auto chain = getPathChain();
+    QStringList titles;
+    for (auto *ws : chain) titles << ws->title();
+    return titles.join("/");
 }
 
 QString Workspace::getVersion() const
@@ -489,10 +478,12 @@ Workspace *Workspace::getRootWorkspace()
     return root;
 }
 
-QString Workspace::getOwner() const {
+QString Workspace::getOwner() const
+{
     return _owner;
 }
 
-void Workspace::setOwner(const QString &owner) {
+void Workspace::setOwner(const QString &owner)
+{
     _owner = owner;
 }

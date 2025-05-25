@@ -77,7 +77,7 @@ void WorkspaceController::removeWorkspace(Workspace *workspace)
     }
 
     // Удаление физически
-    _localStorage->deleteWorkspace(workspace->getName());
+    _localStorage->deleteWorkspace(workspace->title());
 
     // Если есть родительское пространство - сохраняем его после изменений
     if (parent) {
@@ -140,10 +140,10 @@ QList<Workspace *> WorkspaceController::getRootWorkspaces() const
     return roots;
 }
 
-Workspace *WorkspaceController::findWorkspaceById(const QString &id) const
+Workspace *WorkspaceController::findWorkspaceByTitle(const QString &title) const
 {
     for (Workspace *ws : _workspaces) {
-        if (ws->getId() == id)
+        if (ws->title() == title)
             return ws;
     }
     return nullptr;
@@ -166,7 +166,7 @@ void WorkspaceController::deserialize(const QJsonObject &json)
 {
     qDeleteAll(_workspaces);
     _workspaces.clear();
-    QMap<QString, Workspace *> idMap;
+    QMap<QString, Workspace *> titleMap;
     QList<QPair<SubspaceLinkItem *, QString>> linkItemsToFix;
 
     if (json.contains("workspaces")) {
@@ -175,31 +175,30 @@ void WorkspaceController::deserialize(const QJsonObject &json)
         // First pass: Create all workspaces
         for (const QJsonValue &val : arr) {
             QJsonObject obj = val.toObject();
-            QString name = obj["name"].toString();
-            QString id = obj["id"].toString();
+            QString title = obj["title"].toString();
 
-            Workspace *ws = new Workspace(name);
-            ws->setId(id);
-            idMap[id] = ws;
+            Workspace *ws = new Workspace(title);
+            ws->setTitle(title);
+            titleMap[title] = ws;
             _workspaces.append(ws);
 
-            qDebug() << "Created workspace:" << name << "ID:" << id;
+            qDebug() << "Created workspace:" << title;
         }
 
         // Second pass: Set up parent-child relationships and deserialize content
         for (const QJsonValue &val : arr) {
             QJsonObject obj = val.toObject();
-            QString id = obj["id"].toString();
-            QString parentId = obj["parentId"].toString();
+            QString title = obj["title"].toString();
+            QString parentTitle = obj["parentId"].toString();
 
-            Workspace *ws = idMap[id];
-            if (!parentId.isEmpty() && idMap.contains(parentId)) {
-                Workspace *parent = idMap[parentId];
+            Workspace *ws = titleMap[title];
+            if (!parentTitle.isEmpty() && titleMap.contains(parentTitle)) {
+                Workspace *parent = titleMap[parentTitle];
                 ws->setParentWorkspace(parent);
                 parent->addSubWorkspace(ws);
 
                 qDebug() << "Setting up relationship:"
-                         << "Child:" << ws->getName() << "Parent:" << parent->getName();
+                         << "Child:" << ws->title() << "Parent:" << parent->title();
             }
 
             // Deserialize workspace content
@@ -211,14 +210,14 @@ void WorkspaceController::deserialize(const QJsonObject &json)
                     auto *link =
                      static_cast<SubspaceLinkItem *>(const_cast<AbstractWorkspaceItem *>(item));
                     QString subspaceId = link->serialize()["subspaceId"].toString();
-                    if (idMap.contains(subspaceId)) {
-                        link->setLinkedWorkspace(idMap[subspaceId]);
+                    if (titleMap.contains(subspaceId)) {
+                        link->setLinkedWorkspace(titleMap[subspaceId]);
                         QObject::connect(link, &SubspaceLinkItem::subspaceLinkClicked, ws,
                                          &Workspace::subWorkspaceClicked);
 
                         qDebug() << "Setting up link:"
-                                 << "From:" << ws->getName()
-                                 << "To:" << idMap[subspaceId]->getName();
+                                 << "From:" << ws->title()
+                                 << "To:" << titleMap[subspaceId]->title();
                     }
                 }
             }
@@ -251,7 +250,7 @@ void WorkspaceController::saveWorkspaces()
 {
     QString currentUser = _localStorage->getCurrentUser();
     bool isGuest = currentUser.isEmpty();
-    
+
     for (Workspace *workspace : _workspaces) {
         if (!workspace->getParentWorkspace()) {
             _localStorage->saveWorkspace(workspace, isGuest);
@@ -262,14 +261,15 @@ void WorkspaceController::saveWorkspaces()
 void WorkspaceController::loadWorkspaces(QWidget *parent)
 {
     QString currentUser = _localStorage->getCurrentUser();
-    
+
     if (currentUser.isEmpty()) {
         // Load guest workspaces only if not authenticated
         QDir guestDir(QApplication::applicationDirPath() + "/Workspaces/guest/");
         if (guestDir.exists()) {
             QFileInfoList folders = guestDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
             for (const QFileInfo &folder : folders) {
-                Workspace *workspace = _localStorage->loadWorkspace(folder.baseName(), parent, true);
+                Workspace *workspace =
+                 _localStorage->loadWorkspace(folder.baseName(), parent, true);
                 if (workspace) {
                     _workspaces.append(workspace);
                 }
@@ -281,7 +281,8 @@ void WorkspaceController::loadWorkspaces(QWidget *parent)
         if (userDir.exists()) {
             QFileInfoList folders = userDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
             for (const QFileInfo &folder : folders) {
-                Workspace *workspace = _localStorage->loadWorkspace(folder.baseName(), parent, false);
+                Workspace *workspace =
+                 _localStorage->loadWorkspace(folder.baseName(), parent, false);
                 if (workspace) {
                     _workspaces.append(workspace);
                 }
@@ -296,29 +297,32 @@ void WorkspaceController::syncWithServer(bool copyGuestWorkspaces)
         // Копируем гостевые пространства в папку пользователя
         QDir guestDir(QApplication::applicationDirPath() + "/Workspaces/guest/");
         QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
-        
+
         if (guestDir.exists() && userDir.exists()) {
             QFileInfoList folders = guestDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
             for (const QFileInfo &folder : folders) {
                 QString workspaceName = folder.baseName();
                 QString sourcePath = guestDir.filePath(workspaceName);
                 QString destPath = userDir.filePath(workspaceName);
-                
+
                 // Копируем директорию рабочего пространства
                 QDir().mkpath(destPath);
-                QFileInfoList files = QDir(sourcePath).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+                QFileInfoList files =
+                 QDir(sourcePath).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
                 for (const QFileInfo &file : files) {
                     if (file.isDir()) {
                         QDir().mkpath(destPath + "/" + file.fileName());
-                        QFileInfoList subFiles = QDir(file.filePath()).entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+                        QFileInfoList subFiles =
+                         QDir(file.filePath()).entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
                         for (const QFileInfo &subFile : subFiles) {
-                            QFile::copy(subFile.filePath(), destPath + "/" + file.fileName() + "/" + subFile.fileName());
+                            QFile::copy(subFile.filePath(), destPath + "/" + file.fileName() + "/"
+                                                             + subFile.fileName());
                         }
                     } else {
                         QFile::copy(file.filePath(), destPath + "/" + file.fileName());
                     }
                 }
-                
+
                 // Загружаем рабочее пространство в память
                 Workspace *workspace = _localStorage->loadWorkspace(workspaceName, nullptr, false);
                 if (workspace) {
@@ -327,7 +331,7 @@ void WorkspaceController::syncWithServer(bool copyGuestWorkspaces)
             }
         }
     }
-    
+
     // Синхронизируем с сервером
     emit syncRequested();
 }
@@ -336,11 +340,11 @@ void WorkspaceController::handleLogout()
 {
     // Сохраняем все рабочие пространства перед выходом
     saveWorkspaces();
-    
+
     // Очищаем рабочие пространства из памяти
     qDeleteAll(_workspaces);
     _workspaces.clear();
-    
+
     // Очищаем пользовательскую директорию
     QDir userDir(QApplication::applicationDirPath() + "/Workspaces/user/");
     if (userDir.exists()) {
