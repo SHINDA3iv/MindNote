@@ -57,6 +57,10 @@ MainWidget::~MainWidget()
     if (_workspaceController) {
         _workspaceController->saveWorkspaces();
     }
+    // Если пользователь не выбрал rememberMe, очищаем user workspaces
+    if (!_authManager->isRememberMeEnabled()) {
+        _localStorage->clearUserData();
+    }
     saveSettings();
 }
 
@@ -208,6 +212,7 @@ void MainWidget::onLoginRequested()
 void MainWidget::onLogout()
 {
     _authManager->logout();
+    _localStorage->clearUserData();
     updateAuthUI();
 }
 

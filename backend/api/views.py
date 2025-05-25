@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
@@ -12,6 +12,8 @@ from .serializers import (
     FileElementSerializer, CheckboxElementSerializer, TextElementSerializer,
     LinkElementSerializer
 )
+import base64
+from django.core.files.base import ContentFile
 
 
 class WorkspaceViewSet(viewsets.ModelViewSet):
@@ -74,7 +76,8 @@ class PageViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         if instance.is_main:
-            raise serializers.ValidationError("Нельзя удалить главную страницу.")
+            raise serializers.ValidationError(
+                "Нельзя удалить главную страницу.")
         # Обновляем локальное хранилище
         storage = LocalStorageManager(self.request.user)
         workspace_data = WorkspaceSerializer(instance.space).data
@@ -311,6 +314,38 @@ class GuestWorkspaceViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
+def create_page_with_elements(page_data, workspace):
+    from workspaces.models import Page, TextElement, CheckboxElement, FileElement, LinkElement
+    page = Page.objects.create(
+        title=page_data['title'],
+        space=workspace,
+        is_main=page_data.get('is_main', False)
+    )
+    # Обработка иконки
+    icon_b64 = page_data.get('icon')
+    if icon_b64:
+        try:
+            icon_data = base64.b64decode(icon_b64)
+            page.icon.save(f'{page.title}_icon.png', ContentFile(icon_data), save=True)
+        except Exception:
+            pass
+    # Элементы страницы
+    for el in page_data.get('elements', []):
+        el_type = el.get('type')
+        if el_type == 'TextItem':
+            TextElement.objects.create(page=page, content=el.get('content', ''))
+        elif el_type == 'CheckboxItem':
+            CheckboxElement.objects.create(page=page, text=el.get('label', ''), is_checked=el.get('checked', False))
+        elif el_type == 'FileItem':
+            FileElement.objects.create(page=page, file=el.get('filePath', ''))
+        elif el_type == 'SubspaceLinkItem':
+            LinkElement.objects.create(page=page, linked_page=el.get('subspaceTitle', ''))
+        # ... другие типы элементов ...
+    # Рекурсивно вложенные страницы
+    for subpage in page_data.get('pages', []):
+        create_page_with_elements(subpage, workspace)
+
+
 class UserWorkspaceSyncView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -384,13 +419,9 @@ class UserWorkspaceSyncView(APIView):
                         ws_obj.save()
                         # Удалить старые страницы
                         ws_obj.pages.all().delete()
-                        # Создать новые страницы
+                        # Создать новые страницы с элементами
                         for page_data in data.get('pages', []):
-                            Page.objects.create(
-                                title=page_data['title'],
-                                space=ws_obj,
-                                is_main=page_data.get('is_main', False)
-                            )
+                            create_page_with_elements(page_data, ws_obj)
                     else:
                         ws_obj = Workspace.objects.create(
                             title=title,
@@ -398,11 +429,7 @@ class UserWorkspaceSyncView(APIView):
                             status=data.get('status', 'not_started')
                         )
                         for page_data in data.get('pages', []):
-                            Page.objects.create(
-                                title=page_data['title'],
-                                space=ws_obj,
-                                is_main=page_data.get('is_main', False)
-                            )
+                            create_page_with_elements(page_data, ws_obj)
                 elif use == 'server':
                     # Оставить серверную версию — ничего не делать
                     pass
@@ -416,11 +443,7 @@ class UserWorkspaceSyncView(APIView):
                         status=ws.get('status', 'not_started')
                     )
                     for page_data in ws.get('pages', []):
-                        Page.objects.create(
-                            title=page_data['title'],
-                            space=ws_obj,
-                            is_main=page_data.get('is_main', False)
-                        )
+                        create_page_with_elements(page_data, ws_obj)
 
             # Возвращаем итоговый список workspaces пользователя
             workspaces = Workspace.objects.filter(author=user)
@@ -428,7 +451,8 @@ class UserWorkspaceSyncView(APIView):
             return Response(serializer.data)
 
         except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'detail': str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LogoutView(APIView):

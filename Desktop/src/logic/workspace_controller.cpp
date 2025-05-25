@@ -213,6 +213,10 @@ void WorkspaceController::loadWorkspaces(QWidget *parent)
 {
     QString currentUser = _localStorage->getCurrentUser();
 
+    // Очищаем текущий список рабочих пространств
+    qDeleteAll(_workspaces);
+    _workspaces.clear();
+
     if (currentUser.isEmpty()) {
         // Load guest workspaces only if not authenticated
         QDir guestDir(QApplication::applicationDirPath() + "/Workspaces/guest/");
@@ -227,7 +231,7 @@ void WorkspaceController::loadWorkspaces(QWidget *parent)
             }
         }
     } else {
-        // Load user workspaces if authenticated
+        // Только пользовательские workspaces, гостевые не трогаем и не отображаем
         QDir userDir(QApplication::applicationDirPath() + "/Workspaces/users/" + currentUser + "/");
         if (userDir.exists()) {
             QFileInfoList folders = userDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
