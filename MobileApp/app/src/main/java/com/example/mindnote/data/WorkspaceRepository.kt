@@ -35,7 +35,15 @@ class WorkspaceRepository private constructor(private val context: Context) {
 
         fun getInstance(context: Context): WorkspaceRepository {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: WorkspaceRepository(context).also { INSTANCE = it }
+                try {
+                    if (context == null) {
+                        throw IllegalArgumentException("Context cannot be null")
+                    }
+                    INSTANCE ?: WorkspaceRepository(context.applicationContext).also { INSTANCE = it }
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error creating WorkspaceRepository instance", e)
+                    throw e
+                }
             }
         }
     }
@@ -84,11 +92,17 @@ class WorkspaceRepository private constructor(private val context: Context) {
     
     // Удаление элемента содержимого из рабочего пространства
     fun removeContentItem(workspace: Workspace, itemId: String) {
-        val currentWorkspace = _workspaces.value?.find { it.id == workspace.id }
-        currentWorkspace?.let {
-            it.removeItem(itemId)
-            updateWorkspace(it)
-            Log.d("MindNote", "WorkspaceRepository: Removed item $itemId from workspace ${workspace.name}")
+        try {
+            val currentWorkspace = _workspaces.value?.find { it.id == workspace.id }
+            currentWorkspace?.let {
+                it.removeItem(itemId)
+                updateWorkspace(it)
+                saveWorkspaces() // Сохраняем изменения сразу
+                Log.d("MindNote", "WorkspaceRepository: Removed item $itemId from workspace ${workspace.name}")
+            }
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error removing content item in repository", e)
+            throw e
         }
     }
     
@@ -143,14 +157,16 @@ class WorkspaceRepository private constructor(private val context: Context) {
     }
 
     // Удаление рабочего пространства
-    fun removeWorkspace(workspace: Workspace) {
-        val currentWorkspaces = _workspaces.value?.toMutableList() ?: mutableListOf()
-        val index = currentWorkspaces.indexOfFirst { it.id == workspace.id }
-        if (index != -1) {
-            currentWorkspaces.removeAt(index)
+    fun deleteWorkspace(workspace: Workspace) {
+        try {
+            val currentWorkspaces = _workspaces.value?.toMutableList() ?: mutableListOf()
+            currentWorkspaces.removeIf { it.id == workspace.id }
             _workspaces.value = currentWorkspaces
-            saveWorkspaces()
-            Log.d("MindNote", "WorkspaceRepository: Removed workspace ${workspace.name}")
+            saveWorkspaces() // Сохраняем изменения сразу
+            Log.d("MindNote", "WorkspaceRepository: Deleted workspace ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error deleting workspace in repository", e)
+            throw e
         }
     }
 }

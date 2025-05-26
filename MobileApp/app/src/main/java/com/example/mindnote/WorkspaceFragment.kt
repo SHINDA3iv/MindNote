@@ -38,6 +38,7 @@ class WorkspaceFragment : Fragment() {
     private val imageCache = ConcurrentHashMap<String, Bitmap>()
     private var isDestroyed = false
     private var isContentLoaded = false
+    private var selectedIconUri: Uri? = null
 
     private val pickIconLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -702,20 +703,17 @@ class WorkspaceFragment : Fragment() {
     fun showCreateNestedPageDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_menu_item, null)
         val editText = dialogView.findViewById<EditText>(R.id.editTextMenuItem)
-        val buttonSelectIcon = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
-        editText.hint = "Название страницы"
-        var selectedIconUri: Uri? = null
+        val iconButton = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
 
-        buttonSelectIcon.setOnClickListener {
-            showIconSelectionDialog { uri ->
+        iconButton.setOnClickListener {
+            (activity as? MainActivity)?.showIconSelectionDialog { uri ->
                 selectedIconUri = uri
-                // Показываем предпросмотр выбранной иконки
                 uri?.let { previewUri ->
                     try {
                         val inputStream = requireContext().contentResolver.openInputStream(previewUri)
-                        val bitmap = BitmapFactory.decodeStream(inputStream)
-                        buttonSelectIcon.setCompoundDrawablesWithIntrinsicBounds(
-                            BitmapDrawable(resources, bitmap),
+                        val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                        iconButton.setCompoundDrawablesWithIntrinsicBounds(
+                            android.graphics.drawable.BitmapDrawable(resources, bitmap),
                             null, null, null
                         )
                     } catch (e: Exception) {
@@ -726,27 +724,24 @@ class WorkspaceFragment : Fragment() {
         }
 
         AlertDialog.Builder(requireContext())
-            .setTitle("Создать вложенную страницу")
+            .setTitle("Создание вложенной страницы")
             .setView(dialogView)
             .setPositiveButton("Создать") { _, _ ->
-                val pageName = editText.text.toString()
+                val pageName = editText.text.toString().trim()
                 if (pageName.isNotEmpty()) {
-                    // Создаем новое рабочее пространство для вложенной страницы
-                    val nestedWorkspace = viewModel.createWorkspace(pageName, selectedIconUri)
-                    // Создаем элемент вложенной страницы
-                    val nestedPageItem = ContentItem.NestedPageItem(
-                        pageName = pageName,
-                        pageId = nestedWorkspace.id,
-                        iconUri = selectedIconUri
-                    )
-                    // Добавляем элемент в текущее рабочее пространство
-                    currentWorkspace?.let { workspace ->
-                        viewModel.addContentItem(workspace, nestedPageItem)
-                        addNestedPageItem(nestedPageItem)
+                    // Устанавливаем иконку по умолчанию, если не выбрана другая
+                    if (selectedIconUri == null) {
+                        selectedIconUri = (activity as? MainActivity)?.getDefaultWorkspaceIconUri()
                     }
+                    createNestedPage(pageName, selectedIconUri)
+                    selectedIconUri = null
+                } else {
+                    Toast.makeText(context, "Имя страницы не может быть пустым", Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton("Отмена") { _, _ -> 
+                selectedIconUri = null
+            }
             .show()
     }
 
@@ -1008,5 +1003,21 @@ class WorkspaceFragment : Fragment() {
             }
             .setNegativeButton("Отмена", null)
             .show()
+    }
+
+    private fun createNestedPage(pageName: String, iconUri: Uri?) {
+        // Создаем новое рабочее пространство для вложенной страницы
+        val nestedWorkspace = viewModel.createWorkspace(pageName, iconUri)
+        // Создаем элемент вложенной страницы
+        val nestedPageItem = ContentItem.NestedPageItem(
+            pageName = pageName,
+            pageId = nestedWorkspace.id,
+            iconUri = iconUri
+        )
+        // Добавляем элемент в текущее рабочее пространство
+        currentWorkspace?.let { workspace ->
+            viewModel.addContentItem(workspace, nestedPageItem)
+            addNestedPageItem(nestedPageItem)
+        }
     }
 }

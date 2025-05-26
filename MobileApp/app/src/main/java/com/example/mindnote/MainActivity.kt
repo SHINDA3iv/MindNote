@@ -14,6 +14,7 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.*
 import androidx.appcompat.widget.Toolbar
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
@@ -54,111 +55,157 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toolbar: Toolbar
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        enableEdgeToEdge()
-        drawerLayout = findViewById(R.id.drawer_layout)
-        navigationView = findViewById(R.id.nav_view)
-        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
-        
-        // Инициализируем ViewModel
-        viewModel.init(applicationContext)
-        
-        toolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(toolbar)
+        try {
+            super.onCreate(savedInstanceState)
+            setContentView(R.layout.activity_main)
+            enableEdgeToEdge()
 
-        // Настраиваем кастомный layout для toolbar
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-        val customView = layoutInflater.inflate(R.layout.toolbar_with_path, toolbar, false)
-        toolbar.addView(customView)
-        toolbarTitle = customView.findViewById(R.id.toolbar_title)
-        pathContainer = customView.findViewById(R.id.path_container)
-        pathScroll = customView.findViewById(R.id.path_scroll)
+            // Initialize ViewModel first
+            viewModel = ViewModelProvider(this)[MainViewModel::class.java]
+            viewModel.init(applicationContext)
 
-        // Навигация
-        val toggle = ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close)
-        drawerLayout.addDrawerListener(toggle)
-        toggle.syncState()
+            // Initialize views
+            drawerLayout = findViewById(R.id.drawer_layout)
+            navigationView = findViewById(R.id.nav_view)
+            toolbar = findViewById(R.id.toolbar)
 
-        val headerView = navigationView.getHeaderView(0)
-        val addButton = headerView.findViewById<Button>(R.id.nav_header_add_button)
-        val authButton = findViewById<Button>(R.id.auth_button)
-        val userNameText = findViewById<TextView>(R.id.user_name)
-
-        addButton.setOnClickListener {
-            showAddMenuItemDialog()
-        }
-
-        authButton.setOnClickListener {
-            if (isLoggedIn) {
-                // Logout
-                isLoggedIn = false
-                currentUserName = "Гость"
-                authButton.text = "Войти"
-                userNameText.text = currentUserName
-                Toast.makeText(this, "Выход выполнен", Toast.LENGTH_SHORT).show()
-            } else {
-                // Login
-                val intent = Intent(this, LoginActivity::class.java)
-                startActivityForResult(intent, 100)
+            // Set up toolbar
+            setSupportActionBar(toolbar)
+            supportActionBar?.let { actionBar ->
+                actionBar.setDisplayShowTitleEnabled(false)
+                val customView = layoutInflater.inflate(R.layout.toolbar_with_path, toolbar, false)
+                toolbar.addView(customView)
+                toolbarTitle = customView.findViewById(R.id.toolbar_title)
+                pathContainer = customView.findViewById(R.id.path_container)
+                pathScroll = customView.findViewById(R.id.path_scroll)
             }
-        }
 
-        navigationView.setNavigationItemSelectedListener { menuItem ->
-            val workspaceName = menuItem.title.toString()
-            if (menuItem.itemId != -1) {
-                openWorkspace(workspaceName)
-                drawerLayout.closeDrawer(GravityCompat.START)
-                true
-            } else {
-                false
+            // Set up navigation
+            val toggle = ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close)
+            drawerLayout.addDrawerListener(toggle)
+            toggle.syncState()
+
+            // Set up navigation header
+            val headerView = navigationView.getHeaderView(0)
+            val addButton = headerView.findViewById<AppCompatImageButton>(R.id.nav_header_add_button)
+            val authButton = findViewById<Button>(R.id.auth_button)
+            val userNameText = findViewById<TextView>(R.id.user_name)
+
+            addButton?.setOnClickListener {
+                showAddMenuItemDialog()
             }
-        }
 
-        // Восстановление фрагмента если есть
-        if (savedInstanceState != null) {
-            val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
-            if (currentFragment is WorkspaceFragment) {
-                Log.d("MindNote", "Fragment restored after configuration change")
-            } else {
-                // Если фрагмент не найден и есть текущее рабочее пространство, откроем его
-                viewModel.currentWorkspace.value?.let { workspace ->
-                    Log.d("MindNote", "Reopening current workspace after configuration change")
-                    openWorkspace(workspace.name)
+            authButton?.setOnClickListener {
+                if (isLoggedIn) {
+                    // Logout
+                    isLoggedIn = false
+                    currentUserName = "Гость"
+                    authButton.text = "Войти"
+                    userNameText?.text = currentUserName
+                    Toast.makeText(this, "Выход выполнен", Toast.LENGTH_SHORT).show()
+                } else {
+                    // Login
+                    val intent = Intent(this, LoginActivity::class.java)
+                    startActivityForResult(intent, 100)
                 }
             }
-        }
 
-        // Подписываемся на обновления
-        viewModel.workspaces.observe(this) { workspaces ->
-            Log.d("MindNote", "MainActivity: Observed ${workspaces.size} workspaces")
-            updateNavigationMenu(workspaces)
+            navigationView.setNavigationItemSelectedListener { menuItem ->
+                val workspaceName = menuItem.title.toString()
+                if (menuItem.itemId != -1) {
+                    openWorkspace(workspaceName)
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    true
+                } else {
+                    false
+                }
+            }
+
+            // Restore fragment if exists
+            if (savedInstanceState != null) {
+                val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                if (currentFragment is WorkspaceFragment) {
+                    Log.d("MindNote", "Fragment restored after configuration change")
+                } else {
+                    // If fragment not found and there's a current workspace, open it
+                    viewModel.currentWorkspace.value?.let { workspace ->
+                        Log.d("MindNote", "Reopening current workspace after configuration change")
+                        openWorkspace(workspace.name)
+                    }
+                }
+            }
+
+            // Subscribe to updates
+            viewModel.workspaces.observe(this) { workspaces ->
+                Log.d("MindNote", "MainActivity: Observed ${workspaces.size} workspaces")
+                updateNavigationMenu(workspaces)
+            }
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error in onCreate", e)
+            Toast.makeText(this, "Error initializing app: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun updateNavigationMenu(workspaces: List<Workspace>) {
-        val menu = navigationView.menu
-        menu.removeGroup(ws_group)
+        try {
+            val menu = navigationView.menu
+            menu.removeGroup(ws_group)
 
-        // Получаем список ID всех вложенных страниц
-        val nestedPageIds = workspaces.flatMap { workspace ->
-            workspace.items.filterIsInstance<ContentItem.NestedPageItem>().map { it.pageId }
-        }.toSet()
-
-        // Добавляем только те рабочие пространства, которые не являются вложенными страницами
-        workspaces.filter { workspace -> !nestedPageIds.contains(workspace.id) }.forEach { workspace ->
-            // Create menu item with custom layout
-            val menuItem = menu.add(ws_group, workspace.id.hashCode(), Menu.NONE, "")
-            val customView = layoutInflater.inflate(R.layout.nav_menu_item, null)
-            val expandableItem = customView.findViewById<ExpandableMenuItem>(R.id.expandable_menu_item)
-            
-            expandableItem.setWorkspace(workspace)
-            expandableItem.setOnItemClickListener { ws ->
-                openWorkspace(ws.name)
-                drawerLayout.closeDrawer(GravityCompat.START)
+            // If there are no workspaces, show a message
+            if (workspaces.isEmpty()) {
+                toolbarAddButton.isVisible = false
+                // Clear the fragment container
+                supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+                // Clear toolbar
+                toolbarTitle.text = ""
+                toolbar.logo = null
+                pathContainer.removeAllViews()
+                return
             }
-            
-            menuItem.actionView = customView
+
+            // Получаем список ID всех вложенных страниц
+            val nestedPageIds = workspaces.flatMap { workspace ->
+                workspace.items.filterIsInstance<ContentItem.NestedPageItem>().map { it.pageId }
+            }.toSet()
+
+            // Добавляем только те рабочие пространства, которые не являются вложенными страницами
+            workspaces.filter { workspace -> !nestedPageIds.contains(workspace.id) }.forEach { workspace ->
+                try {
+                    // Create menu item with custom layout
+                    val menuItem = menu.add(ws_group, workspace.id.hashCode(), Menu.NONE, "")
+                    menuItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                    
+                    // Создаем кастомный layout для пункта меню
+                    val customView = layoutInflater.inflate(R.layout.nav_menu_item, null)
+                    val expandableItem = customView.findViewById<ExpandableMenuItem>(R.id.expandable_menu_item)
+                    
+                    expandableItem.setWorkspace(workspace)
+                    expandableItem.setOnItemClickListener { ws ->
+                        openWorkspace(ws.name)
+                        drawerLayout.closeDrawer(GravityCompat.START)
+                    }
+                    expandableItem.setOnWorkspaceEdited { ws ->
+                        // Обновляем рабочее пространство в репозитории
+                        viewModel.updateWorkspace(ws)
+                    }
+                    expandableItem.setOnWorkspaceDeleted { ws ->
+                        // Удаляем элемент из меню
+                        navigationView.menu.removeItem(menuItem.itemId)
+                        // Удаляем рабочее пространство из репозитория
+                        viewModel.deleteWorkspace(ws)
+                        // Если удаляемое пространство открыто, закрываем его
+                        if (supportFragmentManager.findFragmentById(R.id.fragment_container) is WorkspaceFragment) {
+                            supportFragmentManager.popBackStack()
+                        }
+                    }
+                    
+                    menuItem.actionView = customView
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error creating menu item for workspace ${workspace.name}", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error updating navigation menu", e)
         }
     }
 
@@ -563,6 +610,10 @@ class MainActivity : AppCompatActivity() {
                 val newItemName = editText.text.toString().trim()
                 if (newItemName.isNotEmpty()) {
                     Log.d("MindNote", "MainActivity: Creating new workspace '$newItemName'")
+                    // Устанавливаем иконку по умолчанию, если не выбрана другая
+                    if (selectedIconUri == null) {
+                        selectedIconUri = getDefaultWorkspaceIconUri()
+                    }
                     val workspace = viewModel.createWorkspace(newItemName, selectedIconUri)
                     addMenuItem(newItemName, workspace)
                     editText.text.clear()
@@ -578,7 +629,7 @@ class MainActivity : AppCompatActivity() {
         builder.show()
     }
 
-    private fun showIconSelectionDialog(onIconSelected: ((Uri?) -> Unit)? = null) {
+    fun showIconSelectionDialog(onIconSelected: ((Uri?) -> Unit)? = null) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_select_icon, null)
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
@@ -673,25 +724,55 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun addMenuItem(itemName: String, workspace: Workspace) {
-        val menu = navigationView.menu
-        val itemId = generateUniqueMenuItemId(menu)
-        val menuItem = menu.add(ws_group, itemId, Menu.NONE, itemName)
-        workspace.iconUri?.let { uri ->
-            val icon = contentResolver.openInputStream(uri)?.use {
-                android.graphics.BitmapFactory.decodeStream(it)
+    private fun addMenuItem(name: String, workspace: Workspace) {
+        val menuItem = navigationView.menu.add(ws_group, generateUniqueMenuItemId(navigationView.menu), Menu.NONE, name)
+        menuItem.setIcon(R.drawable.ic_workspace)
+        menuItem.setOnMenuItemClickListener {
+            openWorkspace(workspace.name)
+            true
+        }
+
+        // Создаем ExpandableMenuItem
+        val expandableItem = ExpandableMenuItem(this)
+        expandableItem.setWorkspace(workspace)
+        expandableItem.setOnItemClickListener { ws ->
+            openWorkspace(ws.name)
+        }
+        expandableItem.setOnWorkspaceEdited { ws ->
+            // Обновляем имя в меню
+            menuItem.title = ws.name
+            // Обновляем иконку
+            ws.iconUri?.let { uri ->
+                try {
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                    val scaledIcon = android.graphics.Bitmap.createScaledBitmap(bitmap, 48, 48, true)
+                    menuItem.icon = android.graphics.drawable.BitmapDrawable(resources, scaledIcon)
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error updating menu item icon", e)
+                    menuItem.setIcon(R.drawable.ic_workspace)
+                }
+            } ?: run {
+                menuItem.setIcon(R.drawable.ic_workspace)
             }
-            icon?.let {
-                val scaledIcon = android.graphics.Bitmap.createScaledBitmap(it, 48, 48, true)
-                menuItem.icon = android.graphics.drawable.BitmapDrawable(resources, scaledIcon)
+            // Обновляем рабочее пространство в репозитории
+            viewModel.updateWorkspace(ws)
+        }
+        expandableItem.setOnWorkspaceDeleted { ws ->
+            // Удаляем элемент из меню
+            navigationView.menu.removeItem(menuItem.itemId)
+            // Удаляем рабочее пространство из репозитория
+            viewModel.deleteWorkspace(ws)
+            // Если удаляемое пространство открыто, закрываем его
+            if (supportFragmentManager.findFragmentById(R.id.fragment_container) is WorkspaceFragment) {
+                supportFragmentManager.popBackStack()
             }
         }
 
-        // Добавляем обработчик долгого нажатия
-        val menuItemView = navigationView.findViewById<View>(itemId)
-        menuItemView?.setOnLongClickListener { view ->
-            showWorkspaceContextMenu(view, workspace)
-            true
+        // Добавляем ExpandableMenuItem в меню
+        val menuItemView = navigationView.menu.findItem(menuItem.itemId).actionView
+        if (menuItemView is LinearLayout) {
+            menuItemView.addView(expandableItem)
         }
     }
 
@@ -747,7 +828,19 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Удалить рабочее пространство")
             .setMessage("Вы уверены, что хотите удалить '${workspace.name}'? Это действие нельзя отменить.")
             .setPositiveButton("Удалить") { _, _ ->
-                viewModel.deleteWorkspace(workspace)
+                try {
+                    viewModel.deleteWorkspace(workspace)
+                    // If this was the last workspace, clear the UI
+                    if (viewModel.workspaces.value?.isEmpty() == true) {
+                        toolbarAddButton.isVisible = false
+                        toolbarTitle.text = ""
+                        toolbar.logo = null
+                        pathContainer.removeAllViews()
+                    }
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error deleting workspace", e)
+                    Toast.makeText(this, "Ошибка при удалении пространства: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
             .setNegativeButton("Отмена", null)
             .show()
@@ -831,5 +924,55 @@ class MainActivity : AppCompatActivity() {
     // Добавляем публичный метод для получения рабочего пространства по ID
     fun getWorkspaceById(id: String): Workspace? {
         return viewModel.getWorkspaceById(id)
+    }
+
+    // Добавляем метод для получения URI иконки по умолчанию
+    fun getDefaultWorkspaceIconUri(): Uri? {
+        try {
+            // Создаем директорию для иконок если её нет
+            val iconsDir = File(filesDir, "icons")
+            if (!iconsDir.exists() && !iconsDir.mkdirs()) {
+                throw Exception("Не удалось создать директорию для иконок")
+            }
+
+            // Создаем файл для иконки по умолчанию
+            val file = File(iconsDir, "default_icon.png")
+            
+            // Получаем векторный drawable
+            val drawable = resources.getDrawable(R.drawable.ic_workspace, theme)
+            
+            // Создаем bitmap с поддержкой прозрачности
+            val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            
+            // Очищаем canvas прозрачным цветом
+            canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+            
+            // Устанавливаем границы drawable
+            drawable.setBounds(0, 0, canvas.width, canvas.height)
+            
+            // Рисуем drawable на canvas
+            drawable.draw(canvas)
+
+            // Сохраняем bitmap в файл
+            file.outputStream().use { out ->
+                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                    throw Exception("Не удалось сохранить иконку")
+                }
+            }
+
+            // Освобождаем память
+            bitmap.recycle()
+
+            // Создаем URI через FileProvider
+            return androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                file
+            )
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error creating default icon", e)
+            return null
+        }
     }
 }

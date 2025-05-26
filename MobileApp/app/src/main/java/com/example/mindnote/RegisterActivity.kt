@@ -14,7 +14,6 @@ class RegisterActivity : AppCompatActivity() {
         val nameInput = findViewById<TextInputEditText>(R.id.name_input)
         val emailInput = findViewById<TextInputEditText>(R.id.email_input)
         val passwordInput = findViewById<TextInputEditText>(R.id.password_input)
-        val confirmPasswordInput = findViewById<TextInputEditText>(R.id.confirm_password_input)
         val registerButton = findViewById<Button>(R.id.register_button)
         val backToLoginButton = findViewById<Button>(R.id.back_to_login_button)
 
@@ -22,15 +21,9 @@ class RegisterActivity : AppCompatActivity() {
             val name = nameInput.text.toString()
             val email = emailInput.text.toString()
             val password = passwordInput.text.toString()
-            val confirmPassword = confirmPasswordInput.text.toString()
 
-            if (name.isEmpty() || email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
+            if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
                 Toast.makeText(this, "Пожалуйста, заполните все поля", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            if (password != confirmPassword) {
-                Toast.makeText(this, "Пароли не совпадают", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 

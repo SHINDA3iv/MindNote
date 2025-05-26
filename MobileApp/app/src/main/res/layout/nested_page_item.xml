@@ -11,7 +11,7 @@
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:layout_gravity="center_vertical"
-        android:src="@android:drawable/ic_menu_agenda"
+        android:src="@drawable/ic_workspace"
         android:tint="@color/design_default_color_primary" />
 
     <TextView

@@ -1,17 +1,21 @@
 package com.example.mindnote.views
 
 import android.content.Context
-import android.net.Uri
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.PopupMenu
+import android.widget.Toast
+import android.app.AlertDialog
+import android.widget.Button
+import android.util.Log
 import com.example.mindnote.MainActivity
 import com.example.mindnote.R
 import com.example.mindnote.data.Workspace
+import android.widget.ImageView
 
 class ExpandableMenuItem @JvmOverloads constructor(
     context: Context,
@@ -19,119 +23,213 @@ class ExpandableMenuItem @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
-    private val headerView: LinearLayout
-    private val iconView: ImageView
-    private val titleView: TextView
-    private val expandButton: ImageButton
-    private val nestedContainer: LinearLayout
-    private var isExpanded = false
     private var workspace: Workspace? = null
     private var onItemClickListener: ((Workspace) -> Unit)? = null
+    private var onWorkspaceEdited: ((Workspace) -> Unit)? = null
+    private var onWorkspaceDeleted: ((Workspace) -> Unit)? = null
+    private var isExpanded = false
+
+    private val expandButton: ImageButton
+    private val titleView: TextView
+    private val nestedItemsContainer: LinearLayout
+    private val iconView: ImageView
 
     init {
         orientation = VERTICAL
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         LayoutInflater.from(context).inflate(R.layout.expandable_menu_item, this, true)
 
-        headerView = findViewById(R.id.menu_item_header)
-        iconView = findViewById(R.id.menu_item_icon)
-        titleView = findViewById(R.id.menu_item_title)
         expandButton = findViewById(R.id.expand_button)
-        nestedContainer = findViewById(R.id.nested_items_container)
-
-        // Устанавливаем параметры для headerView
-        headerView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-
-        setupClickListeners()
-    }
-
-    private fun setupClickListeners() {
-        headerView.setOnClickListener {
-            workspace?.let { ws ->
-                if (ws.items.any { it is com.example.mindnote.data.ContentItem.NestedPageItem }) {
-                    toggleExpansion()
-                } else {
-                    onItemClickListener?.invoke(ws)
-                }
-            }
-        }
+        titleView = findViewById(R.id.menu_item_title)
+        nestedItemsContainer = findViewById(R.id.nested_items_container)
+        iconView = findViewById(R.id.menu_item_icon)
 
         expandButton.setOnClickListener {
             toggleExpansion()
+        }
+
+        setOnClickListener {
+            workspace?.let { ws ->
+                onItemClickListener?.invoke(ws)
+            }
+        }
+
+        setOnLongClickListener { view ->
+            workspace?.let { ws ->
+                showContextMenu(view, ws)
+                true
+            } ?: false
+        }
+    }
+
+    fun setWorkspace(workspace: Workspace) {
+        this.workspace = workspace
+        updateUI()
+    }
+
+    fun setOnItemClickListener(listener: (Workspace) -> Unit) {
+        onItemClickListener = listener
+    }
+
+    fun setOnWorkspaceEdited(listener: (Workspace) -> Unit) {
+        onWorkspaceEdited = listener
+    }
+
+    fun setOnWorkspaceDeleted(listener: (Workspace) -> Unit) {
+        onWorkspaceDeleted = listener
+    }
+
+    private fun updateUI() {
+        workspace?.let { ws ->
+            titleView.text = ws.name
+            ws.iconUri?.let { uri ->
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                    iconView.setImageBitmap(bitmap)
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error loading icon", e)
+                    iconView.setImageResource(R.drawable.ic_workspace)
+                }
+            } ?: run {
+                iconView.setImageResource(R.drawable.ic_workspace)
+            }
+            updateNestedItems()
         }
     }
 
     private fun toggleExpansion() {
         isExpanded = !isExpanded
         expandButton.rotation = if (isExpanded) 180f else 0f
-        nestedContainer.visibility = if (isExpanded) View.VISIBLE else View.GONE
+        nestedItemsContainer.visibility = if (isExpanded) View.VISIBLE else View.GONE
     }
 
-    fun setWorkspace(workspace: Workspace) {
-        this.workspace = workspace
-        titleView.text = workspace.name
-        workspace.iconUri?.let { uri ->
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
-                iconView.setImageBitmap(bitmap)
-            } catch (e: Exception) {
-                iconView.setImageResource(android.R.drawable.ic_menu_agenda)
+    private fun updateNestedItems() {
+        nestedItemsContainer.removeAllViews()
+        workspace?.let { ws ->
+            val mainActivity = context as? MainActivity
+            if (mainActivity == null) {
+                Log.e("MindNote", "Context is not MainActivity")
+                return
             }
-        } ?: run {
-            iconView.setImageResource(android.R.drawable.ic_menu_agenda)
+
+            ws.items.forEach { item ->
+                if (item is com.example.mindnote.data.ContentItem.NestedPageItem) {
+                    val nestedItem = ExpandableMenuItem(context)
+                    val nestedWorkspace = mainActivity.getWorkspaceById(item.pageId)
+                    nestedWorkspace?.let { nestedWs ->
+                        if (nestedWs.iconUri == null) {
+                            nestedWs.iconUri = mainActivity.getDefaultWorkspaceIconUri()
+                        }
+                        nestedItem.setWorkspace(nestedWs)
+                        nestedItem.setOnItemClickListener { nestedWs ->
+                            onItemClickListener?.invoke(nestedWs)
+                        }
+                        nestedItem.setOnWorkspaceEdited { nestedWs ->
+                            onWorkspaceEdited?.invoke(nestedWs)
+                        }
+                        nestedItem.setOnWorkspaceDeleted { nestedWs ->
+                            onWorkspaceDeleted?.invoke(nestedWs)
+                        }
+                        nestedItemsContainer.addView(nestedItem)
+                    }
+                }
+            }
         }
-
-        // Add nested items
-        nestedContainer.removeAllViews()
-        workspace.items.filterIsInstance<com.example.mindnote.data.ContentItem.NestedPageItem>()
-            .forEach { nestedItem ->
-                addNestedItem(nestedItem)
-            }
     }
 
-    private fun addNestedItem(nestedItem: com.example.mindnote.data.ContentItem.NestedPageItem) {
+    private fun showContextMenu(view: View, workspace: Workspace) {
+        try {
+            val popupMenu = PopupMenu(context, view)
+            popupMenu.menuInflater.inflate(R.menu.workspace_context_menu, popupMenu.menu)
+
+            popupMenu.setOnMenuItemClickListener { menuItem ->
+                when (menuItem.itemId) {
+                    R.id.menu_rename -> {
+                        showEditDialog(workspace)
+                        true
+                    }
+                    R.id.menu_change_icon -> {
+                        val mainActivity = context as? MainActivity
+                        if (mainActivity != null) {
+                            mainActivity.showIconSelectionDialog { uri ->
+                                uri?.let {
+                                    workspace.iconUri = it
+                                    onWorkspaceEdited?.invoke(workspace)
+                                }
+                            }
+                            true
+                        } else {
+                            Log.e("MindNote", "Context is not MainActivity")
+                            false
+                        }
+                    }
+                    R.id.menu_delete -> {
+                        showDeleteConfirmation(workspace)
+                        true
+                    }
+                    else -> false
+                }
+            }
+            popupMenu.show()
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error showing context menu", e)
+        }
+    }
+
+    private fun showEditDialog(workspace: Workspace) {
         val mainActivity = context as? MainActivity
-        val targetWorkspace = mainActivity?.getWorkspaceById(nestedItem.pageId)
-        
-        if (targetWorkspace != null && targetWorkspace.items.any { it is com.example.mindnote.data.ContentItem.NestedPageItem }) {
-            // Если у вложенной страницы есть свои дочерние страницы, создаем новый ExpandableMenuItem
-            val nestedExpandableItem = ExpandableMenuItem(context)
-            nestedExpandableItem.setWorkspace(targetWorkspace)
-            nestedExpandableItem.setOnItemClickListener { ws ->
-                onItemClickListener?.invoke(ws)
-            }
-            nestedContainer.addView(nestedExpandableItem)
-        } else {
-            // Если нет дочерних страниц, создаем обычный элемент
-            val nestedView = LayoutInflater.from(context).inflate(R.layout.nested_page_item, null)
-            val nestedIcon = nestedView.findViewById<ImageView>(R.id.pageIcon)
-            val nestedTitle = nestedView.findViewById<TextView>(R.id.pageName)
+        mainActivity?.let { activity ->
+            val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_menu_item, null)
+            val editText = dialogView.findViewById<TextView>(R.id.editTextMenuItem)
+            val iconButton = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
 
-            nestedTitle.text = nestedItem.pageName
-            nestedItem.iconUri?.let { uri ->
-                try {
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
-                    nestedIcon.setImageBitmap(bitmap)
-                } catch (e: Exception) {
-                    nestedIcon.setImageResource(android.R.drawable.ic_menu_agenda)
-                }
-            } ?: run {
-                nestedIcon.setImageResource(android.R.drawable.ic_menu_agenda)
-            }
+            editText.setText(workspace.name)
+            var selectedIconUri = workspace.iconUri
 
-            nestedView.setOnClickListener {
-                targetWorkspace?.let { ws ->
-                    onItemClickListener?.invoke(ws)
+            iconButton.setOnClickListener {
+                activity.showIconSelectionDialog { uri ->
+                    selectedIconUri = uri
+                    uri?.let { previewUri ->
+                        try {
+                            val inputStream = context.contentResolver.openInputStream(previewUri)
+                            val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                            iconButton.setCompoundDrawablesWithIntrinsicBounds(
+                                android.graphics.drawable.BitmapDrawable(resources, bitmap),
+                                null, null, null
+                            )
+                        } catch (e: Exception) {
+                            Log.e("MindNote", "Error loading icon preview", e)
+                        }
+                    }
                 }
             }
 
-            nestedContainer.addView(nestedView)
+            AlertDialog.Builder(context)
+                .setTitle("Редактировать пространство")
+                .setView(dialogView)
+                .setPositiveButton("Сохранить") { _, _ ->
+                    val newName = editText.text.toString().trim()
+                    if (newName.isNotEmpty()) {
+                        workspace.name = newName
+                        workspace.iconUri = selectedIconUri
+                        onWorkspaceEdited?.invoke(workspace)
+                    } else {
+                        Toast.makeText(context, "Имя не может быть пустым", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton("Отмена", null)
+                .show()
         }
     }
 
-    fun setOnItemClickListener(listener: (Workspace) -> Unit) {
-        onItemClickListener = listener
+    private fun showDeleteConfirmation(workspace: Workspace) {
+        AlertDialog.Builder(context)
+            .setTitle("Удалить пространство")
+            .setMessage("Вы уверены, что хотите удалить пространство '${workspace.name}'?")
+            .setPositiveButton("Удалить") { _, _ ->
+                onWorkspaceDeleted?.invoke(workspace)
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 } 

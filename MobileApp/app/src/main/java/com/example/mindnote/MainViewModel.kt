@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.mindnote.data.ContentItem
 import com.example.mindnote.data.Workspace
 import com.example.mindnote.data.WorkspaceRepository
@@ -21,6 +22,7 @@ import com.google.gson.JsonSerializer
 import com.google.gson.reflect.TypeToken
 import java.io.File
 import java.lang.reflect.Type
+import kotlinx.coroutines.launch
 
 class MainViewModel : ViewModel() {
     private lateinit var repository: WorkspaceRepository
@@ -31,7 +33,16 @@ class MainViewModel : ViewModel() {
     
     // Инициализация репозитория, должна быть вызвана перед использованием
     fun init(context: Context) {
-        repository = WorkspaceRepository.getInstance(context)
+        try {
+            if (context == null) {
+                throw IllegalArgumentException("Context cannot be null")
+            }
+            repository = WorkspaceRepository.getInstance(context)
+            Log.d("MindNote", "MainViewModel: Initialized successfully")
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error initializing MainViewModel", e)
+            throw e
+        }
     }
     
     // LiveData со списком всех рабочих пространств
@@ -76,10 +87,35 @@ class MainViewModel : ViewModel() {
     
     // Удаление элемента содержимого из рабочего пространства
     fun removeContentItem(workspace: Workspace, itemId: String) {
-        repository.removeContentItem(workspace, itemId)
-        // Если это текущее рабочее пространство, обновляем его
-        if (_currentWorkspace.value?.id == workspace.id) {
-            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+        try {
+            // Находим элемент перед удалением
+            val item = workspace.items.find { it.id == itemId }
+            
+            // Если это ссылка на подпространство, удаляем и само подпространство
+            if (item is ContentItem.NestedPageItem) {
+                val nestedWorkspace = getWorkspaceById(item.pageId)
+                nestedWorkspace?.let {
+                    // Сначала удаляем все вложенные элементы
+                    it.items.forEach { nestedItem ->
+                        removeContentItem(it, nestedItem.id)
+                    }
+                    // Затем удаляем само подпространство
+                    deleteWorkspace(it)
+                }
+            }
+            
+            // Удаляем элемент из текущего пространства
+            repository.removeContentItem(workspace, itemId)
+            
+            // Если это текущее рабочее пространство, обновляем его
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+            
+            Log.d("MindNote", "MainViewModel: Removed item $itemId from workspace ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error removing content item", e)
+            throw e
         }
     }
     
@@ -138,10 +174,21 @@ class MainViewModel : ViewModel() {
 
     // Удаление рабочего пространства
     fun deleteWorkspace(workspace: Workspace) {
-        repository.removeWorkspace(workspace)
-        // Если удаляемое рабочее пространство было текущим, очищаем текущее
-        if (_currentWorkspace.value?.id == workspace.id) {
-            _currentWorkspace.value = null
+        viewModelScope.launch {
+            try {
+                repository.deleteWorkspace(workspace)
+                // Если удаляемое пространство было текущим, очищаем его
+                if (_currentWorkspace.value?.id == workspace.id) {
+                    _currentWorkspace.value = null
+                }
+                // Если это было последнее пространство, обновляем список
+                if (workspaces.value?.isEmpty() == true) {
+                    _currentWorkspace.value = null
+                }
+            } catch (e: Exception) {
+                Log.e("MindNote", "Error deleting workspace", e)
+                throw e
+            }
         }
     }
 

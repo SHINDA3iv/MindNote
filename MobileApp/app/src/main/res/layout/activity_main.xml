@@ -37,7 +37,6 @@
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:orientation="vertical">
-<!--        android:paddingBottom="0dp"-->
 
         <com.google.android.material.navigation.NavigationView
             android:id="@+id/nav_view"
@@ -61,7 +60,7 @@
                 android:id="@+id/user_avatar"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:src="@android:drawable/ic_menu_myplaces"
+                android:src="@drawable/ic_login"
                 android:tint="?attr/colorPrimary"/>
 
             <TextView

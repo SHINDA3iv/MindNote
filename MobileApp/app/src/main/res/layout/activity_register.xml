@@ -23,7 +23,7 @@
             android:id="@+id/name_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Имя"
+            android:hint="Логин"
             android:inputType="textPersonName"/>
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -58,12 +58,6 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="24dp">
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/confirm_password_input"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Подтвердите пароль"
-            android:inputType="textPassword"/>
     </com.google.android.material.textfield.TextInputLayout>
 
     <Button

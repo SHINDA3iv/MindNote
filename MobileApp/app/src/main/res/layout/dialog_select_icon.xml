@@ -15,9 +15,11 @@
             android:id="@+id/icon1"
             android:layout_width="64dp"
             android:layout_height="64dp"
-            android:layout_margin="8dp"
+            android:layout_margin="12dp"
+            android:padding="8dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_menu_agenda" />
+            android:src="@drawable/ic_workspace"
+            android:scaleType="fitCenter"/>
 
         <ImageButton
             android:id="@+id/icon2"

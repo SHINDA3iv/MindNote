@@ -11,4 +11,4 @@
     android:padding="12dp"
     android:textSize="16sp"
     android:drawablePadding="8dp"
-    android:drawableStart="@drawable/ic_attachment" /> 
+    android:drawableStart="@drawable/ic_attachment" />
