@@ -413,13 +413,10 @@ class UserWorkspaceSyncView(APIView):
                 data = item.get('data')
                 ws_obj = Workspace.objects.filter(author=user, title=title).first()
                 if use == 'local' and data:
-                    # Обновить серверную версию локальными данными
                     if ws_obj:
                         ws_obj.status = data.get('status', ws_obj.status)
                         ws_obj.save()
-                        # Удалить старые страницы
                         ws_obj.pages.all().delete()
-                        # Создать новые страницы с элементами
                         for page_data in data.get('pages', []):
                             create_page_with_elements(page_data, ws_obj)
                     else:
@@ -430,9 +427,7 @@ class UserWorkspaceSyncView(APIView):
                         )
                         for page_data in data.get('pages', []):
                             create_page_with_elements(page_data, ws_obj)
-                elif use == 'server':
-                    # Оставить серверную версию — ничего не делать
-                    pass
+                # use == 'server': ничего не делаем
 
             # Добавляем новые workspaces
             for ws in new_workspaces:
@@ -445,7 +440,7 @@ class UserWorkspaceSyncView(APIView):
                     for page_data in ws.get('pages', []):
                         create_page_with_elements(page_data, ws_obj)
 
-            # Возвращаем итоговый список workspaces пользователя
+            # Возвращаем полный актуальный список workspaces пользователя
             workspaces = Workspace.objects.filter(author=user)
             serializer = WorkspaceSerializer(workspaces, many=True)
             return Response(serializer.data)

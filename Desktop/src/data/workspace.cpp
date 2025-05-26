@@ -515,6 +515,24 @@ void Workspace::setOwner(const QString &owner)
     _owner = owner;
 }
 
+// --- ICON SERIALIZATION UTILS ---
+QString iconToBase64(const QIcon& icon, int size = 64) {
+    if (icon.isNull()) return QString();
+    QPixmap pixmap = icon.pixmap(size, size);
+    QByteArray ba;
+    QBuffer buffer(&ba);
+    buffer.open(QIODevice::WriteOnly);
+    pixmap.save(&buffer, "PNG");
+    return QString::fromLatin1(ba.toBase64());
+}
+
+QIcon base64ToIcon(const QString& base64) {
+    QByteArray ba = QByteArray::fromBase64(base64.toLatin1());
+    QPixmap pixmap;
+    pixmap.loadFromData(ba, "PNG");
+    return QIcon(pixmap);
+}
+
 // --- BACKEND SERIALIZATION ---
 QJsonObject Workspace::serializeBackend(bool isMain) const
 {
@@ -527,15 +545,8 @@ QJsonObject Workspace::serializeBackend(bool isMain) const
     json["is_main"] = isMain;
 
     // --- ICON ---
-    if (_iconLabel) {
-        QPixmap pixmapPtr = _iconLabel->pixmap();
-        if (!pixmapPtr.isNull()) {
-            QByteArray iconData;
-            QBuffer buffer(&iconData);
-            buffer.open(QIODevice::WriteOnly);
-            pixmapPtr.save(&buffer, "PNG");
-            json["icon"] = QString(iconData.toBase64());
-        }
+    if (!_icon.isNull()) {
+        json["icon"] = iconToBase64(_icon);
     }
 
     // Сериализация элементов (items) как elements
@@ -573,12 +584,7 @@ void Workspace::deserializeBackend(const QJsonObject &json, bool isMain)
 
     // --- ICON ---
     if (json.contains("icon")) {
-        QByteArray iconData = QByteArray::fromBase64(json["icon"].toString().toUtf8());
-        QPixmap iconPixmap;
-        iconPixmap.loadFromData(iconData, "PNG");
-        if (!iconPixmap.isNull()) {
-            setIcon(QIcon(iconPixmap));
-        }
+        setIcon(base64ToIcon(json["icon"].toString()));
     }
 
     // is_main можно использовать для логики, если нужно

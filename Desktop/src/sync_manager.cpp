@@ -225,7 +225,7 @@ void SyncManager::onUserSyncDiffReceived(const QJsonObject &diff)
 void SyncManager::onUserSyncFinalReceived(const QJsonArray &finalWorkspaces)
 {
     // 1. Сохраняем все workspaces пользователя локально (очищаем старые)
-    localStorage->syncWorkspaces(finalWorkspaces, true); // true = полная замена
+    localStorage->syncWorkspaces(finalWorkspaces, false); // false = полная замена
 
     // 2. Очищаем guest workspaces
     QDir guestDir(localStorage->getWorkspacePath(true));

@@ -143,55 +143,24 @@ void LocalStorage::deleteWorkspace(const QString &workspaceTitle, bool isGuest)
 
 void LocalStorage::syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepLocal)
 {
-    // Get list of local workspaces
-    QDir guestDir(guestPath);
     QDir userDir(getUserWorkspacePath());
+    QStringList localWorkspaceTitles = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
-    QStringList localWorkspaces;
-    if (keepLocal) {
-        localWorkspaces = guestDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    }
-
-    // Process server workspaces
+    QStringList serverWorkspaceTitles;
     for (const QJsonValue &workspaceValue : serverWorkspaces) {
         QJsonObject workspaceObj = workspaceValue.toObject();
         QString workspaceTitle = workspaceObj["title"].toString();
-        QString version = workspaceObj["version"].toString();
-        QString owner = workspaceObj["owner"].toString();
+        serverWorkspaceTitles.append(workspaceTitle);
 
-        // Check if workspace exists locally
-        bool existsLocally = localWorkspaces.contains(workspaceTitle);
-
-        if (existsLocally && keepLocal) {
-            // Keep local version
-            continue;
-        }
-
-        // Create or update workspace
+        // Полная замена: всегда перезаписываем локальные данные
         Workspace *workspace = new Workspace(workspaceTitle);
-        workspace->setVersion(version);
-        workspace->setOwner(owner);
-
-        // Load workspace items if any
-        if (workspaceObj.contains("items")) {
-            QJsonArray items = workspaceObj["items"].toArray();
-            workspace->deserializeItems(items);
-        }
-
-        // Save workspace to user's directory
+        workspace->deserializeBackend(workspaceObj, true);
         saveWorkspace(workspace, false);
         delete workspace;
     }
 
-    // Remove workspaces that don't exist on server
+    // Удаляем локальные workspaces, которых нет на сервере (если не keepLocal)
     if (!keepLocal) {
-        QStringList serverWorkspaceTitles;
-        for (const QJsonValue &workspaceValue : serverWorkspaces) {
-            QJsonObject workspaceObj = workspaceValue.toObject();
-            serverWorkspaceTitles.append(workspaceObj["title"].toString());
-        }
-
-        QStringList localWorkspaceTitles = userDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
         for (const QString &workspaceTitle : localWorkspaceTitles) {
             if (!serverWorkspaceTitles.contains(workspaceTitle)) {
                 deleteWorkspace(workspaceTitle, false);

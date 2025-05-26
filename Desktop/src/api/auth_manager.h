@@ -38,7 +38,7 @@ private:
     QString _username;
     bool _isAuthenticated;
     bool _rememberMe;
-    QSettings _settings;
+    QSettings* _settings;
 };
 
 #endif // AUTH_MANAGER_H

@@ -41,14 +41,14 @@ void LeftPanel::refreshWorkspaceList()
         QTreeWidgetItem *item = new QTreeWidgetItem(parentItem);
         item->setText(0, ws->getTitle());
         if (!ws->getIcon().isNull()) {
-            QPixmap pixmap = ws->getIcon().pixmap(iconSize);
-            QPixmap paddedPixmap(iconSize.width() + 8, iconSize.height() + 8);
-            paddedPixmap.fill(Qt::transparent);
-            QPixmap scaledPixmap =
-             pixmap.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            QPainter painter(&paddedPixmap);
-            painter.drawPixmap(4, 4, scaledPixmap);
-            item->setIcon(0, QIcon(paddedPixmap));
+            // QPixmap pixmap = ws->getIcon().pixmap(iconSize);
+            // QPixmap paddedPixmap(iconSize.width() + 8, iconSize.height() + 8);
+            // paddedPixmap.fill(Qt::transparent);
+            // QPixmap scaledPixmap =
+            //  pixmap.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            // QPainter painter(&paddedPixmap);
+            // painter.drawPixmap(4, 4, scaledPixmap);
+            item->setIcon(0, ws->getIcon());
         }
         item->setData(0, Qt::UserRole, QVariant::fromValue(static_cast<void *>(ws)));
         if (parentItem)

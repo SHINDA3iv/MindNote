@@ -2,19 +2,26 @@
 #include "auth_manager.h"
 #include <QCryptographicHash>
 #include <QDebug>
+#include <QDir>
+#include <QCoreApplication>
 
 AuthManager::AuthManager(QObject *parent)
     : QObject(parent)
-    , _settings("StudyProject", "Auth")
     , _isAuthenticated(false)
     , _rememberMe(false)
 {
+    // Создаём папку settings, если не существует
+    QString settingsDir = QCoreApplication::applicationDirPath() + "/settings";
+    QDir().mkpath(settingsDir);
+    QString authSettingsPath = settingsDir + "/Auth.ini";
+    _settings = new QSettings(authSettingsPath, QSettings::IniFormat, this);
     loadAuthState();
 }
 
 AuthManager::~AuthManager()
 {
     saveAuthState();
+    delete _settings;
 }
 
 bool AuthManager::isAuthenticated() const
@@ -54,10 +61,10 @@ void AuthManager::logout()
     _username.clear();
     _isAuthenticated = false;
     if (!_rememberMe) {
-        _settings.remove("authToken");
-        _settings.remove("username");
-        _settings.remove("isAuthenticated");
-        _settings.remove("rememberMe");
+        _settings->remove("authToken");
+        _settings->remove("username");
+        _settings->remove("isAuthenticated");
+        _settings->remove("rememberMe");
     }
     saveAuthState();
     emit authStateChanged();
@@ -67,29 +74,29 @@ void AuthManager::saveAuthState()
 {
     qDebug() << "Saving auth state - rememberMe:" << _rememberMe;
     if (_rememberMe) {
-        _settings.setValue("authToken", _authToken);
-        _settings.setValue("username", _username);
-        _settings.setValue("isAuthenticated", _isAuthenticated);
-        _settings.setValue("rememberMe", _rememberMe);
+        _settings->setValue("authToken", _authToken);
+        _settings->setValue("username", _username);
+        _settings->setValue("isAuthenticated", _isAuthenticated);
+        _settings->setValue("rememberMe", _rememberMe);
         qDebug() << "Saved auth state - token:" << _authToken << "username:" << _username << "isAuthenticated:" << _isAuthenticated;
     } else {
         qDebug() << "Remember me is disabled, clearing saved auth state";
-        _settings.remove("authToken");
-        _settings.remove("username");
-        _settings.remove("isAuthenticated");
-        _settings.remove("rememberMe");
+        _settings->remove("authToken");
+        _settings->remove("username");
+        _settings->remove("isAuthenticated");
+        _settings->remove("rememberMe");
     }
 }
 
 void AuthManager::loadAuthState()
 {
-    _rememberMe = _settings.value("rememberMe", false).toBool();
+    _rememberMe = _settings->value("rememberMe", false).toBool();
     qDebug() << "Loading auth state - rememberMe:" << _rememberMe;
     
     if (_rememberMe) {
-        _authToken = _settings.value("authToken").toString();
-        _username = _settings.value("username").toString();
-        _isAuthenticated = _settings.value("isAuthenticated", false).toBool();
+        _authToken = _settings->value("authToken").toString();
+        _username = _settings->value("username").toString();
+        _isAuthenticated = _settings->value("isAuthenticated", false).toBool();
         qDebug() << "Loaded auth state - token:" << _authToken << "username:" << _username << "isAuthenticated:" << _isAuthenticated;
     } else {
         qDebug() << "Remember me is disabled, clearing auth state";
