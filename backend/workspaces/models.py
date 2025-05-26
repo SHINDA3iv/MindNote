@@ -2,11 +2,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.conf import settings
-from django.utils.text import slugify
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.contenttypes.fields import GenericRelation
-from django.contrib.auth.models import User
 
 
 class Workspace(models.Model):
@@ -92,7 +89,8 @@ class Workspace(models.Model):
     def clean(self):
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValidationError(
-                _("Дата начала не может быть позже даты окончания."))
+                _("Дата начала не может быть позже даты окончания.")
+            )
 
 
 class Page(models.Model):
@@ -122,6 +120,14 @@ class Page(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Иконка")
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        related_name='subpages',
+        blank=True,
+        null=True,
+        verbose_name=_('Родительская страница')
     )
 
     class Meta:
@@ -279,7 +285,8 @@ class LinkElement(Element):
     def clean(self):
         if self.linked_page.space != self.page.space:
             raise ValidationError(
-                _("Ссылка должна указывать на страницу в том же пространстве."))
+                _("Ссылка должна указывать на страницу в том же пространстве.")
+            )
 
 
 @receiver(post_save, sender=Workspace)

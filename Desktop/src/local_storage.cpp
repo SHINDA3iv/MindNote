@@ -91,6 +91,10 @@ void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
         qWarning() << "Failed to write workspace data:" << file.errorString();
     }
     file.close();
+
+    // Выводим содержимое json-файла после записи
+    qDebug() << "[LocalStorage] Saved workspace to" << file.fileName();
+    qDebug().noquote() << QJsonDocument::fromJson(jsonData).toJson(QJsonDocument::Indented);
 }
 
 void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &json)

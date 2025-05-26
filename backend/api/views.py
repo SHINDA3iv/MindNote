@@ -14,6 +14,7 @@ from .serializers import (
 )
 import base64
 from django.core.files.base import ContentFile
+import traceback
 
 
 class WorkspaceViewSet(viewsets.ModelViewSet):
@@ -339,7 +340,10 @@ def create_page_with_elements(page_data, workspace):
         elif el_type == 'FileItem':
             FileElement.objects.create(page=page, file=el.get('filePath', ''))
         elif el_type == 'SubspaceLinkItem':
-            LinkElement.objects.create(page=page, linked_page=el.get('subspaceTitle', ''))
+            subspace_title = el.get('subspaceTitle', '')
+            linked_page = Page.objects.filter(space=workspace, title=subspace_title).first()
+            if linked_page:
+                LinkElement.objects.create(page=page, linked_page=linked_page)
         # ... другие типы элементов ...
     # Рекурсивно вложенные страницы
     for subpage in page_data.get('pages', []):
@@ -393,7 +397,10 @@ class UserWorkspaceSyncView(APIView):
             return Response(response_data)
 
         except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                'detail': str(e),
+                'traceback': traceback.format_exc()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def patch(self, request):
         """
@@ -446,8 +453,10 @@ class UserWorkspaceSyncView(APIView):
             return Response(serializer.data)
 
         except Exception as e:
-            return Response({'detail': str(e)},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                'detail': str(e),
+                'traceback': traceback.format_exc()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LogoutView(APIView):

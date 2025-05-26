@@ -6,6 +6,7 @@
 #include <QNetworkRequest>
 #include <QUrlQuery>
 #include "../error_handler.h"
+#include <QDebug>
 
 ApiClient::ApiClient(QObject *parent) :
     QObject(parent),
@@ -339,10 +340,30 @@ void ApiClient::postUserSync(const QJsonArray &localWorkspaces)
     data["local_workspaces"] = localWorkspaces;
     QNetworkRequest request = createRequest("/user-sync/");
     QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
-    handleResponse(reply, [this](const QJsonDocument &response) {
-        if (response.isObject()) {
-            emit userSyncDiffReceived(response.object());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(response);
+            QString detail, traceback;
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                detail = obj.value("detail").toString();
+                traceback = obj.value("traceback").toString();
+            }
+            QString errorMsg = detail;
+            if (!traceback.isEmpty()) {
+                errorMsg += "\n" + traceback;
+            }
+            qDebug() << errorMsg;
+            emit syncError(errorMsg);
+            reply->deleteLater();
+            return;
         }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isObject()) {
+            emit userSyncDiffReceived(doc.object());
+        }
+        reply->deleteLater();
     });
 }
 
@@ -353,9 +374,29 @@ void ApiClient::patchUserSync(const QJsonArray &resolve, const QJsonArray &newWo
     data["new"] = newWorkspaces;
     QNetworkRequest request = createRequest("/user-sync/");
     QNetworkReply *reply = networkManager->sendCustomRequest(request, "PATCH", QJsonDocument(data).toJson());
-    handleResponse(reply, [this](const QJsonDocument &response) {
-        if (response.isArray()) {
-            emit userSyncFinalReceived(response.array());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(response);
+            QString detail, traceback;
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                detail = obj.value("detail").toString();
+                traceback = obj.value("traceback").toString();
+            }
+            QString errorMsg = detail;
+            if (!traceback.isEmpty()) {
+                errorMsg += "\n" + traceback;
+            }
+            qDebug() << errorMsg;
+            emit syncError(errorMsg);
+            reply->deleteLater();
+            return;
         }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isArray()) {
+            emit userSyncFinalReceived(doc.array());
+        }
+        reply->deleteLater();
     });
 }
