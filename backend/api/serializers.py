@@ -203,17 +203,21 @@ class WorkspaceSerializer(serializers.ModelSerializer):
                     file=el.get('filePath', '')
                 )
             elif el_type == 'SubspaceLinkItem':
-                LinkElement.objects.create(
-                    page=main_page,
-                    linked_page=el.get('subspaceTitle', '')
-                )
-            # ... другие типы ...
+                # Ссылка на подпространство: ищем страницу по title среди уже созданных
+                subspace_title = el.get('subspaceTitle', '')
+                linked_page = Page.objects.filter(space=workspace, title=subspace_title).first()
+                if linked_page:
+                    LinkElement.objects.create(
+                        page=main_page,
+                        linked_page=linked_page
+                    )
         # Вложенные страницы рекурсивно
         self._create_subpages(main_page, pages_data)
         return workspace
 
     def _create_subpages(self, parent_page, pages_data):
         for page_data in pages_data:
+            # Только подстраницы (is_main=False)
             subpage = Page.objects.create(
                 space=parent_page.space,
                 title=page_data.get('title'),
@@ -252,11 +256,15 @@ class WorkspaceSerializer(serializers.ModelSerializer):
                         file=el.get('filePath', '')
                     )
                 elif el_type == 'SubspaceLinkItem':
-                    LinkElement.objects.create(
-                        page=subpage,
-                        linked_page=el.get('subspaceTitle', '')
-                    )
-                # ... другие типы ...
+                    subspace_title = el.get('subspaceTitle', '')
+                    linked_page = Page.objects.filter(
+                        space=subpage.space, title=subspace_title
+                    ).first()
+                    if linked_page:
+                        LinkElement.objects.create(
+                            page=subpage,
+                            linked_page=linked_page
+                        )
             # Рекурсивно вложенные страницы
             self._create_subpages(subpage, page_data.get('pages', []))
 
@@ -314,10 +322,15 @@ class WorkspaceSerializer(serializers.ModelSerializer):
                     file=el.get('filePath', '')
                 )
             elif el_type == 'SubspaceLinkItem':
-                LinkElement.objects.create(
-                    page=main_page,
-                    linked_page=el.get('subspaceTitle', '')
-                )
+                subspace_title = el.get('subspaceTitle', '')
+                linked_page = Page.objects.filter(
+                    space=main_page.space, title=subspace_title
+                ).first()
+                if linked_page:
+                    LinkElement.objects.create(
+                        page=main_page,
+                        linked_page=linked_page
+                    )
             # ... другие типы ...
         # Вложенные страницы рекурсивно
         self._create_subpages(main_page, self.initial_data.get('pages', []))
