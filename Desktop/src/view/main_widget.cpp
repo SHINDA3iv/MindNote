@@ -45,6 +45,9 @@ MainWidget::MainWidget(QWidget *parent) :
     if (!_authManager->isAuthenticated()) {
         showAuthDialog();
     } else {
+        initWindow();
+        initConnections();
+        restoreSettings();
         initApplication();
     }
 
@@ -62,6 +65,7 @@ MainWidget::~MainWidget()
 
 void MainWidget::showAuthDialog()
 {
+    this->window()->hide();
     qDebug() << "Showing auth dialog";
     auto authDialog = new AuthDialog(this);
     authDialog->setWindowTitle("Авторизация");
@@ -78,32 +82,18 @@ void MainWidget::showAuthDialog()
     connect(authDialog, &AuthDialog::guestLoginRequested, this, [this]() {
         _isGuestMode = true;
         initApplication();
+        this->window()->show();
     });
 
     connect(
      _apiClient.get(), &ApiClient::loginSuccess, this, [this, authDialog](const QString &token) {
          _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
-
-         // Устанавливаем пользователя для LocalStorage
          _localStorage->setCurrentUser(_authManager->getUsername());
-
-         // --- СИНХРОНИЗАЦИЯ ГОСТЕВЫХ ПРОСТРАНСТВ ---
-         QProgressDialog progress("Синхронизация рабочих пространств...", QString(), 0, 0, this);
-         progress.setWindowModality(Qt::ApplicationModal);
-         progress.setCancelButton(nullptr);
-         progress.setMinimumDuration(0);
-         progress.show();
-
-         connect(_syncManager.get(), &SyncManager::syncCompleted, &progress,
-                 &QProgressDialog::close);
-         connect(_syncManager.get(), &SyncManager::syncError, &progress, &QProgressDialog::close);
-
          _syncManager->startUserSync();
-
-         // После syncCompleted/initApplication
          connect(_syncManager.get(), &SyncManager::syncCompleted, this, [this, authDialog]() {
              initApplication();
              authDialog->accept();
+             this->window()->show();
          });
          connect(_syncManager.get(), &SyncManager::syncError, this,
                  [authDialog](const QString &err) {
@@ -115,9 +105,10 @@ void MainWidget::showAuthDialog()
         authDialog->showLoginError(error);
         ErrorHandler::instance().showError("Ошибка входа", error);
     });
-    connect(_apiClient.get(), &ApiClient::registerSuccess, this, [authDialog]() {
+    connect(_apiClient.get(), &ApiClient::registerSuccess, this, [authDialog, this]() {
         ErrorHandler::instance().showInfo("Успех", "Регистрация успешна");
         authDialog->accept();
+        this->window()->show();
     });
     connect(_apiClient.get(), &ApiClient::registerError, this, [authDialog](const QString &error) {
         authDialog->showRegisterError(error);
@@ -168,20 +159,32 @@ void MainWidget::initApplication()
     if (!_isGuestMode) {
         _localStorage->setCurrentUser(_authManager->getUsername());
     }
-    // Инициализация остального приложения
-    initWindow();
-    initConnections();
-    restoreSettings();
+    // Пересоздаём виджеты, если их нет (после clearUserSession)
+    if (!_leftPanel) {
+        _leftPanel = std::make_unique<LeftPanel>(this);
+    }
+    if (!_editorWidget) {
+        _editorWidget = std::make_unique<EditorWidget>(this);
+    }
+    if (!_mainSplitter) {
+        _mainSplitter = new QSplitter(Qt::Horizontal, this);
+        _mainSplitter->setContentsMargins(0, 0, 0, 0);
+        _mainSplitter->setHandleWidth(1);
+        _mainSplitter->addWidget(_leftPanel.get());
+        _mainSplitter->addWidget(_editorWidget.get());
+        _mainSplitter->setStretchFactor(1, 1);
+        QVBoxLayout *mainLayout = new QVBoxLayout(this);
+        mainLayout->setContentsMargins(0, 0, 0, 0);
+        mainLayout->setSpacing(0);
+        mainLayout->addWidget(_mainSplitter);
+        setLayout(mainLayout);
+    }
+    _leftPanel->setWorkspaceController(_workspaceController.get());
     _workspaceController->loadWorkspaces();
     updateWorkspaceList();
-
     if (!_isGuestMode) {
         _apiClient->setAuthToken(_authManager->getAuthToken());
-
-        // Проверяем токен на сервере при запуске
         _apiClient->getCurrentUser();
-
-        // Обработка результата проверки токена
         connect(_apiClient.get(), &ApiClient::error, this, [this](const QString &err) {
             QMessageBox::warning(this, "Сессия истекла",
                                  "Ваша сессия истекла. Пожалуйста, войдите снова.");
@@ -189,7 +192,6 @@ void MainWidget::initApplication()
             showAuthDialog();
         });
     }
-
     _leftPanel->refreshWorkspaceList();
 }
 
@@ -198,21 +200,6 @@ void MainWidget::checkToken()
     if (_authManager->isAuthenticated()) {
         _apiClient->getCurrentUser();
     }
-}
-
-void MainWidget::onLoginRequested()
-{
-    showAuthDialog();
-}
-
-void MainWidget::onLogout()
-{
-    _authManager->logout();
-    _localStorage->clearUserData();
-    _workspaceController->loadWorkspaces();
-    _leftPanel->refreshWorkspaceList();
-    updateWorkspaceList();
-    updateAuthUI();
 }
 
 void MainWidget::initConnections()
@@ -228,8 +215,6 @@ void MainWidget::initConnections()
     // Auth connections
     connect(_authManager.get(), &AuthManager::authStateChanged, this,
             &MainWidget::onAuthStateChanged);
-    connect(_authManager.get(), &AuthManager::loginRequested, this, &MainWidget::onLoginRequested);
-    connect(_authManager.get(), &AuthManager::logoutRequested, this, &MainWidget::onLogout);
 
     // Token validation connections
     connect(_apiClient.get(), &ApiClient::error, this, [this](const QString &err) {
@@ -539,6 +524,7 @@ void MainWidget::logout()
 {
     _authManager->logout();
     _localStorage->clearUserData();
+    clearUserSession();
     _workspaceController->loadWorkspaces();
     updateWorkspaceList();
     updateAuthUI();
@@ -548,5 +534,22 @@ void MainWidget::updateWorkspaceList()
 {
     if (auto leftPanel = findChild<LeftPanel *>()) {
         leftPanel->updateWorkspaceList();
+    }
+}
+
+void MainWidget::clearUserSession()
+{
+    // Отключить сигналы, удалить контроллеры и виджеты
+    if (_editorWidget) {
+        _editorWidget->deleteLater();
+        _editorWidget.reset();
+    }
+    if (_leftPanel) {
+        _leftPanel->deleteLater();
+        _leftPanel.reset();
+    }
+    if (_mainSplitter) {
+        _mainSplitter->deleteLater();
+        _mainSplitter = nullptr;
     }
 }

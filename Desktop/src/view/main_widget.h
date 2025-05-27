@@ -61,8 +61,6 @@ signals:
 public slots:
     void updateWorkspaceList();
 
-    void onLogout();
-    void onLoginRequested();
     void onAuthStateChanged();
     void updateAuthUI();
     void onVersionConflictDetected(const QJsonArray &serverWorkspaces);

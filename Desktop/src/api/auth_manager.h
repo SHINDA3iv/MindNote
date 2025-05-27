@@ -25,8 +25,6 @@ public:
 
 signals:
     void authStateChanged();
-    void loginRequested();
-    void logoutRequested();
     void registrationSuccess();
     void registrationFailed(const QString &error);
 
