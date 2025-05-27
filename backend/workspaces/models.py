@@ -92,6 +92,16 @@ class Workspace(models.Model):
                 _("Дата начала не может быть позже даты окончания.")
             )
 
+    def get_all_elements(self):
+        """
+        Получает все элементы, принадлежащие этому пространству,
+        независимо от того, находятся ли они на уровне пространства или на страницах.
+        """
+        elements = []
+        for subclass in Element.__subclasses__():
+            elements.extend(subclass.objects.filter(workspace=self))
+        return elements
+
 
 class Page(models.Model):
     """
@@ -103,13 +113,17 @@ class Page(models.Model):
         related_name='pages',
         verbose_name=_("Пространство")
     )
+    parent_page = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        related_name='subpages',
+        blank=True,
+        null=True,
+        verbose_name=_('Родительская страница')
+    )
     title = models.CharField(
         max_length=255,
         verbose_name=_("Название")
-    )
-    is_main = models.BooleanField(
-        default=False,
-        verbose_name=_("Главная страница")
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -121,14 +135,6 @@ class Page(models.Model):
         null=True,
         verbose_name=_("Иконка")
     )
-    parent = models.ForeignKey(
-        'self',
-        on_delete=models.CASCADE,
-        related_name='subpages',
-        blank=True,
-        null=True,
-        verbose_name=_('Родительская страница')
-    )
 
     class Meta:
         verbose_name = _("Страница")
@@ -139,17 +145,30 @@ class Page(models.Model):
     def __str__(self):
         return f"{self.space.title} - {self.title}"
 
-    def save(self, *args, **kwargs):
-        if self.is_main:
-            Page.objects.filter(
-                space=self.space, is_main=True).update(is_main=False)
-        super().save(*args, **kwargs)
+    def get_all_elements(self):
+        """
+        Получает все элементы, принадлежащие этой странице,
+        включая элементы подстраниц рекурсивно.
+        """
+        elements = []
+        for subclass in Element.__subclasses__():
+            elements.extend(subclass.objects.filter(page=self))
+        
+        for subpage in self.subpages.all():
+            elements.extend(subpage.get_all_elements())
+        
+        return elements
 
-    def delete(self, *args, **kwargs):
-        if self.is_main:
-            raise ValidationError(
-                _("Нельзя удалить главную страницу. Удалите пространство."))
-        super().delete(*args, **kwargs)
+    def get_full_path(self):
+        """
+        Возвращает полный путь к странице через все родительские страницы.
+        """
+        path = [self.title]
+        parent = self.parent_page
+        while parent:
+            path.insert(0, parent.title)
+            parent = parent.parent_page
+        return " > ".join(path)
 
 
 class Element(models.Model):
@@ -169,12 +188,25 @@ class Element(models.Model):
         choices=ELEMENT_TYPES,
         default='text'
     )
+
+    workspace = models.ForeignKey(
+        'Workspace',
+        on_delete=models.CASCADE,
+        related_name='%(class)s_elements',
+        verbose_name=_("Пространство"),
+        blank=True,
+        null=True
+    )
+
     page = models.ForeignKey(
         'Page',
         on_delete=models.CASCADE,
         related_name='%(class)s_elements',
-        verbose_name=_("Страница")
+        verbose_name=_("Страница"),
+        blank=True,
+        null=True
     )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Дата создания")
@@ -185,7 +217,21 @@ class Element(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self._meta.verbose_name} - {self.page.title}"
+        return f"{self._meta.verbose_name} - {self.workspace or self.page}"
+
+    def clean(self):
+        """
+        Проверка, что элемент связан либо с пространством, либо со страницей,
+        но не с обоими одновременно.
+        """
+        if self.workspace and self.page:
+            raise ValidationError(
+                _("Элемент должен быть связан либо с пространством, либо со страницей, но не с обоими одновременно.")
+            )
+        if not self.workspace and not self.page:
+            raise ValidationError(
+                _("Элемент должен быть связан либо с пространством, либо со страницей.")
+            )
 
 
 class ImageElement(Element):
@@ -283,20 +329,13 @@ class LinkElement(Element):
         verbose_name_plural = _("Ссылки на страницы")
 
     def clean(self):
-        if self.linked_page.space != self.page.space:
-            raise ValidationError(
-                _("Ссылка должна указывать на страницу в том же пространстве.")
-            )
-
-
-@receiver(post_save, sender=Workspace)
-def create_main_page(sender, instance, created, **kwargs):
-    """
-    Создание главной страницы при создании пространства.
-    """
-    if created:
-        Page.objects.create(
-            space=instance,
-            title="Главная",
-            is_main=True
-        )
+        super().clean()
+        if self.linked_page:
+            if self.workspace and self.linked_page.space != self.workspace:
+                raise ValidationError(
+                    _("Ссылка должна указывать на страницу в том же пространстве.")
+                )
+            elif self.page and self.linked_page.space != self.page.space:
+                raise ValidationError(
+                    _("Ссылка должна указывать на страницу в том же пространстве.")
+                )

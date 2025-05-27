@@ -1,7 +1,9 @@
+# views.py
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from workspaces.models import (
     Workspace, Page, ImageElement, FileElement,
     CheckboxElement, TextElement, LinkElement
@@ -15,7 +17,9 @@ from .serializers import (
 import base64
 from django.core.files.base import ContentFile
 import traceback
+import logging
 
+logger = logging.getLogger(__name__)
 
 class WorkspaceViewSet(viewsets.ModelViewSet):
     queryset = Workspace.objects.all()
@@ -28,26 +32,53 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         workspace = serializer.save(author=self.request.user)
-        # Сохраняем рабочее пространство локально
         storage = LocalStorageManager(self.request.user)
         storage.save_workspace(serializer.data)
 
     def perform_update(self, serializer):
         workspace = serializer.save()
-        # Обновляем локальное хранилище
         storage = LocalStorageManager(self.request.user)
         storage.save_workspace(serializer.data)
 
     def perform_destroy(self, instance):
-        # Удаляем из локального хранилища
         storage = LocalStorageManager(self.request.user)
         storage.delete_workspace(instance.title)
         instance.delete()
 
+    @action(detail=True, methods=['get'])
+    def full_structure(self, request, title=None):
+        """
+        Возвращает полную структуру пространства, включая все страницы и элементы.
+        """
+        workspace = self.get_object()
+        data = WorkspaceSerializer(workspace).data
+        
+        def add_subpages(pages):
+            for page in pages:
+                page_obj = Page.objects.get(title=page['title'], space=workspace)
+                page['elements'] = {
+                    'images': ImageElementSerializer(page_obj.imageelement_elements.all(), many=True).data,
+                    'files': FileElementSerializer(page_obj.fileelement_elements.all(), many=True).data,
+                    'checkboxes': CheckboxElementSerializer(page_obj.checkboxelement_elements.all(), many=True).data,
+                    'texts': TextElementSerializer(page_obj.textelement_elements.all(), many=True).data,
+                    'links': LinkElementSerializer(page_obj.linkelement_elements.all(), many=True).data,
+                }
+                subpages = page_obj.subpages.all()
+                if subpages.exists():
+                    page['pages'] = PageSerializer(subpages, many=True).data
+                    add_subpages(page['pages'])
+
+        pages = workspace.pages.filter(parent_page__isnull=True)
+        if pages.exists():
+            data['pages'] = PageSerializer(pages, many=True).data
+            add_subpages(data['pages'])
+        
+        return Response(data)
+
     @action(detail=True, methods=['get'], url_path='pages')
     def pages(self, request, title=None):
         workspace = self.get_object()
-        pages = workspace.pages.all()
+        pages = workspace.pages.filter(parent_page__isnull=True)
         serializer = PageSerializer(pages, many=True)
         return Response(serializer.data)
 
@@ -63,23 +94,17 @@ class PageViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         page = serializer.save()
-        # Обновляем локальное хранилище
         storage = LocalStorageManager(self.request.user)
         workspace_data = WorkspaceSerializer(page.space).data
         storage.save_workspace(workspace_data)
 
     def perform_update(self, serializer):
         page = serializer.save()
-        # Обновляем локальное хранилище
         storage = LocalStorageManager(self.request.user)
         workspace_data = WorkspaceSerializer(page.space).data
         storage.save_workspace(workspace_data)
 
     def perform_destroy(self, instance):
-        if instance.is_main:
-            raise serializers.ValidationError(
-                "Нельзя удалить главную страницу.")
-        # Обновляем локальное хранилище
         storage = LocalStorageManager(self.request.user)
         workspace_data = WorkspaceSerializer(instance.space).data
         storage.save_workspace(workspace_data)
@@ -89,42 +114,36 @@ class PageViewSet(viewsets.ModelViewSet):
     def add_element(self, request, title=None):
         page = self.get_object()
         element_type = request.data.get('element_type')
-        
         if element_type == 'image':
             serializer = ImageElementSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(page=page)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
         elif element_type == 'file':
             serializer = FileElementSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(page=page)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
         elif element_type == 'checkbox':
             serializer = CheckboxElementSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(page=page)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
         elif element_type == 'text':
             serializer = TextElementSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(page=page)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
         elif element_type == 'link':
             serializer = LinkElementSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(page=page)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
         return Response(
             {"detail": "Неизвестный тип элемента."},
             status=status.HTTP_400_BAD_REQUEST
@@ -134,7 +153,6 @@ class PageViewSet(viewsets.ModelViewSet):
     def update_element(self, request, title=None, element_id=None):
         page = self.get_object()
         element_type = request.data.get('element_type')
-        
         try:
             if element_type == 'image':
                 element = ImageElement.objects.get(id=element_id, page=page)
@@ -156,12 +174,10 @@ class PageViewSet(viewsets.ModelViewSet):
                     {"detail": "Неизвестный тип элемента."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-                
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
         except (ImageElement.DoesNotExist, FileElement.DoesNotExist, 
                 CheckboxElement.DoesNotExist, TextElement.DoesNotExist, 
                 LinkElement.DoesNotExist):
@@ -174,7 +190,6 @@ class PageViewSet(viewsets.ModelViewSet):
     def remove_element(self, request, title=None, element_id=None):
         page = self.get_object()
         element_type = request.data.get('element_type')
-        
         try:
             if element_type == 'image':
                 element = ImageElement.objects.get(id=element_id, page=page)
@@ -191,10 +206,8 @@ class PageViewSet(viewsets.ModelViewSet):
                     {"detail": "Неизвестный тип элемента."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-                
             element.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-            
         except (ImageElement.DoesNotExist, FileElement.DoesNotExist, 
                 CheckboxElement.DoesNotExist, TextElement.DoesNotExist, 
                 LinkElement.DoesNotExist):
@@ -259,14 +272,13 @@ class SyncView(APIView):
 
                 if page_title in existing_pages:
                     page = existing_pages[page_title]
-                    page.is_main = page_data.get('is_main', page.is_main)
                     page.save()
                     print(f"Updated page: {page_title}")  # Отладочный вывод
                 else:
                     page = Page.objects.create(
                         title=page_title,
                         space=workspace,
-                        is_main=page_data.get('is_main', False)
+                        parent_page=page_data.get('parent_page')
                     )
                     print(f"Created page: {page_title}")  # Отладочный вывод
 
@@ -320,7 +332,7 @@ def create_page_with_elements(page_data, workspace):
     page = Page.objects.create(
         title=page_data['title'],
         space=workspace,
-        is_main=page_data.get('is_main', False)
+        parent_page=page_data.get('parent_page')
     )
     # Обработка иконки
     icon_b64 = page_data.get('icon')
@@ -344,7 +356,7 @@ def create_page_with_elements(page_data, workspace):
             linked_page = Page.objects.filter(space=workspace, title=subspace_title).first()
             if linked_page:
                 LinkElement.objects.create(page=page, linked_page=linked_page)
-        # ... другие типы элементов ...
+
     # Рекурсивно вложенные страницы
     for subpage in page_data.get('pages', []):
         create_page_with_elements(subpage, workspace)
@@ -450,6 +462,8 @@ class UserWorkspaceSyncView(APIView):
             # Возвращаем полный актуальный список workspaces пользователя
             workspaces = Workspace.objects.filter(author=user)
             serializer = WorkspaceSerializer(workspaces, many=True)
+            logger.debug("Serialized workspace data: %s", serializer.data)
+            print(serializer.data)
             return Response(serializer.data)
 
         except Exception as e:
@@ -492,13 +506,12 @@ class LogoutView(APIView):
                     for page_data in workspace_data.get('pages', []):
                         if page_data['title'] in existing_pages:
                             page = existing_pages[page_data['title']]
-                            page.is_main = page_data.get('is_main', page.is_main)
                             page.save()
                         else:
                             Page.objects.create(
                                 title=page_data['title'],
                                 space=workspace_obj,
-                                is_main=page_data.get('is_main', False)
+                                parent_page=page_data.get('parent_page')
                             )
 
             # Очищаем локальное хранилище пользователя
@@ -512,3 +525,65 @@ class LogoutView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+class SaveGuestWorkspacesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Сохраняет рабочие пространства гостя в аккаунт пользователя.
+        Ожидает JSON данных с локальными рабочими пространствами гостя.
+        """
+        try:
+            local_workspaces = request.data.get('local_workspaces', [])
+            user = request.user
+
+            for ws_data in local_workspaces:
+                workspace, created = Workspace.objects.get_or_create(
+                    title=ws_data['title'],
+                    defaults={
+                        'author': user,
+                        'status': ws_data.get('status', 'not_started')
+                    }
+                )
+                if not created:
+                    # Обновляем существующее рабочее пространство
+                    workspace.status = ws_data.get('status', workspace.status)
+                    workspace.save()
+
+                # Рекурсивно создаем страницы и элементы
+                self._create_pages(workspace, ws_data.get('pages', []))
+
+            return Response({"detail": "Рабочие пространства успешно сохранены."})
+        except Exception as e:
+            return Response({"detail": str(e)}, status=500)
+
+    def _create_pages(self, workspace, pages_data, parent_page=None):
+        for page_data in pages_data:
+            page = Page.objects.create(
+                space=workspace,
+                title=page_data['title'],
+                parent_page=parent_page
+            )
+
+            # Создаем элементы страницы
+            for el_type, el_list in page_data.get('elements', {}).items():
+                for el in el_list:
+                    if el_type == 'images':
+                        ImageElement.objects.create(page=page, **el)
+                    elif el_type == 'files':
+                        FileElement.objects.create(page=page, **el)
+                    elif el_type == 'checkboxes':
+                        CheckboxElement.objects.create(page=page, **el)
+                    elif el_type == 'texts':
+                        TextElement.objects.create(page=page, **el)
+                    elif el_type == 'links':
+                        linked_page_title = el.pop('linked_page', None)
+                        if linked_page_title:
+                            linked_page = Page.objects.filter(space=workspace, title=linked_page_title).first()
+                            if linked_page:
+                                LinkElement.objects.create(page=page, linked_page=linked_page, **el)
+                        else:
+                            LinkElement.objects.create(page=page, **el)
+
+            # Рекурсивно создаем подстраницы
+            self._create_pages(workspace, page_data.get('pages', []), page)

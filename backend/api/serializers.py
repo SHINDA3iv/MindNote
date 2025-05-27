@@ -2,11 +2,13 @@ import base64
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 from workspaces.models import (
-    Workspace, Page, ImageElement,
+    Workspace, Page, Element, ImageElement,
     FileElement, CheckboxElement,
     TextElement, LinkElement
 )
+import logging
 
+logger = logging.getLogger(__name__)
 
 class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
@@ -60,7 +62,7 @@ class PageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Page
         fields = [
-            'title', 'is_main', 'elements', 'created_at', 'icon', 'pages'
+            'title', 'elements', 'created_at', 'icon', 'pages'
         ]
         read_only_fields = ['created_at']
 
@@ -93,16 +95,13 @@ class PageSerializer(serializers.ModelSerializer):
         return ''
 
     def get_pages(self, obj):
-        # Только подстраницы (parent=this page)
         subpages = obj.subpages.all()
         return PageSerializer(subpages, many=True).data
 
     def create(self, validated_data):
-        # Не используется напрямую, вложенные страницы создаются вручную
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Не используется напрямую
         return super().update(instance, validated_data)
 
 
@@ -117,222 +116,141 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         fields = ['title', 'status', 'created_at', 'icon', 'elements', 'pages']
         read_only_fields = ['created_at']
 
-    def get_main_page(self, obj):
-        # Получить главную страницу (is_main=True)
-        return obj.pages.filter(is_main=True).first()
-
-    def get_elements(self, obj):
-        main_page = self.get_main_page(obj)
-        if main_page:
-            return PageSerializer(main_page).get_elements(main_page)
-        return []
-
     def get_icon(self, obj):
-        main_page = self.get_main_page(obj)
-        if main_page:
-            return PageSerializer(main_page).get_icon(main_page)
+        if obj.icon and hasattr(obj.icon, 'url'):
+            try:
+                with obj.icon.open('rb') as f:
+                    return base64.b64encode(f.read()).decode('utf-8')
+            except Exception:
+                return ''
         return ''
 
     def get_created_at(self, obj):
-        main_page = self.get_main_page(obj)
-        if main_page:
-            return main_page.created_at.isoformat()
-        return ''
+        return obj.created_at.isoformat()
 
     def get_pages(self, obj):
-        main_page = self.get_main_page(obj)
-        if not main_page:
-            return []
-        # Только подстраницы главной страницы (parent=main_page, is_main=False)
-        subpages = main_page.subpages.all()
+        subpages = obj.pages.filter(parent_page__isnull=True)
         return PageSerializer(subpages, many=True).data
 
-    def to_representation(self, instance):
-        # Обычная сериализация
-        return super().to_representation(instance)
+    def get_elements(self, obj):
+        elements = []
+        for subclass in Element.__subclasses__():
+            elements.extend(subclass.objects.filter(workspace=obj))
+        return {
+            'images': ImageElementSerializer(obj.imageelement_elements.all(), many=True).data,
+            'files': FileElementSerializer(obj.fileelement_elements.all(), many=True).data,
+            'checkboxes': CheckboxElementSerializer(obj.checkboxelement_elements.all(), many=True).data,
+            'texts': TextElementSerializer(obj.textelement_elements.all(), many=True).data,
+            'links': LinkElementSerializer(obj.linkelement_elements.all(), many=True).data,
+        }
 
     def create(self, validated_data):
-        # Создать workspace и главную страницу, а также вложенные страницы
         pages_data = self.initial_data.get('pages', [])
-        elements = self.initial_data.get('elements', [])
+        elements_data = self.initial_data.get('elements', {})
         icon_b64 = self.initial_data.get('icon')
-        created_at = self.initial_data.get('created_at')
         title = validated_data['title']
         status = validated_data.get('status', 'not_started')
+
         workspace = Workspace.objects.create(
             title=title,
             status=status,
             author=self.context['request'].user
         )
-        # Главная страница
-        main_page = Page.objects.create(
-            space=workspace,
-            title=title,
-            is_main=True
-        )
-        if created_at:
-            main_page.created_at = created_at
+
         if icon_b64:
             try:
                 icon_data = base64.b64decode(icon_b64)
-                main_page.icon.save(
+                workspace.icon.save(
                     f'{title}_icon.png',
                     ContentFile(icon_data),
                     save=True
                 )
-            except Exception:
-                pass
-        main_page.save()
-        # Элементы главной страницы
-        for el in elements:
-            el_type = el.get('type')
-            if el_type == 'TextItem':
-                TextElement.objects.create(
-                    page=main_page,
-                    content=el.get('content', '')
-                )
-            elif el_type == 'CheckboxItem':
-                CheckboxElement.objects.create(
-                    page=main_page,
-                    text=el.get('label', ''),
-                    is_checked=el.get('checked', False)
-                )
-            elif el_type == 'FileItem':
-                FileElement.objects.create(
-                    page=main_page,
-                    file=el.get('filePath', '')
-                )
-            elif el_type == 'SubspaceLinkItem':
-                # Ссылка на подпространство: ищем страницу по title среди уже созданных
-                subspace_title = el.get('subspaceTitle', '')
-                linked_page = Page.objects.filter(space=workspace, title=subspace_title).first()
-                if linked_page:
-                    LinkElement.objects.create(
-                        page=main_page,
-                        linked_page=linked_page
-                    )
-        # Вложенные страницы рекурсивно
-        self._create_subpages(main_page, pages_data)
-        return workspace
+            except Exception as e:
+                logger.error(f"Error saving icon: {e}")
 
-    def _create_subpages(self, parent_page, pages_data):
+        workspace.save()
+
+        self._create_elements(workspace, elements_data)
+        self._create_pages(workspace, pages_data)
+        return workspace
+    
+    def _create_elements(self, workspace, elements_data):
+        for el_type, el_list in elements_data.items():
+            for el in el_list:
+                if el_type == 'images':
+                    ImageElement.objects.create(workspace=workspace, **el)
+                elif el_type == 'files':
+                    FileElement.objects.create(workspace=workspace, **el)
+                elif el_type == 'checkboxes':
+                    CheckboxElement.objects.create(workspace=workspace, **el)
+                elif el_type == 'texts':
+                    TextElement.objects.create(workspace=workspace, **el)
+                elif el_type == 'links':
+                    linked_page_title = el.pop('linked_page', None)
+                    if linked_page_title:
+                        linked_page = Page.objects.filter(space=workspace, title=linked_page_title).first()
+                        if linked_page:
+                            LinkElement.objects.create(workspace=workspace, linked_page=linked_page, **el)
+                    else:
+                        LinkElement.objects.create(workspace=workspace, **el)
+
+    def _create_pages(self, workspace, pages_data, parent_page=None):
         for page_data in pages_data:
-            # Только подстраницы (is_main=False)
-            subpage = Page.objects.create(
-                space=parent_page.space,
-                title=page_data.get('title'),
-                is_main=False,
-                parent=parent_page
+            elements_data = page_data.pop('elements', {})
+            subpages_data = page_data.pop('pages', [])
+            icon_b64 = page_data.pop('icon', None)
+
+            page = Page.objects.create(
+                space=workspace,
+                parent_page=parent_page,
+                **page_data
             )
-            icon_b64 = page_data.get('icon')
+
             if icon_b64:
                 try:
                     icon_data = base64.b64decode(icon_b64)
-                    subpage.icon.save(
-                        f'{subpage.title}_icon.png',
+                    page.icon.save(
+                        f'{page.title}_icon.png',
                         ContentFile(icon_data),
                         save=True
                     )
-                except Exception:
-                    pass
-            subpage.save()
-            # Элементы
-            for el in page_data.get('elements', []):
-                el_type = el.get('type')
-                if el_type == 'TextItem':
-                    TextElement.objects.create(
-                        page=subpage,
-                        content=el.get('content', '')
-                    )
-                elif el_type == 'CheckboxItem':
-                    CheckboxElement.objects.create(
-                        page=subpage,
-                        text=el.get('label', ''),
-                        is_checked=el.get('checked', False)
-                    )
-                elif el_type == 'FileItem':
-                    FileElement.objects.create(
-                        page=subpage,
-                        file=el.get('filePath', '')
-                    )
-                elif el_type == 'SubspaceLinkItem':
-                    subspace_title = el.get('subspaceTitle', '')
-                    linked_page = Page.objects.filter(
-                        space=subpage.space, title=subspace_title
-                    ).first()
-                    if linked_page:
-                        LinkElement.objects.create(
-                            page=subpage,
-                            linked_page=linked_page
-                        )
-            # Рекурсивно вложенные страницы
-            self._create_subpages(subpage, page_data.get('pages', []))
+                except Exception as e:
+                    logger.error(f"Error saving page icon: {e}")
+
+            self._create_elements(page, elements_data)
+            self._create_pages(workspace, subpages_data, page)
 
     def update(self, instance, validated_data):
-        # Аналогично create, но с удалением старых страниц/элементов
-        main_page = instance.pages.filter(is_main=True).first()
-        if not main_page:
-            main_page = Page.objects.create(
-                space=instance,
-                title=instance.title,
-                is_main=True
-            )
-        # Обновить поля
         instance.status = validated_data.get('status', instance.status)
         instance.save()
-        # Обновить главную страницу
-        main_page.title = instance.title
-        main_page.save()
-        # Обновить иконку
+
         icon_b64 = self.initial_data.get('icon')
         if icon_b64:
             try:
                 icon_data = base64.b64decode(icon_b64)
-                main_page.icon.save(
-                    f'{main_page.title}_icon.png',
+                instance.icon.save(
+                    f'{instance.title}_icon.png',
                     ContentFile(icon_data),
                     save=True
                 )
-            except Exception:
-                pass
-        # Удалить старые элементы и страницы
-        main_page.imageelement_elements.all().delete()
-        main_page.fileelement_elements.all().delete()
-        main_page.checkboxelement_elements.all().delete()
-        main_page.textelement_elements.all().delete()
-        main_page.linkelement_elements.all().delete()
-        main_page.subpages.all().delete()
-        # Добавить новые элементы
-        for el in self.initial_data.get('elements', []):
-            el_type = el.get('type')
-            if el_type == 'TextItem':
-                TextElement.objects.create(
-                    page=main_page,
-                    content=el.get('content', '')
-                )
-            elif el_type == 'CheckboxItem':
-                CheckboxElement.objects.create(
-                    page=main_page,
-                    text=el.get('label', ''),
-                    is_checked=el.get('checked', False)
-                )
-            elif el_type == 'FileItem':
-                FileElement.objects.create(
-                    page=main_page,
-                    file=el.get('filePath', '')
-                )
-            elif el_type == 'SubspaceLinkItem':
-                subspace_title = el.get('subspaceTitle', '')
-                linked_page = Page.objects.filter(
-                    space=main_page.space, title=subspace_title
-                ).first()
-                if linked_page:
-                    LinkElement.objects.create(
-                        page=main_page,
-                        linked_page=linked_page
-                    )
-            # ... другие типы ...
-        # Вложенные страницы рекурсивно
-        self._create_subpages(main_page, self.initial_data.get('pages', []))
+            except Exception as e:
+                logger.error(f"Error updating icon: {e}")
+
+        elements_data = self.initial_data.get('elements', {})
+        pages_data = self.initial_data.get('pages', [])
+
+        # Удаляем существующие элементы
+        for subclass in Element.__subclasses__():
+            subclass.objects.filter(workspace=instance).delete()
+
+        # Создаем новые элементы
+        self._create_elements(instance, elements_data)
+
+        # Удаляем существующие страницы
+        instance.pages.all().delete()
+
+        # Создаем новые страницы
+        self._create_pages(instance, pages_data)
+
         return instance
     
