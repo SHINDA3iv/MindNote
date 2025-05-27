@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/popup_option1"
-        android:title="Текстовый блок" />
+        android:title="Текст" />
     <item
         android:id="@+id/popup_option2"
         android:title="Чекбокс" />
@@ -15,5 +15,5 @@
         android:title="Файл" />
     <item
         android:id="@+id/popup_option5"
-        android:title="Вложенная страница" />
+        android:title="Страница" />
 </menu> 

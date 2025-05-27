@@ -638,7 +638,8 @@ class MainActivity : AppCompatActivity() {
         // Устанавливаем обработчики для каждой иконки
         val iconIds = arrayOf(
             R.id.icon1, R.id.icon2, R.id.icon3, R.id.icon4,
-            R.id.icon5, R.id.icon6, R.id.icon7, R.id.icon8
+            R.id.icon5, R.id.icon6, R.id.icon7, R.id.icon8,
+            R.id.icon9, R.id.icon10, R.id.icon11, R.id.icon12
         )
 
         iconIds.forEachIndexed { index, id ->
@@ -913,10 +914,10 @@ class MainActivity : AppCompatActivity() {
                     item.icon = BitmapDrawable(resources, bitmap)
                 } catch (e: Exception) {
                     Log.e("MindNote", "Error updating workspace icon in menu", e)
-                    item.icon = getDrawable(android.R.drawable.ic_menu_agenda)
+                    item.icon = getDrawable(R.drawable.ic_workspace)
                 }
             } ?: run {
-                item.icon = getDrawable(android.R.drawable.ic_menu_agenda)
+                item.icon = getDrawable(R.drawable.ic_workspace)
             }
         }
     }
