@@ -208,6 +208,10 @@ void MainWidget::onLoginRequested()
 void MainWidget::onLogout()
 {
     _authManager->logout();
+    _localStorage->clearUserData();
+    _workspaceController->loadWorkspaces();
+    _leftPanel->refreshWorkspaceList();
+    updateWorkspaceList();
     updateAuthUI();
 }
 
@@ -534,6 +538,9 @@ QString MainWidget::getUsername() const
 void MainWidget::logout()
 {
     _authManager->logout();
+    _localStorage->clearUserData();
+    _workspaceController->loadWorkspaces();
+    updateWorkspaceList();
     updateAuthUI();
 }
 

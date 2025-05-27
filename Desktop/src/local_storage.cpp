@@ -52,11 +52,10 @@ QString LocalStorage::getCurrentUser() const
 
 void LocalStorage::clearUserData()
 {
-    if (!currentUser.isEmpty()) {
-        QDir userDir(getUserWorkspacePath());
-        if (userDir.exists()) {
-            userDir.removeRecursively();
-        }
+    QDir userDir(userPath);
+    if (userDir.exists()) {
+        userDir.removeRecursively();
+        QDir().mkpath(userPath); // пересоздать пустую папку users
     }
     currentUser.clear();
 }
