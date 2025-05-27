@@ -20,6 +20,7 @@ AuthManager::AuthManager(QObject *parent)
 
 AuthManager::~AuthManager()
 {
+    qDebug() << "delete";
     saveAuthState();
     delete _settings;
 }
@@ -51,6 +52,7 @@ void AuthManager::login(const QString &token, const QString &username, bool reme
     _username = username;
     _isAuthenticated = true;
     _rememberMe = rememberMe;
+    qDebug() << "login";
     saveAuthState();
     emit authStateChanged();
 }
@@ -66,6 +68,7 @@ void AuthManager::logout()
         _settings->remove("isAuthenticated");
         _settings->remove("rememberMe");
     }
+    qDebug() << "LOGOUT";
     saveAuthState();
     emit authStateChanged();
 }
@@ -122,4 +125,5 @@ void AuthManager::setRememberMe(bool enabled)
 {
     _rememberMe = enabled;
     saveAuthState();
+    qDebug() << "setRememberMe";
 }

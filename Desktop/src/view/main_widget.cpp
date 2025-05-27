@@ -1,6 +1,7 @@
 #include "main_widget.h"
-#include "auth_dialog.h"
 #include "../error_handler.h"
+#include "auth_dialog.h"
+#include <qmainwindow.h>
 #include <qtoolbar.h>
 
 #include <QLayout>
@@ -43,6 +44,7 @@ MainWidget::MainWidget(QWidget *parent) :
 
     // Check authentication after UI is initialized
     if (!_authManager->isAuthenticated()) {
+        qDebug() << "SHITmain";
         showAuthDialog();
     } else {
         initApplication();
@@ -62,6 +64,8 @@ MainWidget::~MainWidget()
 
 void MainWidget::showAuthDialog()
 {
+    // Скрыть только MainWidget, а не всё главное окно
+    this->hide();
     qDebug() << "Showing auth dialog";
     auto authDialog = new AuthDialog(this);
     authDialog->setWindowTitle("Авторизация");
@@ -78,6 +82,7 @@ void MainWidget::showAuthDialog()
     connect(authDialog, &AuthDialog::guestLoginRequested, this, [this]() {
         _isGuestMode = true;
         initApplication();
+        this->show();
     });
 
     connect(
@@ -87,23 +92,15 @@ void MainWidget::showAuthDialog()
          // Устанавливаем пользователя для LocalStorage
          _localStorage->setCurrentUser(_authManager->getUsername());
 
-         // --- СИНХРОНИЗАЦИЯ ГОСТЕВЫХ ПРОСТРАНСТВ ---
-         QProgressDialog progress("Синхронизация рабочих пространств...", QString(), 0, 0, this);
-         progress.setWindowModality(Qt::ApplicationModal);
-         progress.setCancelButton(nullptr);
-         progress.setMinimumDuration(0);
-         progress.show();
-
-         connect(_syncManager.get(), &SyncManager::syncCompleted, &progress,
-                 &QProgressDialog::close);
-         connect(_syncManager.get(), &SyncManager::syncError, &progress, &QProgressDialog::close);
-
+         qDebug() << "SHITSTARTAFTERSUCCESS";
          _syncManager->startUserSync();
 
          // После syncCompleted/initApplication
          connect(_syncManager.get(), &SyncManager::syncCompleted, this, [this, authDialog]() {
+             _isGuestMode = false;
              initApplication();
              authDialog->accept();
+             this->show();
          });
          connect(_syncManager.get(), &SyncManager::syncError, this,
                  [authDialog](const QString &err) {
@@ -150,8 +147,11 @@ void MainWidget::showAuthDialog()
 
     // Обработка закрытия диалога
     connect(authDialog, &QDialog::rejected, this, [this]() {
+        qDebug() << "Auth dialog rejected, isAuthenticated:" << _authManager->isAuthenticated()
+                 << "isGuest:" << _isGuestMode;
         // Если пользователь закрыл диалог, продолжаем как гость
         if (!_authManager->isAuthenticated() && !_isGuestMode) {
+            qDebug() << "QApplication::quit() called from auth dialog rejected";
             QApplication::quit();
         }
     });
@@ -160,6 +160,11 @@ void MainWidget::showAuthDialog()
     authDialog->exec();
     qDebug() << "Auth dialog finished";
     authDialog->deleteLater();
+
+    // Явно показываем MainWidget, если пользователь авторизован
+    if (_authManager->isAuthenticated() && !_isGuestMode) {
+        this->show();
+    }
 }
 
 void MainWidget::initApplication()
@@ -186,6 +191,7 @@ void MainWidget::initApplication()
             QMessageBox::warning(this, "Сессия истекла",
                                  "Ваша сессия истекла. Пожалуйста, войдите снова.");
             _authManager->logout();
+            qDebug() << "SHITinitApplication";
             showAuthDialog();
         });
     }
@@ -219,6 +225,7 @@ void MainWidget::initConnections()
         QMessageBox::warning(this, "Сессия истекла",
                              "Ваша сессия истекла. Пожалуйста, войдите снова.");
         _authManager->logout();
+        qDebug() << "SHITinitConnections";
         showAuthDialog();
     });
 
@@ -249,6 +256,7 @@ void MainWidget::updateAuthUI()
         emit statusMessage(tr("Not logged in"));
     }
 
+    qDebug() << "updateAuthUI";
     // Emit auth state changed to update main window UI
     emit authStateChanged();
 }
@@ -446,6 +454,12 @@ bool MainWidget::hasUnsavedChanges() const
 
 void MainWidget::initWindow()
 {
+    // Удаляем старый layout, если он есть
+    if (layout()) {
+        QLayout *oldLayout = layout();
+        delete oldLayout;
+    }
+
     this->setStyleSheet(R"(
         /* Общие стили */
         QWidget {
@@ -522,7 +536,10 @@ void MainWidget::logout()
 {
     _authManager->logout();
     _localStorage->clearUserData();
+    _workspaceController->loadWorkspaces();
+    updateWorkspaceList();
     updateAuthUI();
+    _leftPanel->refreshWorkspaceList();
 }
 
 void MainWidget::updateWorkspaceList()

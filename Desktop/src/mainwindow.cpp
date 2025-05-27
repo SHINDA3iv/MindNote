@@ -35,11 +35,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
     // Connect workspace controller signals
     connect(_mainWidget.get(), &MainWidget::workspaceAdded, this, &MainWindow::updateWorkspaceList);
-    connect(_mainWidget.get(), &MainWidget::workspaceRemoved, this, &MainWindow::updateWorkspaceList);
+    connect(_mainWidget.get(), &MainWidget::workspaceRemoved, this,
+            &MainWindow::updateWorkspaceList);
 
     // Подключаем к изменениям состояния аутентификации
     connect(_mainWidget.get(), &MainWidget::authStateChanged, this, &MainWindow::updateAuthMenu);
-    
+
     // Update auth UI with initial state
     updateAuthMenu();
 }
@@ -54,7 +55,8 @@ void MainWindow::createMenus()
     // File menu
     QMenu *fileMenu = menuBar()->addMenu("Файл");
 
-    QAction *createWorkspaceAction = fileMenu->addAction(QIcon(":/icons/add.png"), "Создать рабочее пространство");
+    QAction *createWorkspaceAction =
+     fileMenu->addAction(QIcon(":/icons/add.png"), "Создать рабочее пространство");
     connect(createWorkspaceAction, &QAction::triggered, [this]() {
         if (_mainWidget) {
             auto leftPanel = _mainWidget->findChild<LeftPanel *>();
@@ -126,7 +128,8 @@ void MainWindow::createMenus()
 
     viewMenu->addSeparator();
 
-    QAction *toggleSidebarAction = viewMenu->addAction(QIcon(":/icons/edit.png"), "Показать/скрыть боковую панель");
+    QAction *toggleSidebarAction =
+     viewMenu->addAction(QIcon(":/icons/edit.png"), "Показать/скрыть боковую панель");
     toggleSidebarAction->setShortcut(QKeySequence("Ctrl+B"));
     connect(toggleSidebarAction, &QAction::triggered, _mainWidget.get(),
             &MainWidget::toggleSidebar);
@@ -149,8 +152,8 @@ void MainWindow::createMenus()
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
 
     // Auth elements (right-aligned)
-    QWidget* authWidget = new QWidget(this);
-    QHBoxLayout* authLayout = new QHBoxLayout(authWidget);
+    QWidget *authWidget = new QWidget(this);
+    QHBoxLayout *authLayout = new QHBoxLayout(authWidget);
     authLayout->setContentsMargins(8, 0, 8, 0);
     authLayout->setSpacing(8);
 
@@ -172,7 +175,7 @@ void MainWindow::createMenus()
     authLayout->addWidget(_logoutButton);
 
     // Добавляем виджет аутентификации в правый угол
-    QWidget* spacer = new QWidget(this);
+    QWidget *spacer = new QWidget(this);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     menuBar()->setCornerWidget(spacer, Qt::TopLeftCorner);
     menuBar()->setCornerWidget(authWidget, Qt::TopRightCorner);
@@ -183,7 +186,8 @@ void MainWindow::updateAuthMenu()
     bool isAuthenticated = _mainWidget->isAuthenticated();
     QString username = _mainWidget->getUsername();
 
-    qDebug() << "Updating auth menu - isAuthenticated:" << isAuthenticated << "username:" << username;
+    qDebug() << "Updating auth menu - isAuthenticated:" << isAuthenticated
+             << "username:" << username;
 
     _userLabel->setText(isAuthenticated ? username : "Гость");
     _loginButton->setVisible(!isAuthenticated);
@@ -195,6 +199,7 @@ void MainWindow::updateAuthMenu()
 
 void MainWindow::onLoginRequested()
 {
+    qDebug() << "SHITwindow";
     _mainWidget->showAuthDialog();
 }
 

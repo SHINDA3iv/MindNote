@@ -80,6 +80,7 @@ void ApiClient::login(const QString &username, const QString &password)
             QJsonObject obj = response.object();
             if (obj.contains("auth_token")) {
                 authToken = obj["auth_token"].toString();
+                qDebug() << "SHITloginSuccess";
                 emit loginSuccess(authToken);
             }
         }
@@ -361,6 +362,7 @@ void ApiClient::postUserSync(const QJsonArray &localWorkspaces)
         }
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         if (doc.isObject()) {
+            qDebug() << "SHITuserSyncDiffReceived";
             emit userSyncDiffReceived(doc.object());
         }
         reply->deleteLater();

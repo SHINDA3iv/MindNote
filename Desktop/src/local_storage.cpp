@@ -92,8 +92,8 @@ void LocalStorage::saveWorkspace(Workspace *workspace, bool isGuest)
     file.close();
 
     // Выводим содержимое json-файла после записи
-    qDebug() << "[LocalStorage] Saved workspace to" << file.fileName();
-    qDebug().noquote() << QJsonDocument::fromJson(jsonData).toJson(QJsonDocument::Indented);
+    // qDebug() << "[LocalStorage] Saved workspace to" << file.fileName();
+    // qDebug().noquote() << QJsonDocument::fromJson(jsonData).toJson(QJsonDocument::Indented);
 }
 
 void LocalStorage::saveWorkspaceRecursive(Workspace *workspace, QJsonObject &json)

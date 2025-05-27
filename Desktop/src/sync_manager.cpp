@@ -204,6 +204,8 @@ void SyncManager::startUserSync()
             }
         }
     }
+
+    qDebug() << "SHITstartUserSync";
     apiClient->postUserSync(localWorkspaces);
 }
 
