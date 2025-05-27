@@ -20,38 +20,83 @@ class Base64ImageField(serializers.ImageField):
 
 
 class ImageElementSerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+    imageData = serializers.SerializerMethodField()
+
     class Meta:
         model = ImageElement
-        fields = ['image', 'created_at']
+        fields = ['type', 'imageData', 'created_at']
         read_only_fields = ['created_at']
+
+    def get_type(self, obj):
+        return 'ImageItem'
+
+    def get_imageData(self, obj):
+        if obj.image and hasattr(obj.image, 'url'):
+            try:
+                with obj.image.open('rb') as f:
+                    return base64.b64encode(f.read()).decode('utf-8')
+            except Exception:
+                return ''
+        return ''
 
 
 class FileElementSerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+    filePath = serializers.SerializerMethodField()
+
     class Meta:
         model = FileElement
-        fields = ['file', 'created_at']
+        fields = ['type', 'filePath', 'created_at']
         read_only_fields = ['created_at']
+
+    def get_type(self, obj):
+        return 'FileItem'
+
+    def get_filePath(self, obj):
+        return obj.file.name if obj.file else ''
 
 
 class CheckboxElementSerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+    label = serializers.CharField(source='text')
+    checked = serializers.BooleanField(source='is_checked')
+
     class Meta:
         model = CheckboxElement
-        fields = ['text', 'is_checked', 'created_at']
+        fields = ['type', 'label', 'checked', 'created_at']
         read_only_fields = ['created_at']
+
+    def get_type(self, obj):
+        return 'CheckboxItem'
 
 
 class TextElementSerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+
     class Meta:
         model = TextElement
-        fields = ['content', 'created_at']
+        fields = ['type', 'content', 'created_at']
         read_only_fields = ['created_at']
+
+    def get_type(self, obj):
+        return 'TextItem'
 
 
 class LinkElementSerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+    subspaceTitle = serializers.SerializerMethodField()
+
     class Meta:
         model = LinkElement
-        fields = ['linked_page', 'created_at']
+        fields = ['type', 'subspaceTitle', 'linked_page', 'created_at']
         read_only_fields = ['created_at']
+
+    def get_type(self, obj):
+        return 'SubspaceLinkItem'
+
+    def get_subspaceTitle(self, obj):
+        return obj.linked_page.title if obj.linked_page else None
 
 
 class PageSerializer(serializers.ModelSerializer):
@@ -67,23 +112,27 @@ class PageSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
     def get_elements(self, obj):
-        elements = []
-        elements.extend(ImageElementSerializer(
-            obj.imageelement_elements.all(), many=True
-        ).data)
-        elements.extend(FileElementSerializer(
-            obj.fileelement_elements.all(), many=True
-        ).data)
-        elements.extend(CheckboxElementSerializer(
-            obj.checkboxelement_elements.all(), many=True
-        ).data)
-        elements.extend(TextElementSerializer(
-            obj.textelement_elements.all(), many=True
-        ).data)
-        elements.extend(LinkElementSerializer(
-            obj.linkelement_elements.all(), many=True
-        ).data)
-        return elements
+        # Собираем все элементы, сортируем по created_at
+        all_elements = []
+        all_elements.extend(list(obj.imageelement_elements.all()))
+        all_elements.extend(list(obj.fileelement_elements.all()))
+        all_elements.extend(list(obj.checkboxelement_elements.all()))
+        all_elements.extend(list(obj.textelement_elements.all()))
+        all_elements.extend(list(obj.linkelement_elements.all()))
+        all_elements.sort(key=lambda el: el.created_at)
+        result = []
+        for el in all_elements:
+            if hasattr(el, 'image'):
+                result.append(ImageElementSerializer(el).data)
+            elif hasattr(el, 'file'):
+                result.append(FileElementSerializer(el).data)
+            elif hasattr(el, 'is_checked'):
+                result.append(CheckboxElementSerializer(el).data)
+            elif hasattr(el, 'content'):
+                result.append(TextElementSerializer(el).data)
+            elif hasattr(el, 'linked_page'):
+                result.append(LinkElementSerializer(el).data)
+        return result
 
     def get_icon(self, obj):
         if obj.icon and hasattr(obj.icon, 'url'):
@@ -137,11 +186,21 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         for subclass in Element.__subclasses__():
             elements.extend(subclass.objects.filter(workspace=obj))
         return {
-            'images': ImageElementSerializer(obj.imageelement_elements.all(), many=True).data,
-            'files': FileElementSerializer(obj.fileelement_elements.all(), many=True).data,
-            'checkboxes': CheckboxElementSerializer(obj.checkboxelement_elements.all(), many=True).data,
-            'texts': TextElementSerializer(obj.textelement_elements.all(), many=True).data,
-            'links': LinkElementSerializer(obj.linkelement_elements.all(), many=True).data,
+            'images': ImageElementSerializer(
+                obj.imageelement_elements.all(), many=True
+            ).data,
+            'files': FileElementSerializer(
+                obj.fileelement_elements.all(), many=True
+            ).data,
+            'checkboxes': CheckboxElementSerializer(
+                obj.checkboxelement_elements.all(), many=True
+            ).data,
+            'texts': TextElementSerializer(
+                obj.textelement_elements.all(), many=True
+            ).data,
+            'links': LinkElementSerializer(
+                obj.linkelement_elements.all(), many=True
+            ).data,
         }
 
     def create(self, validated_data):
@@ -174,25 +233,73 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         self._create_pages(workspace, pages_data)
         return workspace
     
-    def _create_elements(self, workspace, elements_data):
+    def _create_elements(self, obj, elements_data):
+        """
+        obj: Workspace или Page
+        """
         for el_type, el_list in elements_data.items():
             for el in el_list:
                 if el_type == 'images':
-                    ImageElement.objects.create(workspace=workspace, **el)
+                    if isinstance(obj, Workspace):
+                        ImageElement.objects.create(
+                            workspace=obj, **el
+                        )
+                    else:
+                        ImageElement.objects.create(
+                            page=obj, **el
+                        )
                 elif el_type == 'files':
-                    FileElement.objects.create(workspace=workspace, **el)
+                    if isinstance(obj, Workspace):
+                        FileElement.objects.create(
+                            workspace=obj, **el
+                        )
+                    else:
+                        FileElement.objects.create(
+                            page=obj, **el
+                        )
                 elif el_type == 'checkboxes':
-                    CheckboxElement.objects.create(workspace=workspace, **el)
+                    if isinstance(obj, Workspace):
+                        CheckboxElement.objects.create(
+                            workspace=obj, **el
+                        )
+                    else:
+                        CheckboxElement.objects.create(
+                            page=obj, **el
+                        )
                 elif el_type == 'texts':
-                    TextElement.objects.create(workspace=workspace, **el)
+                    if isinstance(obj, Workspace):
+                        TextElement.objects.create(
+                            workspace=obj, **el
+                        )
+                    else:
+                        TextElement.objects.create(
+                            page=obj, **el
+                        )
                 elif el_type == 'links':
                     linked_page_title = el.pop('linked_page', None)
                     if linked_page_title:
-                        linked_page = Page.objects.filter(space=workspace, title=linked_page_title).first()
+                        linked_page = Page.objects.filter(
+                            space=obj.space if isinstance(obj, Page) else obj,
+                            title=linked_page_title
+                        ).first()
                         if linked_page:
-                            LinkElement.objects.create(workspace=workspace, linked_page=linked_page, **el)
+                            if isinstance(obj, Workspace):
+                                LinkElement.objects.create(
+                                    workspace=obj, linked_page=linked_page, **el
+                                )
+                            else:
+                                LinkElement.objects.create(
+                                    page=obj, linked_page=linked_page, **el
+                                )
                     else:
-                        LinkElement.objects.create(workspace=workspace, **el)
+                        if isinstance(obj, Workspace):
+                            LinkElement.objects.create(
+                                workspace=obj, **el
+                            )
+                        else:
+                            LinkElement.objects.create(
+                                page=obj, **el
+                            )
 
     def _create_pages(self, workspace, pages_data, parent_page=None):
         for page_data in pages_data:
@@ -215,7 +322,9 @@ class WorkspaceSerializer(serializers.ModelSerializer):
                         save=True
                     )
                 except Exception as e:
-                    logger.error(f"Error saving page icon: {e}")
+                    logger.error(
+                        f"Error saving page icon: {e}"
+                    )
 
             self._create_elements(page, elements_data)
             self._create_pages(workspace, subpages_data, page)

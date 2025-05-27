@@ -1,5 +1,5 @@
 # views.py
-from rest_framework import viewsets, permissions, status, serializers
+from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
@@ -327,12 +327,14 @@ class GuestWorkspaceViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-def create_page_with_elements(page_data, workspace):
-    from workspaces.models import Page, TextElement, CheckboxElement, FileElement, LinkElement
+def create_page_with_elements(page_data, workspace, parent_page=None):
+    from workspaces.models import Page, TextElement, CheckboxElement, FileElement, LinkElement, ImageElement
+    from django.core.files.base import ContentFile
+    import base64
     page = Page.objects.create(
         title=page_data['title'],
         space=workspace,
-        parent_page=page_data.get('parent_page')
+        parent_page=parent_page
     )
     # Обработка иконки
     icon_b64 = page_data.get('icon')
@@ -342,24 +344,33 @@ def create_page_with_elements(page_data, workspace):
             page.icon.save(f'{page.title}_icon.png', ContentFile(icon_data), save=True)
         except Exception:
             pass
-    # Элементы страницы
-    for el in page_data.get('elements', []):
+    # Элементы страницы (сохраняем в исходном порядке)
+    for idx, el in enumerate(page_data.get('elements', [])):
         el_type = el.get('type')
         if el_type == 'TextItem':
             TextElement.objects.create(page=page, content=el.get('content', ''))
         elif el_type == 'CheckboxItem':
             CheckboxElement.objects.create(page=page, text=el.get('label', ''), is_checked=el.get('checked', False))
         elif el_type == 'FileItem':
+            # Если потребуется поддержка base64 для файлов, добавить аналогично ImageItem
             FileElement.objects.create(page=page, file=el.get('filePath', ''))
+        elif el_type == 'ImageItem':
+            image_data = el.get('imageData')
+            if image_data:
+                try:
+                    img_content = base64.b64decode(image_data)
+                    image_file = ContentFile(img_content, name=f'image_{idx}.png')
+                    ImageElement.objects.create(page=page, image=image_file)
+                except Exception as e:
+                    pass
         elif el_type == 'SubspaceLinkItem':
             subspace_title = el.get('subspaceTitle', '')
             linked_page = Page.objects.filter(space=workspace, title=subspace_title).first()
             if linked_page:
                 LinkElement.objects.create(page=page, linked_page=linked_page)
-
     # Рекурсивно вложенные страницы
     for subpage in page_data.get('pages', []):
-        create_page_with_elements(subpage, workspace)
+        create_page_with_elements(subpage, workspace, parent_page=page)
 
 
 class UserWorkspaceSyncView(APIView):
@@ -437,7 +448,7 @@ class UserWorkspaceSyncView(APIView):
                         ws_obj.save()
                         ws_obj.pages.all().delete()
                         for page_data in data.get('pages', []):
-                            create_page_with_elements(page_data, ws_obj)
+                            create_page_with_elements(page_data, ws_obj, parent_page=None)
                     else:
                         ws_obj = Workspace.objects.create(
                             title=title,
@@ -445,7 +456,7 @@ class UserWorkspaceSyncView(APIView):
                             status=data.get('status', 'not_started')
                         )
                         for page_data in data.get('pages', []):
-                            create_page_with_elements(page_data, ws_obj)
+                            create_page_with_elements(page_data, ws_obj, parent_page=None)
                 # use == 'server': ничего не делаем
 
             # Добавляем новые workspaces
@@ -457,7 +468,7 @@ class UserWorkspaceSyncView(APIView):
                         status=ws.get('status', 'not_started')
                     )
                     for page_data in ws.get('pages', []):
-                        create_page_with_elements(page_data, ws_obj)
+                        create_page_with_elements(page_data, ws_obj, parent_page=None)
 
             # Возвращаем полный актуальный список workspaces пользователя
             workspaces = Workspace.objects.filter(author=user)
@@ -586,4 +597,4 @@ class SaveGuestWorkspacesView(APIView):
                             LinkElement.objects.create(page=page, **el)
 
             # Рекурсивно создаем подстраницы
-            self._create_pages(workspace, page_data.get('pages', []), page)
+            self._create_pages(workspace, page_data.get('pages', []), parent_page=page)
