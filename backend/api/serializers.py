@@ -7,6 +7,7 @@ from workspaces.models import (
     TextElement, LinkElement
 )
 import logging
+import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -182,26 +183,30 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         return PageSerializer(subpages, many=True).data
 
     def get_elements(self, obj):
+        # Собираем все элементы, у которых workspace=obj и page=None
         elements = []
-        for subclass in Element.__subclasses__():
-            elements.extend(subclass.objects.filter(workspace=obj))
-        return {
-            'images': ImageElementSerializer(
-                obj.imageelement_elements.all(), many=True
-            ).data,
-            'files': FileElementSerializer(
-                obj.fileelement_elements.all(), many=True
-            ).data,
-            'checkboxes': CheckboxElementSerializer(
-                obj.checkboxelement_elements.all(), many=True
-            ).data,
-            'texts': TextElementSerializer(
-                obj.textelement_elements.all(), many=True
-            ).data,
-            'links': LinkElementSerializer(
-                obj.linkelement_elements.all(), many=True
-            ).data,
-        }
+        elements.extend(TextElement.objects.filter(workspace=obj, page=None))
+        elements.extend(CheckboxElement.objects.filter(workspace=obj, page=None))
+        elements.extend(ImageElement.objects.filter(workspace=obj, page=None))
+        elements.extend(FileElement.objects.filter(workspace=obj, page=None))
+        elements.extend(LinkElement.objects.filter(workspace=obj, page=None))
+        # Сортируем по created_at, если есть поле created_at
+        elements.sort(
+            key=lambda el: getattr(el, 'created_at', None) or 0
+        )
+        result = []
+        for el in elements:
+            if isinstance(el, TextElement):
+                result.append(TextElementSerializer(el).data)
+            elif isinstance(el, CheckboxElement):
+                result.append(CheckboxElementSerializer(el).data)
+            elif isinstance(el, ImageElement):
+                result.append(ImageElementSerializer(el).data)
+            elif isinstance(el, FileElement):
+                result.append(FileElementSerializer(el).data)
+            elif isinstance(el, LinkElement):
+                result.append(LinkElementSerializer(el).data)
+        return result
 
     def create(self, validated_data):
         pages_data = self.initial_data.get('pages', [])
@@ -209,6 +214,15 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         icon_b64 = self.initial_data.get('icon')
         title = validated_data['title']
         status = validated_data.get('status', 'not_started')
+
+        print("[WorkspaceSerializer.create] title=", title, "status=", status)
+        print("[WorkspaceSerializer.create] icon_b64 exists:", bool(icon_b64))
+        print("[WorkspaceSerializer.create] elements_data:")
+        print(pprint.pformat(elements_data))
+        print("[WorkspaceSerializer.create] pages_data:")
+        print(
+            pprint.pformat(pages_data)
+        )  # если понадобится, раскомментировать
 
         workspace = Workspace.objects.create(
             title=title,
@@ -224,13 +238,26 @@ class WorkspaceSerializer(serializers.ModelSerializer):
                     ContentFile(icon_data),
                     save=True
                 )
+                print(f"[WorkspaceSerializer.create] icon saved for {title}")
             except Exception as e:
-                logger.error(f"Error saving icon: {e}")
+                print(f"Error saving icon for workspace {title}: {e}")
 
         workspace.save()
 
-        self._create_elements(workspace, elements_data)
-        self._create_pages(workspace, pages_data)
+        try:
+            self._create_elements(workspace, elements_data)
+            print(f"[WorkspaceSerializer.create] elements created for {title}")
+        except Exception as e:
+            print(f"Error creating elements for workspace {title}: {e}")
+            print(pprint.pformat(elements_data))
+
+        try:
+            self._create_pages(workspace, pages_data)
+            print(f"[WorkspaceSerializer.create] pages created for {title}")
+        except Exception as e:
+            print(f"Error creating pages for workspace {title}: {e}")
+            print(pprint.pformat(pages_data))
+
         return workspace
     
     def _create_elements(self, obj, elements_data):
@@ -242,38 +269,38 @@ class WorkspaceSerializer(serializers.ModelSerializer):
                 if el_type == 'images':
                     if isinstance(obj, Workspace):
                         ImageElement.objects.create(
-                            workspace=obj, **el
+                            workspace=obj, page=None, **el
                         )
                     else:
                         ImageElement.objects.create(
-                            page=obj, **el
+                            page=obj, workspace=None, **el
                         )
                 elif el_type == 'files':
                     if isinstance(obj, Workspace):
                         FileElement.objects.create(
-                            workspace=obj, **el
+                            workspace=obj, page=None, **el
                         )
                     else:
                         FileElement.objects.create(
-                            page=obj, **el
+                            page=obj, workspace=None, **el
                         )
                 elif el_type == 'checkboxes':
                     if isinstance(obj, Workspace):
                         CheckboxElement.objects.create(
-                            workspace=obj, **el
+                            workspace=obj, page=None, **el
                         )
                     else:
                         CheckboxElement.objects.create(
-                            page=obj, **el
+                            page=obj, workspace=None, **el
                         )
                 elif el_type == 'texts':
                     if isinstance(obj, Workspace):
                         TextElement.objects.create(
-                            workspace=obj, **el
+                            workspace=obj, page=None, **el
                         )
                     else:
                         TextElement.objects.create(
-                            page=obj, **el
+                            page=obj, workspace=None, **el
                         )
                 elif el_type == 'links':
                     linked_page_title = el.pop('linked_page', None)
@@ -285,20 +312,22 @@ class WorkspaceSerializer(serializers.ModelSerializer):
                         if linked_page:
                             if isinstance(obj, Workspace):
                                 LinkElement.objects.create(
-                                    workspace=obj, linked_page=linked_page, **el
+                                    workspace=obj, page=None,
+                                    linked_page=linked_page, **el
                                 )
                             else:
                                 LinkElement.objects.create(
-                                    page=obj, linked_page=linked_page, **el
+                                    page=obj, workspace=None,
+                                    linked_page=linked_page, **el
                                 )
                     else:
                         if isinstance(obj, Workspace):
                             LinkElement.objects.create(
-                                workspace=obj, **el
+                                workspace=obj, page=None, **el
                             )
                         else:
                             LinkElement.objects.create(
-                                page=obj, **el
+                                page=obj, workspace=None, **el
                             )
 
     def _create_pages(self, workspace, pages_data, parent_page=None):

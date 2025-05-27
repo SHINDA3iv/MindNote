@@ -14,10 +14,9 @@ from .serializers import (
     FileElementSerializer, CheckboxElementSerializer, TextElementSerializer,
     LinkElementSerializer
 )
-import base64
-from django.core.files.base import ContentFile
 import traceback
 import logging
+import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -377,6 +376,8 @@ class UserWorkspaceSyncView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        print("[UserWorkspaceSyncView.post] request.data:")
+        print(pprint.pformat(request.data))
         """
         Синхронизация рабочих пространств гостя с пользователем.
         Ожидает: {"local_workspaces": [ ... ]}
@@ -426,6 +427,8 @@ class UserWorkspaceSyncView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def patch(self, request):
+        print("[UserWorkspaceSyncView.patch] request.data:")
+        print(pprint.pformat(request.data))
         """
         Применение решения пользователя по конфликтам и новым workspaces.
         Ожидает: {"resolve": [{"title": ..., "use": "local"/"server", "data": {...}}], "new": [ ... ]}
@@ -435,6 +438,43 @@ class UserWorkspaceSyncView(APIView):
             user = request.user
             resolve = request.data.get('resolve', [])
             new_workspaces = request.data.get('new', [])
+
+            def save_icon_and_elements(ws_obj, data):
+                icon_b64 = data.get('icon')
+                if icon_b64:
+                    try:
+                        import base64
+                        from django.core.files.base import ContentFile
+                        icon_data = base64.b64decode(icon_b64)
+                        ws_obj.icon.save(f'{ws_obj.title}_icon.png', ContentFile(icon_data), save=True)
+                    except Exception as e:
+                        print(f"Error saving icon for workspace {ws_obj.title}: {e}")
+                elements = data.get('elements', [])
+                if elements:
+                    from workspaces.models import ImageElement, FileElement, CheckboxElement, TextElement, LinkElement, Page
+                    for el in elements:
+                        el_type = el.get('type')
+                        if el_type == 'TextItem':
+                            TextElement.objects.create(workspace=ws_obj, page=None, content=el.get('content', ''))
+                        elif el_type == 'CheckboxItem':
+                            CheckboxElement.objects.create(workspace=ws_obj, page=None, text=el.get('label', ''), is_checked=el.get('checked', False))
+                        elif el_type == 'FileItem':
+                            FileElement.objects.create(workspace=ws_obj, page=None, file=el.get('filePath', ''))
+                        elif el_type == 'ImageItem':
+                            image_data = el.get('imageData')
+                            if image_data:
+                                try:
+                                    img_content = base64.b64decode(image_data)
+                                    from django.core.files.base import ContentFile
+                                    image_file = ContentFile(img_content, name=f'image_{ws_obj.title}.png')
+                                    ImageElement.objects.create(workspace=ws_obj, page=None, image=image_file)
+                                except Exception as e:
+                                    print(f"Error saving image for workspace {ws_obj.title}: {e}")
+                        elif el_type == 'SubspaceLinkItem':
+                            subspace_title = el.get('subspaceTitle', '')
+                            linked_page = Page.objects.filter(space=ws_obj, title=subspace_title).first()
+                            if linked_page:
+                                LinkElement.objects.create(workspace=ws_obj, page=None, linked_page=linked_page)
 
             # Применяем решения по конфликтам
             for item in resolve:
@@ -447,6 +487,11 @@ class UserWorkspaceSyncView(APIView):
                         ws_obj.status = data.get('status', ws_obj.status)
                         ws_obj.save()
                         ws_obj.pages.all().delete()
+                        # Удаляем старые элементы
+                        from workspaces.models import Element
+                        for subclass in Element.__subclasses__():
+                            subclass.objects.filter(workspace=ws_obj, page=None).delete()
+                        save_icon_and_elements(ws_obj, data)
                         for page_data in data.get('pages', []):
                             create_page_with_elements(page_data, ws_obj, parent_page=None)
                     else:
@@ -455,6 +500,7 @@ class UserWorkspaceSyncView(APIView):
                             author=user,
                             status=data.get('status', 'not_started')
                         )
+                        save_icon_and_elements(ws_obj, data)
                         for page_data in data.get('pages', []):
                             create_page_with_elements(page_data, ws_obj, parent_page=None)
                 # use == 'server': ничего не делаем
@@ -467,6 +513,7 @@ class UserWorkspaceSyncView(APIView):
                         author=user,
                         status=ws.get('status', 'not_started')
                     )
+                    save_icon_and_elements(ws_obj, ws)
                     for page_data in ws.get('pages', []):
                         create_page_with_elements(page_data, ws_obj, parent_page=None)
 
@@ -474,7 +521,6 @@ class UserWorkspaceSyncView(APIView):
             workspaces = Workspace.objects.filter(author=user)
             serializer = WorkspaceSerializer(workspaces, many=True)
             logger.debug("Serialized workspace data: %s", serializer.data)
-            print(serializer.data)
             return Response(serializer.data)
 
         except Exception as e:
