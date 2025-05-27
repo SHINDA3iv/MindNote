@@ -64,107 +64,45 @@ MainWidget::~MainWidget()
 
 void MainWidget::showAuthDialog()
 {
-    // Скрыть только MainWidget, а не всё главное окно
     this->hide();
     qDebug() << "Showing auth dialog";
-    auto authDialog = new AuthDialog(this);
-    authDialog->setWindowTitle("Авторизация");
-    authDialog->setWindowModality(Qt::ApplicationModal);
+    _pendingAuthDialog = new AuthDialog(this);
+    _pendingAuthDialog->setWindowTitle("Авторизация");
+    _pendingAuthDialog->setWindowModality(Qt::ApplicationModal);
+    _pendingAuthType.clear();
 
-    connect(authDialog, &AuthDialog::loginRequested, this,
-            [this, authDialog](const QString &username, const QString &password, bool rememberMe) {
-                qDebug() << "Login requested - username:" << username
-                         << "rememberMe:" << rememberMe;
+    connect(_pendingAuthDialog, &AuthDialog::loginRequested, this,
+            [this](const QString &username, const QString &password, bool rememberMe) {
+                qDebug() << "Login requested - username:" << username << "rememberMe:" << rememberMe;
+                _pendingAuthType = "login";
                 _apiClient->login(username, password);
                 _authManager->setRememberMe(rememberMe);
             });
-    connect(authDialog, &AuthDialog::registerRequested, _apiClient.get(), &ApiClient::registerUser);
-    connect(authDialog, &AuthDialog::guestLoginRequested, this, [this]() {
+    connect(_pendingAuthDialog, &AuthDialog::registerRequested, _apiClient.get(), &ApiClient::registerUser);
+    connect(_pendingAuthDialog, &AuthDialog::guestLoginRequested, this, [this]() {
+        _pendingAuthType = "guest";
         _isGuestMode = true;
         initApplication();
         this->show();
+        if (_pendingAuthDialog) _pendingAuthDialog->accept();
     });
-
-    connect(
-     _apiClient.get(), &ApiClient::loginSuccess, this, [this, authDialog](const QString &token) {
-         _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
-
-         // Устанавливаем пользователя для LocalStorage
-         _localStorage->setCurrentUser(_authManager->getUsername());
-
-         qDebug() << "SHITSTARTAFTERSUCCESS";
-         _syncManager->startUserSync();
-
-         // После syncCompleted/initApplication
-         connect(_syncManager.get(), &SyncManager::syncCompleted, this, [this, authDialog]() {
-             _isGuestMode = false;
-             initApplication();
-             authDialog->accept();
-             this->show();
-         });
-         connect(_syncManager.get(), &SyncManager::syncError, this,
-                 [authDialog](const QString &err) {
-                     ErrorHandler::instance().showError("Ошибка синхронизации", err);
-                     authDialog->accept();
-                 });
-     });
-    connect(_apiClient.get(), &ApiClient::loginError, this, [authDialog](const QString &error) {
-        authDialog->showLoginError(error);
-        ErrorHandler::instance().showError("Ошибка входа", error);
-    });
-    connect(_apiClient.get(), &ApiClient::registerSuccess, this, [authDialog]() {
-        ErrorHandler::instance().showInfo("Успех", "Регистрация успешна");
-        authDialog->accept();
-    });
-    connect(_apiClient.get(), &ApiClient::registerError, this, [authDialog](const QString &error) {
-        authDialog->showRegisterError(error);
-        ErrorHandler::instance().showError("Ошибка регистрации", error);
-    });
-
-    // Handle workspace synchronization after login
-    connect(_apiClient.get(), &ApiClient::workspacesReceived, this,
-            [this](const QJsonArray &serverWorkspaces) {
-                if (_authManager->isRememberMeEnabled()) {
-                    // Show dialog to choose synchronization strategy
-                    QMessageBox::StandardButton reply = QMessageBox::question(
-                     this, "Синхронизация пространств",
-                     "Обнаружены различия между локальными и серверными пространствами. "
-                     "Хотите сохранить локальные версии?",
-                     QMessageBox::Yes | QMessageBox::No);
-
-                    if (reply == QMessageBox::Yes) {
-                        // Keep local versions
-                        _localStorage->syncWorkspaces(serverWorkspaces, true);
-                    } else {
-                        // Use server versions
-                        _localStorage->syncWorkspaces(serverWorkspaces, false);
-                    }
-                } else {
-                    // If remember me is not enabled, only sync to server
-                    _localStorage->syncWorkspaces(serverWorkspaces, false);
-                }
-            });
-
     // Обработка закрытия диалога
-    connect(authDialog, &QDialog::rejected, this, [this]() {
+    connect(_pendingAuthDialog, &QDialog::rejected, this, [this]() {
         qDebug() << "Auth dialog rejected, isAuthenticated:" << _authManager->isAuthenticated()
                  << "isGuest:" << _isGuestMode;
-        // Если пользователь закрыл диалог, продолжаем как гость
         if (!_authManager->isAuthenticated() && !_isGuestMode) {
             qDebug() << "QApplication::quit() called from auth dialog rejected";
             QApplication::quit();
         }
     });
-
-    qDebug() << "Executing auth dialog";
-    authDialog->exec();
+    _pendingAuthDialog->exec();
     qDebug() << "Auth dialog finished";
-    authDialog->deleteLater();
-
-    // Явно показываем MainWidget, если пользователь авторизован
+    if (_pendingAuthDialog) _pendingAuthDialog->deleteLater();
     if (_authManager->isAuthenticated() && !_isGuestMode) {
         this->show();
     }
+    _pendingAuthDialog = nullptr;
+    _pendingAuthType.clear();
 }
 
 void MainWidget::initApplication()
@@ -232,8 +170,52 @@ void MainWidget::initConnections()
     // Sync connections
     connect(_syncManager.get(), &SyncManager::versionConflictDetected, this,
             &MainWidget::onVersionConflictDetected);
-    connect(_syncManager.get(), &SyncManager::syncCompleted, this, &MainWidget::onSyncCompleted);
-    connect(_syncManager.get(), &SyncManager::syncError, this, &MainWidget::onSyncError);
+    connect(_syncManager.get(), &SyncManager::syncCompleted, this, &MainWidget::onSyncCompletedAuth);
+    connect(_syncManager.get(), &SyncManager::syncError, this, &MainWidget::onSyncErrorAuth);
+
+    connect(_apiClient.get(), &ApiClient::loginSuccess, this, &MainWidget::onLoginSuccess);
+    connect(_apiClient.get(), &ApiClient::loginError, this, [this](const QString &error) {
+        if (_pendingAuthDialog) {
+            _pendingAuthDialog->showLoginError(error);
+            ErrorHandler::instance().showError("Ошибка входа", error);
+        }
+    });
+    connect(_apiClient.get(), &ApiClient::registerSuccess, this, [this]() {
+        if (_pendingAuthDialog) {
+            ErrorHandler::instance().showInfo("Успех", "Регистрация успешна");
+            _pendingAuthDialog->accept();
+        }
+    });
+    connect(_apiClient.get(), &ApiClient::registerError, this, [this](const QString &error) {
+        if (_pendingAuthDialog) {
+            _pendingAuthDialog->showRegisterError(error);
+            ErrorHandler::instance().showError("Ошибка регистрации", error);
+        }
+    });
+
+    // Handle workspace synchronization after login
+    connect(_apiClient.get(), &ApiClient::workspacesReceived, this,
+            [this](const QJsonArray &serverWorkspaces) {
+                if (_authManager->isRememberMeEnabled()) {
+                    // Show dialog to choose synchronization strategy
+                    QMessageBox::StandardButton reply = QMessageBox::question(
+                     this, "Синхронизация пространств",
+                     "Обнаружены различия между локальными и серверными пространствами. "
+                     "Хотите сохранить локальные версии?",
+                     QMessageBox::Yes | QMessageBox::No);
+
+                    if (reply == QMessageBox::Yes) {
+                        // Keep local versions
+                        _localStorage->syncWorkspaces(serverWorkspaces, true);
+                    } else {
+                        // Use server versions
+                        _localStorage->syncWorkspaces(serverWorkspaces, false);
+                    }
+                } else {
+                    // If remember me is not enabled, only sync to server
+                    _localStorage->syncWorkspaces(serverWorkspaces, false);
+                }
+            });
 }
 
 void MainWidget::onAuthStateChanged()
@@ -278,16 +260,33 @@ void MainWidget::onVersionConflictDetected(const QJsonArray &serverWorkspaces)
     }
 }
 
-void MainWidget::onSyncCompleted()
+void MainWidget::onLoginSuccess(const QString &token)
 {
-    emit statusMessage(tr("Синхронизация завершена"));
-    updateWorkspaceList();
+    qDebug() << "SHITloginSuccess";
+    _authManager->login(token, _apiClient->getUsername(), _authManager->isRememberMeEnabled());
+    _localStorage->setCurrentUser(_authManager->getUsername());
+    qDebug() << "SHITSTARTAFTERSUCCESS";
+    _syncManager->startUserSync();
 }
 
-void MainWidget::onSyncError(const QString &error)
+void MainWidget::onSyncCompletedAuth()
 {
-    emit statusMessage(tr("Ошибка синхронизации: %1").arg(error));
-    ErrorHandler::instance().showError("Ошибка синхронизации", error);
+    if (_pendingAuthType == "login") {
+        _isGuestMode = false;
+        initApplication();
+        if (_pendingAuthDialog) _pendingAuthDialog->accept();
+        this->show();
+    }
+}
+
+void MainWidget::onSyncErrorAuth(const QString &err)
+{
+    if (_pendingAuthType == "login") {
+        if (_pendingAuthDialog) {
+            ErrorHandler::instance().showError("Ошибка синхронизации", err);
+            _pendingAuthDialog->accept();
+        }
+    }
 }
 
 void MainWidget::syncWorkspaces()
@@ -547,4 +546,14 @@ void MainWidget::updateWorkspaceList()
     if (auto leftPanel = findChild<LeftPanel *>()) {
         leftPanel->updateWorkspaceList();
     }
+}
+
+void MainWidget::onSyncCompleted()
+{
+    // Заглушка для слота, чтобы не было ошибки линковки
+}
+
+void MainWidget::onSyncError(const QString &error)
+{
+    // Заглушка для слота, чтобы не было ошибки линковки
 }

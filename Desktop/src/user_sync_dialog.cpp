@@ -127,11 +127,9 @@ void UserSyncDialog::buildNewTable(const QJsonArray &newArr)
 
 void UserSyncDialog::buildConflictsTable(const QJsonArray &conflictsArr)
 {
-    if (conflictsArr.isEmpty())
-        return;
-    conflictsTable = new QTableWidget(conflictsArr.size(), 4, this);
-    conflictsTable->setHorizontalHeaderLabels(
-     { "Локальная версия", "Серверная версия", "Название", "Различия" });
+    if (conflictsArr.isEmpty()) return;
+    conflictsTable = new QTableWidget(conflictsArr.size(), 3, this);
+    conflictsTable->setHorizontalHeaderLabels({"Локальная версия", "Серверная версия", "Название"});
     conflictsTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     conflictsTable->setStyleSheet(R"(
         QTableWidget {
@@ -169,28 +167,18 @@ void UserSyncDialog::buildConflictsTable(const QJsonArray &conflictsArr)
         QWidget *localWidget = new QWidget(this);
         QHBoxLayout *localLayout = new QHBoxLayout(localWidget);
         localLayout->addWidget(localBtn);
-        localLayout->setContentsMargins(0, 0, 0, 0);
+        localLayout->setContentsMargins(0,0,0,0);
         localWidget->setLayout(localLayout);
         QWidget *serverWidget = new QWidget(this);
         QHBoxLayout *serverLayout = new QHBoxLayout(serverWidget);
         serverLayout->addWidget(serverBtn);
-        serverLayout->setContentsMargins(0, 0, 0, 0);
+        serverLayout->setContentsMargins(0,0,0,0);
         serverWidget->setLayout(serverLayout);
         conflictsTable->setCellWidget(i, 0, localWidget);
         conflictsTable->setCellWidget(i, 1, serverWidget);
-        QTableWidgetItem *item =
-         new QTableWidgetItem(QIcon(":/resources/icons/workspace.png"), title);
+        QTableWidgetItem *item = new QTableWidgetItem(QIcon(":/resources/icons/workspace.png"), title);
         conflictsTable->setItem(i, 2, item);
-        QPushButton *diffBtn =
-         new QPushButton(QIcon(":/resources/icons/edit.png"), "Показать различия", this);
-        diffBtn->setStyleSheet("padding: 4px 12px; border-radius: 6px; background:#1976d2; "
-                               "color:white; font-weight:500;");
-        connect(diffBtn, &QPushButton::clicked, this, [=]() {
-            QMessageBox::information(this, "Diff",
-                                     "Показ различий между версиями\n(реализуй по желанию)");
-        });
-        conflictsTable->setCellWidget(i, 3, diffBtn);
-        conflictRadioButtons.append(QPair<QRadioButton *, QRadioButton *>(localBtn, serverBtn));
+        conflictRadioButtons.append(QPair<QRadioButton*, QRadioButton*>(localBtn, serverBtn));
         conflictLocalData.append(conflict["local"].toObject());
         conflictServerData.append(conflict["server"].toObject());
     }

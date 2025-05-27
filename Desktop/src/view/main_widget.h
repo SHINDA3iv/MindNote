@@ -97,6 +97,15 @@ private:
     bool _sidebarVisible;
     int _lastPanelWidth = 200; // Default width for the first time
     QTimer _tokenCheckTimer;
+
+    // Для авторизации
+    QPointer<class AuthDialog> _pendingAuthDialog;
+    QString _pendingAuthType;
+
+private slots:
+    void onLoginSuccess(const QString &token);
+    void onSyncCompletedAuth();
+    void onSyncErrorAuth(const QString &err);
 };
 
 #endif // MAIN_WIDGET_H
