@@ -17,38 +17,49 @@ class WorkspaceController : public QObject
 
 public:
     explicit WorkspaceController(std::shared_ptr<LocalStorage> localStorage,
-                                 QObject *parent = nullptr);
+                                 QWidget *parent = nullptr);
 
-    // Создание нового рабочего пространства
-    Workspace *createWorkspace(const QString &name, const QString &id = QString());
-    // Удаление рабочего пространства
+    Workspace *createWorkspace(const QString &title);
     void removeWorkspace(Workspace *workspace);
-
-    // Получение рабочего пространства по индексу
-    Workspace *getWorkspace(int index) const;
-    // Получение всех рабочих пространств
+    Workspace *getWorkspaceByTitle(const QString &title) const;
     QList<Workspace *> getAllWorkspaces() const;
 
-    Workspace *getWorkspaceById(const QString &id) const;
-
-    // Сериализация всех рабочих пространств в JSON
+    // Сериализация и сохранение данных
     QJsonObject serialize() const;
-    // Десериализация рабочих пространств из JSON
     void deserialize(const QJsonObject &json);
+    void saveWorkspaces();
+    void loadWorkspaces(QWidget *parent = nullptr);
+
+    // Работа с подпространствами (страницами)
+    Workspace *createSubWorkspace(Workspace *parent, const QString &title);
+    QList<Workspace *> getRootWorkspaces() const;
+
+public:
+    // Получение рабочего пространства по индексу
+    Workspace *getWorkspace(int index) const;
 
     // Сохранение рабочих пространств в файл
     void saveToFile(const QString &filePath);
     // Загрузка рабочих пространств из файла
     void loadFromFile(const QString &filePath);
 
-    // Сохранение всех рабочих пространств
-    void saveWorkspaces();
-    // Загрузка рабочих пространств
-    void loadWorkspaces();
+    Workspace *findWorkspaceByTitle(const QString &title) const;
+
+    Workspace *findWorkspaceRecursive(Workspace *workspace, const QString &title) const;
+signals:
+    void workspaceAdded(Workspace *workspace);
+    void workspaceRemoved(Workspace *workspace);
+    void pathUpdated(Workspace *workspace);
+
+private slots:
+    void handleAddSubspaceRequest(Workspace *parent);
 
 private:
     QList<Workspace *> _workspaces;
     std::shared_ptr<LocalStorage> _localStorage;
+
+    void recursiveSerialize(Workspace *workspace, QJsonObject &json) const;
+    Workspace *recursiveDeserialize(const QJsonObject &json, Workspace *parent = nullptr);
 };
 
 #endif // WORKSPACE_CONTROLLER_H

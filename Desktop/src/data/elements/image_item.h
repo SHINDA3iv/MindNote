@@ -13,7 +13,7 @@ class ImageItem : public ResizableItem
     Q_OBJECT
 
 public:
-    explicit ImageItem(const QString &imagePath = "", Workspace *parent = nullptr);
+    explicit ImageItem(const QString &imagePath = QString(), Workspace *parent = nullptr);
 
     QString type() const override;
 
@@ -25,8 +25,14 @@ protected:
     void addCustomContextMenuActions(QMenu *contextMenu) override;
 
 private:
+    void updateImageSize();
+    QString imageToBase64(const QPixmap &pixmap) const;
+    QPixmap base64ToImage(const QString &base64String) const;
+
     QPointer<QLabel> _imageLabel;
     QString _imagePath;
+    QPixmap _originalPixmap;
+    QString _imageData;
 };
 
 #endif // IMAGEITEM_H

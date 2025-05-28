@@ -6,68 +6,66 @@ from .models import (
 )
 
 
-class ImageElementInline(admin.StackedInline):
-    model = ImageElement
+class BaseElementInline(admin.StackedInline):
     extra = 0
+    readonly_fields = ['created_at']
+
+
+class ImageElementInline(BaseElementInline):
+    model = ImageElement
     fields = ['image']
 
 
-class FileElementInline(admin.StackedInline):
+class FileElementInline(BaseElementInline):
     model = FileElement
-    extra = 0
     fields = ['file']
 
 
-class CheckboxElementInline(admin.StackedInline):
+class CheckboxElementInline(BaseElementInline):
     model = CheckboxElement
-    extra = 0
     fields = ['text', 'is_checked']
 
 
-class TextElementInline(admin.StackedInline):
+class TextElementInline(BaseElementInline):
     model = TextElement
-    extra = 0
     fields = ['content']
 
 
-class LinkElementInline(admin.StackedInline):
+# Отдельные Inline классы для LinkElement
+class PageLinkElementInline(BaseElementInline):
     model = LinkElement
-    extra = 0
-    fields = ['linked_page']
-    fk_name = 'page'
+    fields = ['linked_page', 'created_at']
+    fk_name = 'page'  # Связь через поле 'page'
 
+class WorkspaceLinkElementInline(BaseElementInline):
+    model = LinkElement
+    fields = ['linked_page', 'created_at']
+    fk_name = 'workspace'  # Связь через поле 'workspace'
 
-class PageInline(admin.StackedInline):
-    model = Page
-    extra = 0
-    fields = ['title', 'link', 'is_main']
-    readonly_fields = ['link']
+@admin.register(Workspace)
+class WorkspaceAdmin(admin.ModelAdmin):
+    list_display = ['title', 'author', 'status', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['title', 'author__username']
+    readonly_fields = ['created_at']
     inlines = [
         ImageElementInline,
         FileElementInline,
         CheckboxElementInline,
         TextElementInline,
-        LinkElementInline
+        WorkspaceLinkElementInline  # Используем версию для рабочих пространств
     ]
 
-
-@admin.register(Workspace)
-class WorkspaceAdmin(admin.ModelAdmin):
-    list_display = ['title', 'author', 'created_at', 'status']
-    list_filter = ['status', 'created_at']
-    search_fields = ['title', 'author__username']
-    readonly_fields = ['created_at']
-    inlines = [PageInline]
     fieldsets = (
         (None, {
-            'fields': ('title', 'author', 'created_at')
+            'fields': ('title', 'author', 'status', 'created_at')
         }),
-        (_('Дополнительная информация'), {
-            'fields': ('icon', 'banner', 'tags', 'info'),
+        (_('Медиа'), {
+            'fields': ('icon', 'banner'),
             'classes': ('collapse',)
         }),
-        (_('Статус и даты'), {
-            'fields': ('status', 'start_date', 'end_date'),
+        (_('Дополнительная информация'), {
+            'fields': ('tags', 'info', 'start_date', 'end_date'),
             'classes': ('collapse',)
         }),
     )
@@ -75,85 +73,83 @@ class WorkspaceAdmin(admin.ModelAdmin):
 
 @admin.register(Page)
 class PageAdmin(admin.ModelAdmin):
-    list_display = ['title', 'space', 'link', 'is_main', 'created_at']
-    list_filter = ['is_main', 'created_at']
+    list_display = ['title', 'space', 'get_full_path', 'created_at']
+    list_filter = ['space', 'created_at']
     search_fields = ['title', 'space__title']
-    readonly_fields = ['link', 'created_at']
+    readonly_fields = ['created_at']
     inlines = [
         ImageElementInline,
         FileElementInline,
         CheckboxElementInline,
         TextElementInline,
-        LinkElementInline
+        PageLinkElementInline  # Используем версию для страниц
     ]
+
     fieldsets = (
         (None, {
-            'fields': ('space', 'title', 'link', 'is_main', 'created_at')
+            'fields': ('title', 'space', 'parent_page', 'icon', 'created_at')
         }),
     )
+
+    def get_full_path(self, obj):
+        return obj.get_full_path()
+    get_full_path.short_description = _('Полный путь')
 
 
 @admin.register(ImageElement)
 class ImageElementAdmin(admin.ModelAdmin):
-    list_display = ['id', 'page', 'created_at']
+    list_display = ['id', 'get_related', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['page__title']
     readonly_fields = ['created_at']
-    fieldsets = (
-        (None, {
-            'fields': ('page', 'image', 'created_at')
-        }),
-    )
+
+    def get_related(self, obj):
+        return obj.workspace.title if obj.workspace else obj.page.title
+    get_related.short_description = _('Пространство/Страница')
 
 
 @admin.register(FileElement)
 class FileElementAdmin(admin.ModelAdmin):
-    list_display = ['id', 'page', 'created_at']
+    list_display = ['id', 'get_related', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['page__title']
     readonly_fields = ['created_at']
-    fieldsets = (
-        (None, {
-            'fields': ('page', 'file', 'created_at')
-        }),
-    )
+
+    def get_related(self, obj):
+        return obj.workspace.title if obj.workspace else obj.page.title
+    get_related.short_description = _('Пространство/Страница')
 
 
 @admin.register(CheckboxElement)
 class CheckboxElementAdmin(admin.ModelAdmin):
-    list_display = ['id', 'page', 'text', 'is_checked', 'created_at']
-    list_filter = ['is_checked', 'created_at']
-    search_fields = ['page__title', 'text']
+    list_display = ['id', 'get_related', 'text', 'is_checked', 'created_at']
+    list_filter = ['created_at']
     readonly_fields = ['created_at']
-    fieldsets = (
-        (None, {
-            'fields': ('page', 'text', 'is_checked', 'created_at')
-        }),
-    )
+
+    def get_related(self, obj):
+        return obj.workspace.title if obj.workspace else obj.page.title
+    get_related.short_description = _('Пространство/Страница')
 
 
 @admin.register(TextElement)
 class TextElementAdmin(admin.ModelAdmin):
-    list_display = ['id', 'page', 'created_at']
+    list_display = ['id', 'get_related', 'content_short', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['page__title', 'content']
     readonly_fields = ['created_at']
-    fieldsets = (
-        (None, {
-            'fields': ('page', 'content', 'created_at')
-        }),
-    )
+
+    def get_related(self, obj):
+        return obj.workspace.title if obj.workspace else obj.page.title
+    get_related.short_description = _('Пространство/Страница')
+
+    def content_short(self, obj):
+        return obj.content[:50] + '...' if len(obj.content) > 50 else obj.content
+    content_short.short_description = _('Содержимое')
 
 
 @admin.register(LinkElement)
 class LinkElementAdmin(admin.ModelAdmin):
-    list_display = ['id', 'page', 'linked_page', 'created_at']
+    list_display = ['id', 'get_related', 'linked_page', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['page__title', 'linked_page__title']
     readonly_fields = ['created_at']
-    fieldsets = (
-        (None, {
-            'fields': ('page', 'linked_page', 'created_at')
-        }),
-    )
 
+    def get_related(self, obj):
+        return obj.workspace.title if obj.workspace else obj.page.title
+    get_related.short_description = _('Пространство/Страница')

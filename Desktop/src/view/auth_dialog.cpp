@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 #include <qevent.h>
 #include <qtabbar.h>
+#include <QCheckBox>
 
 AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
 {
@@ -25,8 +26,67 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     mainLayout->setContentsMargins(20, 20, 20, 20);
     mainLayout->setSpacing(15);
 
+    // Настройка стилей для всего окна авторизации
+    setStyleSheet(R"(
+        QDialog {
+            background-color: #f5f5f5;
+        }
+        QLabel#titleLabel {
+            background-color: #f5f5f5;
+            font-size: 18pt;
+            font-weight: bold;
+            qproperty-alignment: AlignCenter;
+        }
+        QTabWidget::pane {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: -1px;
+        }
+        QTabBar::tab {
+            padding: 8px;
+            border: 1px solid #ddd;
+            background: #e0e0e0;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+        QTabBar::tab:selected {
+            background: #f5f5f5;
+            border-bottom-color: #f5f5f5;
+        }
+        QLineEdit {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        QPushButton#loginButton {
+            padding: 8px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        QPushButton#registerButton {
+            padding: 8px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        QPushButton#guestButton {
+            padding: 8px;
+            background-color: #9E9E9E;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        QFrame[frameShape="4"] { /* QFrame::HLine */
+            color: #ddd;
+        }
+    )");
+
     // Заголовок
     QLabel *titleLabel = new QLabel("MindNote", this);
+    titleLabel->setObjectName("titleLabel");
     titleLabel->setAlignment(Qt::AlignCenter);
     QFont titleFont = titleLabel->font();
     titleFont.setPointSize(18);
@@ -51,68 +111,73 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
                                         "}");
 
     // Вкладка входа
-    QWidget *loginTab = new QWidget();
+    QWidget *loginTab = new QWidget(this);
     QVBoxLayout *loginLayout = new QVBoxLayout(loginTab);
     loginLayout->setContentsMargins(15, 15, 15, 15);
     loginLayout->setSpacing(15);
 
     // Поля входа
-    _loginEmail = new QLineEdit();
-    _loginEmail->setPlaceholderText("Email");
-    _loginEmail->setStyleSheet("padding: 8px; border: 1px solid #ccc; border-radius: 4px;");
+    _loginUsername = new QLineEdit(this);
+    _loginUsername->setPlaceholderText("Логин");
 
-    _loginPassword = new QLineEdit();
+    _loginPassword = new QLineEdit(this);
     _loginPassword->setPlaceholderText("Пароль");
     _loginPassword->setEchoMode(QLineEdit::Password);
-    _loginPassword->setStyleSheet("padding: 8px; border: 1px solid #ccc; border-radius: 4px;");
 
-    _loginButton = new QPushButton("Войти");
-    _loginButton->setStyleSheet("padding: 8px;"
-                                "background-color: #4CAF50;"
-                                "color: white;"
-                                "border: none;"
-                                "border-radius: 4px;");
+    _rememberMe = new QCheckBox("Запомнить меня", this);
+    _rememberMe->setChecked(true);
 
-    loginLayout->addWidget(new QLabel("Email:"));
-    loginLayout->addWidget(_loginEmail);
-    loginLayout->addWidget(new QLabel("Пароль:"));
+    _loginButton = new QPushButton("Войти", this);
+    _loginButton->setObjectName("loginButton");
+
+    // Error label for login
+    _loginErrorLabel = new QLabel(this);
+    _loginErrorLabel->setStyleSheet("color: red;");
+    _loginErrorLabel->setWordWrap(true);
+    _loginErrorLabel->hide();
+
+    loginLayout->addWidget(new QLabel("Логин*:", this));
+    loginLayout->addWidget(_loginUsername);
+    loginLayout->addWidget(new QLabel("Пароль*:", this));
     loginLayout->addWidget(_loginPassword);
+    loginLayout->addWidget(_loginErrorLabel);
+    loginLayout->addWidget(_rememberMe);
     loginLayout->addWidget(_loginButton);
     loginLayout->addStretch();
 
     // Вкладка регистрации
-    QWidget *registerTab = new QWidget();
+    QWidget *registerTab = new QWidget(this);
     QVBoxLayout *registerLayout = new QVBoxLayout(registerTab);
     registerLayout->setContentsMargins(15, 15, 15, 15);
     registerLayout->setSpacing(15);
 
     // Поля регистрации
-    _registerEmail = new QLineEdit();
-    _registerEmail->setPlaceholderText("Email");
-    _registerEmail->setStyleSheet("padding: 8px; border: 1px solid #ccc; border-radius: 4px;");
-
-    _registerUsername = new QLineEdit();
+    _registerUsername = new QLineEdit(this);
     _registerUsername->setPlaceholderText("Имя пользователя");
-    _registerUsername->setStyleSheet("padding: 8px; border: 1px solid #ccc; border-radius: 4px;");
 
-    _registerPassword = new QLineEdit();
+    _registerPassword = new QLineEdit(this);
     _registerPassword->setPlaceholderText("Пароль");
     _registerPassword->setEchoMode(QLineEdit::Password);
-    _registerPassword->setStyleSheet("padding: 8px; border: 1px solid #ccc; border-radius: 4px;");
 
-    _registerButton = new QPushButton("Зарегистрироваться");
-    _registerButton->setStyleSheet("padding: 8px;"
-                                   "background-color: #2196F3;"
-                                   "color: white;"
-                                   "border: none;"
-                                   "border-radius: 4px;");
+    _registerEmail = new QLineEdit(this);
+    _registerEmail->setPlaceholderText("Email");
 
-    registerLayout->addWidget(new QLabel("Email:"));
-    registerLayout->addWidget(_registerEmail);
-    registerLayout->addWidget(new QLabel("Имя пользователя:"));
+    _registerButton = new QPushButton("Зарегистрироваться", this);
+    _registerButton->setObjectName("registerButton");
+
+    // Error label for registration
+    _registerErrorLabel = new QLabel(this);
+    _registerErrorLabel->setStyleSheet("color: red;");
+    _registerErrorLabel->setWordWrap(true);
+    _registerErrorLabel->hide();
+
+    registerLayout->addWidget(new QLabel("Имя пользователя*:", this));
     registerLayout->addWidget(_registerUsername);
-    registerLayout->addWidget(new QLabel("Пароль:"));
+    registerLayout->addWidget(new QLabel("Пароль*:", this));
     registerLayout->addWidget(_registerPassword);
+    registerLayout->addWidget(new QLabel("Email:", this));
+    registerLayout->addWidget(_registerEmail);
+    registerLayout->addWidget(_registerErrorLabel);
     registerLayout->addWidget(_registerButton);
 
     // Добавляем вкладки
@@ -121,19 +186,14 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     mainLayout->addWidget(_tabWidget);
 
     // Разделитель
-    QFrame *divider = new QFrame();
+    QFrame *divider = new QFrame(this);
     divider->setFrameShape(QFrame::HLine);
     divider->setFrameShadow(QFrame::Plain);
-    divider->setStyleSheet("color: #ddd;");
     mainLayout->addWidget(divider);
 
     // Кнопка гостевого входа
-    QPushButton *guestButton = new QPushButton("Продолжить как гость");
-    guestButton->setStyleSheet("padding: 8px;"
-                               "background-color: #9E9E9E;"
-                               "color: white;"
-                               "border: none;"
-                               "border-radius: 4px;");
+    QPushButton *guestButton = new QPushButton("Продолжить как гость", this);
+    guestButton->setObjectName("guestButton");
     mainLayout->addWidget(guestButton);
 
     // Соединения сигналов
@@ -143,18 +203,6 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
         emit guestLoginRequested();
         accept();
     });
-
-    // Настройка стилей без теней
-    setStyleSheet(R"(
-        QDialog {
-            background-color: #f5f5f5;
-        }
-        QTabWidget::pane {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-top: -1px;
-        }
-    )");
 }
 
 void AuthDialog::closeEvent(QCloseEvent *event)
@@ -166,10 +214,33 @@ void AuthDialog::closeEvent(QCloseEvent *event)
 
 void AuthDialog::onLoginClicked()
 {
-    emit loginRequested(_loginEmail->text(), _loginPassword->text());
+    QString username = _loginUsername->text().trimmed();
+    QString password = _loginPassword->text();
+    bool rememberMe = _rememberMe->isChecked();
+
+    if (username.isEmpty() || password.isEmpty()) {
+        showLoginError("Пожалуйста, заполните все поля");
+        return;
+    }
+
+    emit loginRequested(username, password, rememberMe);
 }
 
 void AuthDialog::onRegisterClicked()
 {
-    emit registerRequested(_loginEmail->text(), _loginPassword->text(), _registerUsername->text());
+    _registerErrorLabel->hide();
+    emit registerRequested(_registerEmail->text(), _registerPassword->text(),
+                           _registerUsername->text());
+}
+
+void AuthDialog::showLoginError(const QString &error)
+{
+    _loginErrorLabel->setText(error);
+    _loginErrorLabel->show();
+}
+
+void AuthDialog::showRegisterError(const QString &error)
+{
+    _registerErrorLabel->setText(error);
+    _registerErrorLabel->show();
 }

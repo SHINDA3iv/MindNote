@@ -1,24 +1,33 @@
 #include "image_item.h"
+#include <QBuffer>
+#include <QDebug>
 
 ImageItem::ImageItem(const QString &imagePath, Workspace *parent) :
     ResizableItem(parent),
-    _imageLabel(new QLabel(this)),
-    _imagePath(imagePath)
+    _imageLabel(new QLabel(this))
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(_imageLabel);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-
     setLayout(layout);
 
     if (!imagePath.isEmpty()) {
         QPixmap pixmap(imagePath);
-        _imageLabel->setPixmap(pixmap.scaled(pixmap.width(), pixmap.height(), Qt::KeepAspectRatio,
-                                             Qt::SmoothTransformation));
+        _originalPixmap = pixmap;
+        _imageData = imageToBase64(pixmap);
+
+        // Calculate initial size while respecting minimum size
+        int initialWidth = qMax(qMin(pixmap.width(), 500), 250);
+        int initialHeight = qMax((initialWidth * pixmap.height()) / pixmap.width(), 250);
+
+        setFixedSize(initialWidth, initialHeight);
+        updateImageSize();
+    } else {
+        setFixedSize(250, 250);
     }
 
-    resize(_imageLabel->pixmap().width(), _imageLabel->pixmap().height());
+    _imageLabel->installEventFilter(this);
 }
 
 QString ImageItem::type() const
@@ -26,59 +35,72 @@ QString ImageItem::type() const
     return "ImageItem";
 }
 
+QString ImageItem::imageToBase64(const QPixmap &pixmap) const
+{
+    QByteArray imageData;
+    QBuffer buffer(&imageData);
+    buffer.open(QIODevice::WriteOnly);
+    pixmap.save(&buffer, "PNG");
+    return QString(imageData.toBase64());
+}
+
+QPixmap ImageItem::base64ToImage(const QString &base64String) const
+{
+    QByteArray imageData = QByteArray::fromBase64(base64String.toUtf8());
+    QPixmap pixmap;
+    pixmap.loadFromData(imageData, "PNG");
+    return pixmap;
+}
+
 QJsonObject ImageItem::serialize() const
 {
     QJsonObject json;
     json["type"] = type();
-    json["imagePath"] = _imagePath;
+    json["imageData"] = _imageData;
     return json;
 }
 
 void ImageItem::deserialize(const QJsonObject &json)
 {
-    if (json.contains("imagePath")) {
-        _imagePath = json["imagePath"].toString();
-        QPixmap pixmap(_imagePath);
-
-        _imageLabel->setPixmap(pixmap.scaled(pixmap.width(), pixmap.height(), Qt::KeepAspectRatio,
-                                             Qt::SmoothTransformation));
+    if (json.contains("imageData")) {
+        _imageData = json["imageData"].toString();
+        _originalPixmap = base64ToImage(_imageData);
+        updateImageSize();
     }
 }
 
 void ImageItem::resizeEvent(QResizeEvent *event)
 {
-    if (!_imagePath.isEmpty()) {
-        QPixmap pixmap(_imagePath);
-        int maxWidth = event->size().width() - 20;
-        int maxHeight = event->size().height() - 20;
-        _imageLabel->setPixmap(
-         pixmap.scaled(maxWidth, maxHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    if (!_imageData.isEmpty()) {
+        updateImageSize();
     }
     ResizableItem::resizeEvent(event);
 }
 
+void ImageItem::updateImageSize()
+{
+    if (!_originalPixmap.isNull()) {
+        _imageLabel->setPixmap(_originalPixmap);
+        _imageLabel->setFixedSize(width(), height());
+        _imageLabel->setAlignment(Qt::AlignCenter);
+        _imageLabel->setScaledContents(true);
+    }
+}
+
 void ImageItem::addCustomContextMenuActions(QMenu *contextMenu)
 {
-    // Выравнивание по центру
     QAction *alignCenterAction = contextMenu->addAction("Выравнить по центру");
     connect(alignCenterAction, &QAction::triggered, this, [this]() {
         _imageLabel->setAlignment(Qt::AlignCenter);
     });
 
-    // Выравнивание по левому краю
     QAction *alignLeftAction = contextMenu->addAction("Выравнить по левому краю");
     connect(alignLeftAction, &QAction::triggered, this, [this]() {
         _imageLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     });
 
-    // Выравнивание по правому краю
     QAction *alignRightAction = contextMenu->addAction("Выравнить по правому краю");
     connect(alignRightAction, &QAction::triggered, this, [this]() {
         _imageLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     });
-
-    QAction *deleteAction = contextMenu->addAction("Удалить элемент");
-    connect(deleteAction, &QAction::triggered, this, &AbstractWorkspaceItem::deleteItem);
-
-    contextMenu->exec(mapToGlobal(pos()));
 }

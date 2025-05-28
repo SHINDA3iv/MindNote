@@ -2,8 +2,8 @@
 #define LOCALSTORAGE_H
 
 #include <QObject>
-#include <QSettings>
-#include <QJsonObject>
+#include <QDir>
+#include "workspace.h"
 
 class LocalStorage : public QObject
 {
@@ -11,17 +11,26 @@ class LocalStorage : public QObject
 public:
     explicit LocalStorage(QObject *parent = nullptr);
 
-    void saveWorkspaces(const QJsonArray &workspaces);
-    QJsonArray loadWorkspaces() const;
-
-    void saveWorkspaceItems(const QString &workspaceId, const QJsonArray &items);
-    QJsonArray loadWorkspaceItems(const QString &workspaceId) const;
-
-    QDateTime lastSyncTime() const;
-    void setLastSyncTime(const QDateTime &time);
+    void saveWorkspace(Workspace *workspace, bool isGuest = false);
+    Workspace *
+    loadWorkspace(const QString &workspaceTitle, QWidget *parent = nullptr, bool isGuest = false);
+    void deleteWorkspace(const QString &workspaceTitle, bool isGuest = false);
+    void syncWorkspaces(const QJsonArray &serverWorkspaces, bool keepLocal = false);
+    QString getWorkspacePath(bool isGuest = false) const;
+    void setCurrentUser(const QString &username);
+    QString getCurrentUser() const;
+    void clearUserData();
+    QString getWorkspaceOwnerPath(const QString &ownerUsername) const;
 
 private:
     QString storagePath;
+    QString guestPath;
+    QString userPath;
+    QString currentUser;
+    void saveWorkspaceRecursive(Workspace *workspace, QJsonObject &json);
+    Workspace *loadWorkspaceRecursive(const QJsonObject &json, QWidget *parent = nullptr);
+    void initializePaths();
+    QString getUserWorkspacePath() const;
 };
 
 #endif // LOCALSTORAGE_H

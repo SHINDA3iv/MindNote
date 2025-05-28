@@ -2,8 +2,8 @@
 #define MAIN_WIDGET_H
 
 #include "../sync_manager.h"
-#include "api_client.h"
-#include "auth_manager.h"
+#include "api/api_client.h"
+#include "api/auth_manager.h"
 #include "editor_widget.h"
 #include "left_panel.h"
 
@@ -12,6 +12,8 @@
 #include <QSplitter>
 #include <QSettings>
 #include <memory>
+#include <QScrollArea>
+#include <QTimer>
 
 class MainWidget : public QWidget
 {
@@ -21,21 +23,62 @@ public:
     MainWidget(QWidget *parent = nullptr);
     ~MainWidget();
 
-private slots:
-    void onLogout();
-    void onLoginRequested();
+    // Workspace operations
+    void createNewWorkspace();
+    void openWorkspace();
+    bool saveCurrentWorkspace();
+    bool saveWorkspaceAs();
+    void syncWorkspaces();
+
+    // Edit operations
+    void undo();
+    void redo();
+    void cut();
+    void copy();
+    void paste();
+
+    // View operations
+    void zoomIn();
+    void zoomOut();
+    void zoomReset();
+    void toggleSidebar();
+
+    // State
+    bool hasUnsavedChanges() const;
+
+    // Auth operations
+    bool isAuthenticated() const;
+    QString getUsername() const;
+    void showAuthDialog();
+    void logout();
+
+signals:
+    void statusMessage(const QString &message);
+    void authStateChanged();
+    void workspaceAdded(Workspace *workspace);
+    void workspaceRemoved(Workspace *workspace);
+
+public slots:
+    void updateWorkspaceList();
+
+    void onAuthStateChanged();
+    void updateAuthUI();
+    void onVersionConflictDetected(const QJsonArray &serverWorkspaces);
+    void onSyncCompleted();
+    void onSyncError(const QString &error);
 
 private:
     void initWindow();
     void initConnections();
     void restoreSettings();
     void saveSettings();
-    void showAuthDialog();
     void initApplication();
+    void checkToken();
 
-    bool _isGuestMode = true;
+    bool _isGuestMode = false;
 
     QPointer<QSplitter> _mainSplitter;
+    QScrollArea *_workspaceArea;
 
     std::unique_ptr<WorkspaceController> _workspaceController { nullptr };
 
@@ -47,11 +90,22 @@ private:
     std::unique_ptr<LeftPanel> _leftPanel { nullptr };
     std::unique_ptr<EditorWidget> _editorWidget { nullptr };
 
-    QPointer<QToolButton> _logoutButton { nullptr };
-    QPointer<QToolButton> _loginButton { nullptr };
-    QAction *_syncAction { nullptr };
-
     QPointer<QSettings> _settings;
+
+    bool _hasUnsavedChanges;
+    double _zoomFactor;
+    bool _sidebarVisible;
+    int _lastPanelWidth = 200; // Default width for the first time
+    QTimer _tokenCheckTimer;
+
+    // Для авторизации
+    QPointer<class AuthDialog> _pendingAuthDialog;
+    QString _pendingAuthType;
+
+private slots:
+    void onLoginSuccess(const QString &token);
+    void onSyncCompletedAuth();
+    void onSyncErrorAuth(const QString &err);
 };
 
 #endif // MAIN_WIDGET_H

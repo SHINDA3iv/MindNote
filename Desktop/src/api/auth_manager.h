@@ -11,25 +11,32 @@ class AuthManager : public QObject
     Q_OBJECT
 public:
     explicit AuthManager(QObject *parent = nullptr);
+    ~AuthManager();
 
     bool isAuthenticated() const;
-    QString getCurrentUserId() const;
+    QString getUsername() const;
     QString getAuthToken() const;
+    bool isRememberMeEnabled() const;
 
-    void login(const QString &email, const QString &password);
-    void registerUser(const QString &email, const QString &password, const QString &username);
+    void login(const QString &token, const QString &username, bool rememberMe = false);
+    void setRememberMe(bool enabled);
     void logout();
+    void registerUser(const QString &email, const QString &password, const QString &username);
 
 signals:
-    void loginSuccess();
-    void loginFailed(const QString &error);
+    void authStateChanged();
     void registrationSuccess();
     void registrationFailed(const QString &error);
 
 private:
-    QSettings _settings;
+    void saveAuthState();
+    void loadAuthState();
+
     QString _authToken;
-    QString _currentUserId;
+    QString _username;
+    bool _isAuthenticated;
+    bool _rememberMe;
+    QSettings *_settings;
 };
 
 #endif // AUTH_MANAGER_H

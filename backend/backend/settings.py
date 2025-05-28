@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_filters",
     "djoser", 
-    'drf_spectacular', 
+    'drf_spectacular',
+    'corsheaders',
     "api.apps.ApiConfig",
     "users.apps.UsersConfig",
     "workspaces.apps.WorkspacesConfig",
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -126,6 +128,20 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Workspace files
+WORKSPACE_ROOT = os.path.join(BASE_DIR, 'workspaces')
+GUEST_WORKSPACE_ROOT = os.path.join(WORKSPACE_ROOT, 'guest')
+USER_WORKSPACE_ROOT = os.path.join(WORKSPACE_ROOT, 'user')
+
+# Create workspace directories if they don't exist
+os.makedirs(GUEST_WORKSPACE_ROOT, exist_ok=True)
+os.makedirs(USER_WORKSPACE_ROOT, exist_ok=True)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
@@ -136,12 +152,13 @@ AUTH_USER_MODEL = "users.MindNoteUser"
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', 
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # DJOSER = {
@@ -161,5 +178,6 @@ REST_FRAMEWORK = {
 
 AUTHENTICATION_BACKENDS = ("django.contrib.auth.backends.ModelBackend",)
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True  # В продакшене лучше указать конкретные домены
+CORS_ALLOW_CREDENTIALS = True

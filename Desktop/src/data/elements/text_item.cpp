@@ -41,7 +41,9 @@ TextItem::TextItem(const QString &text, Workspace *parent) :
     layout->addWidget(toolBar);
     layout->addWidget(_textEdit);
     setLayout(layout);
-    resize(width(), 200);
+    resize(width(), 250);
+    
+    _textEdit->installEventFilter(this);
 }
 
 QString TextItem::type() const

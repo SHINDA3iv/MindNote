@@ -2,10 +2,10 @@
 #define LEFT_PANEL_H
 
 #include "abstract_workspace_item.h"
-#include "workspace_controller.h"
+#include "logic/workspace_controller.h"
 
 #include <QWidget>
-#include <QListWidget>
+#include <QTreeWidget>
 #include <QToolButton>
 
 class LeftPanel : public QWidget
@@ -21,17 +21,23 @@ public:
 
 signals:
     void workspaceSelected(Workspace *workspace);
+    void subWorkspaceSelected(Workspace *workspace);
+
+public slots:
+    void onCreateWorkspace();
+    void onCreateSubWorkspace();
+    void updateWorkspaceList();
 
 private slots:
-    void onWorkspaceClicked(QListWidgetItem *item);
-    void onCreateWorkspace();
-
+    void onWorkspaceClicked(QTreeWidgetItem *item);
     void showContextMenu(const QPoint &pos);
 
 private:
-    QListWidget *_workspaceList;
-    QToolButton *_createWorkspaceButton;
+    void addSubWorkspacesToTree(QTreeWidgetItem *parentItem, Workspace *parentWorkspace);
+    
+    QTreeWidget *_workspaceTree;
     WorkspaceController *_workspaceController { nullptr };
+    void logItemPositions(QTreeWidgetItem *parent, int level);
 };
 
 #endif // LEFT_PANEL_H

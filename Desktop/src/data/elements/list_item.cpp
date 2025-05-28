@@ -11,9 +11,11 @@ ListItem::ListItem(ListType type, Workspace *parent) :
     layout->addWidget(_listWidget);
     setLayout(layout);
 
-    resize(width(), 200);
+    resize(width(), 250);
 
     setupContextMenu();
+    
+    _listWidget->installEventFilter(this);
 }
 
 QString ListItem::type() const

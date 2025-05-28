@@ -1,268 +1,404 @@
 #include "api_client.h"
-#include <qjsonarray.h>
-#include <qjsonobject.h>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QUrlQuery>
+#include "../error_handler.h"
+#include <QDebug>
 
-ApiClient::ApiClient(QObject *parent) : QObject(parent)
+ApiClient::ApiClient(QObject *parent) :
+    QObject(parent),
+    networkManager(new QNetworkAccessManager(this)),
+    baseUrl("http://localhost:8000/api")
+{}
+
+ApiClient::~ApiClient()
 {
-    _manager = std::make_unique<QNetworkAccessManager>(this);
-    connect(_manager.get(), &QNetworkAccessManager::finished, this, &ApiClient::handleReply);
+    delete networkManager;
 }
 
-void ApiClient::login(const QString &email, const QString &password)
+void ApiClient::setBaseUrl(const QString &url)
 {
-    QNetworkRequest request(QUrl(_baseUrl + "auth/login"));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    QJsonObject data { { "email", email }, { "password", password } };
-
-    auto reply = _manager->post(request, QJsonDocument(data).toJson());
-    _pendingRequests[reply] = "login";
-}
-
-void ApiClient::registerUser(const QString &email, const QString &password, const QString &username)
-{
-    QNetworkRequest request(QUrl(_baseUrl + "auth/register"));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    QJsonObject data { { "email", email }, { "password", password }, { "username", username } };
-
-    auto reply = _manager->post(request, QJsonDocument(data).toJson());
-    _pendingRequests[reply] = "register";
-}
-
-void ApiClient::getCurrentUser()
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "users/me"));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->get(request);
-    _pendingRequests[reply] = "getCurrentUser";
-}
-
-void ApiClient::updateUser(const QJsonObject &userData)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "user/me"));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->put(request, QJsonDocument(userData).toJson());
-    _pendingRequests[reply] = "updateUser";
-}
-
-void ApiClient::deleteUser()
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "user/me"));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->deleteResource(request);
-    _pendingRequests[reply] = "deleteUser";
-}
-
-void ApiClient::getWorkspaces()
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "/api/workspaces"));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->get(request);
-    _pendingRequests[reply] = "fetchWorkspaces";
-}
-
-void ApiClient::createWorkspace(const QJsonObject &data)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "workspaces"));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->post(request, QJsonDocument(data).toJson());
-    _pendingRequests[reply] = "createWorkspace";
-}
-
-void ApiClient::updateWorkspace(int id, const QJsonObject &data)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "/api/workspaces/" + QString::number(id)));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->put(request, QJsonDocument(data).toJson());
-    _pendingRequests[reply] = "updateWorkspace";
-}
-
-void ApiClient::deleteWorkspace(int id)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "/api/workspaces/" + QString::number(id)));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->deleteResource(request);
-    _pendingRequests[reply] = "deleteWorkspace";
-}
-
-void ApiClient::getWorkspaceItems(const QString &workspaceId)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "workspaces/" + workspaceId + "/items"));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->get(request);
-    _pendingRequests[reply] = "fetchWorkspaceItems";
-}
-
-void ApiClient::createWorkspaceItem(const QString &workspaceId, const QJsonObject &data)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "/api/workspaces/" + workspaceId + "/items"));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    auto reply = _manager->post(request, QJsonDocument(data).toJson());
-    _pendingRequests[reply] = "createWorkspaceItem";
-}
-
-void ApiClient::updateWorkspaceItem(const QString &workspaceId,
-                                    const QString &itemId,
-                                    const QJsonObject &data)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "/api/workspaces/" + workspaceId + "/items/" + itemId));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    auto reply = _manager->put(request, QJsonDocument(data).toJson());
-    _pendingRequests[reply] = "updateWorkspaceItem";
-}
-
-void ApiClient::deleteWorkspaceItem(const QString &workspaceId, const QString &itemId)
-{
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "/api/workspaces/" + workspaceId + "/items/" + itemId));
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    auto reply = _manager->deleteResource(request);
-    _pendingRequests[reply] = "deleteWorkspaceItem";
+    baseUrl = url;
 }
 
 void ApiClient::setAuthToken(const QString &token)
 {
-    _authToken = token;
+    authToken = token;
 }
 
 bool ApiClient::isAuthenticated() const
 {
-    return !_authToken.isEmpty();
+    return !authToken.isEmpty();
 }
 
-void ApiClient::handleReply(QNetworkReply *reply)
+QString ApiClient::getUsername() const
 {
-    if (!_pendingRequests.contains(reply))
-        return;
-
-    QString requestType = _pendingRequests.take(reply);
-    if (reply->error() != QNetworkReply::NoError) {
-        emit errorOccurred(reply->errorString());
-        reply->deleteLater();
-        return;
-    }
-
-    QByteArray response = reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(response);
-    if (doc.isNull()) {
-        emit errorOccurred("Invalid JSON response");
-        reply->deleteLater();
-        return;
-    }
-
-    if (requestType == "fetchWorkspaces") {
-        emit workspacesReceived(doc.array());
-    } else if (requestType == "createWorkspace") {
-        emit workspaceCreated(doc.object());
-    } else if (requestType == "updateWorkspace") {
-        emit workspaceUpdated(doc.object());
-    } else if (requestType == "deleteWorkspace") {
-        emit workspaceDeleted(doc.object()["id"].toString());
-    } else if (requestType == "fetchWorkspaceItems") {
-        QString workspaceId = reply->url().path().split('/')[3];
-        emit itemsReceived(workspaceId, doc.array());
-    } else if (requestType == "createWorkspaceItem") {
-        QString workspaceId = reply->url().path().split('/')[3];
-        emit itemCreated(workspaceId, doc.object());
-    } else if (requestType == "updateWorkspaceItem") {
-        QString workspaceId = reply->url().path().split('/')[3];
-        emit itemUpdated(workspaceId, doc.object());
-    } else if (requestType == "deleteWorkspaceItem") {
-        QString workspaceId = reply->url().path().split('/')[3];
-        QString itemId = reply->url().path().split('/')[5];
-        emit itemDeleted(workspaceId, itemId);
-    } else if (requestType == "sync") {
-        emit syncCompleted(doc.object());
-    } else if (requestType == "login") {
-        if (doc.object().contains("token")) {
-            _authToken = doc.object()["token"].toString();
-            emit loginSuccess(_authToken);
-        } else {
-            emit loginFailed(doc.object()["error"].toString());
-        }
-    } else if (requestType == "register") {
-        if (reply->error() == QNetworkReply::NoError) {
-            emit registrationSuccess();
-        } else {
-            emit registrationFailed(doc.object()["error"].toString());
-        }
-    }
-
-    reply->deleteLater();
+    return _username;
 }
 
-void ApiClient::syncChanges(const QJsonObject &localChanges)
+QNetworkRequest ApiClient::createRequest(const QString &endpoint)
 {
-    if (!isAuthenticated()) {
-        emit errorOccurred("Not authenticated");
-        return;
-    }
-
-    QNetworkRequest request(QUrl(_baseUrl + "sync/"));
+    QNetworkRequest request(QUrl(baseUrl + endpoint));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + _authToken).toUtf8());
-    QNetworkReply *reply = _manager->post(request, QJsonDocument(localChanges).toJson());
-    _pendingRequests[reply] = "sync";
+    if (!authToken.isEmpty()) {
+        request.setRawHeader("Authorization", ("Token " + authToken).toUtf8());
+    }
+    return request;
+}
+
+void ApiClient::handleResponse(QNetworkReply *reply,
+                               const std::function<void(const QJsonDocument &)> &successCallback)
+{
+    connect(reply, &QNetworkReply::finished, [=]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            QJsonDocument jsonResponse = QJsonDocument::fromJson(response);
+            successCallback(jsonResponse);
+        } else {
+            emit error(reply->errorString());
+        }
+        reply->deleteLater();
+    });
+}
+
+// Аутентификация
+void ApiClient::login(const QString &username, const QString &password)
+{
+    QJsonObject data;
+    _username = username;
+    data["username"] = username;
+    data["password"] = password;
+
+    QNetworkRequest request = createRequest("/auth/token/login/");
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            QJsonObject obj = response.object();
+            if (obj.contains("auth_token")) {
+                authToken = obj["auth_token"].toString();
+                emit loginSuccess(authToken);
+            }
+        }
+    });
+}
+
+void ApiClient::registerUser(const QString &email, const QString &password, const QString &username)
+{
+    QJsonObject data;
+    data["email"] = email;
+    data["password"] = password;
+    data["username"] = username;
+
+    QNetworkRequest request = createRequest("/users/");
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit registerSuccess();
+        } else {
+            emit registerError("Registration failed");
+        }
+    });
+}
+
+void ApiClient::logout()
+{
+    QNetworkRequest request = createRequest("/auth/token/logout/");
+    QNetworkReply *reply = networkManager->post(request, QByteArray());
+
+    handleResponse(reply, [this](const QJsonDocument &) {
+        authToken.clear();
+        _username.clear();
+        emit logoutSuccess();
+    });
+}
+
+// Рабочие пространства
+void ApiClient::getWorkspaces()
+{
+    QNetworkRequest request = createRequest("/workspaces/");
+    QNetworkReply *reply = networkManager->get(request);
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isArray()) {
+            emit workspacesReceived(response.array());
+        }
+    });
+}
+
+void ApiClient::createWorkspace(const QJsonObject &workspaceData)
+{
+    QNetworkRequest request = createRequest("/workspaces/");
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(workspaceData).toJson());
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit workspaceCreated(response.object());
+        }
+    });
+}
+
+void ApiClient::updateWorkspace(const QString &title, const QJsonObject &workspaceData)
+{
+    QNetworkRequest request = createRequest(QString("/workspaces/%1/").arg(title));
+    QNetworkReply *reply = networkManager->put(request, QJsonDocument(workspaceData).toJson());
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit workspaceUpdated(response.object());
+        }
+    });
+}
+
+void ApiClient::deleteWorkspace(const QString &title)
+{
+    QNetworkRequest request = createRequest(QString("/workspaces/%1/").arg(title));
+    QNetworkReply *reply = networkManager->deleteResource(request);
+
+    handleResponse(reply, [this, title](const QJsonDocument &) {
+        emit workspaceDeleted(title);
+    });
+}
+
+// Страницы
+void ApiClient::getPages(const QString &workspaceTitle)
+{
+    QNetworkRequest request = createRequest(QString("/workspaces/%1/pages/").arg(workspaceTitle));
+    QNetworkReply *reply = networkManager->get(request);
+
+    handleResponse(reply, [this, workspaceTitle](const QJsonDocument &response) {
+        if (response.isArray()) {
+            emit pagesReceived(workspaceTitle, response.array());
+        }
+    });
+}
+
+void ApiClient::createPage(const QString &workspaceTitle, const QString &title, bool isMain)
+{
+    QJsonObject data;
+    data["title"] = title;
+    data["is_main"] = isMain;
+
+    QNetworkRequest request = createRequest(QString("/workspaces/%1/pages/").arg(workspaceTitle));
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
+
+    handleResponse(reply, [this, workspaceTitle](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit pageCreated(workspaceTitle, response.object());
+        }
+    });
+}
+
+void ApiClient::updatePage(const QString &workspaceTitle,
+                           const QString &title,
+                           const QString &newTitle,
+                           bool isMain)
+{
+    QJsonObject data;
+    data["title"] = newTitle;
+    data["is_main"] = isMain;
+
+    QNetworkRequest request =
+     createRequest(QString("/workspaces/%1/pages/%2/").arg(workspaceTitle, title));
+    QNetworkReply *reply = networkManager->put(request, QJsonDocument(data).toJson());
+
+    handleResponse(reply, [this, workspaceTitle](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit pageUpdated(workspaceTitle, response.object());
+        }
+    });
+}
+
+void ApiClient::deletePage(const QString &workspaceTitle, const QString &title)
+{
+    QNetworkRequest request =
+     createRequest(QString("/workspaces/%1/pages/%2/").arg(workspaceTitle, title));
+    QNetworkReply *reply = networkManager->deleteResource(request);
+
+    handleResponse(reply, [this, workspaceTitle, title](const QJsonDocument &) {
+        emit pageDeleted(workspaceTitle, title);
+    });
+}
+
+// Элементы страниц
+void ApiClient::addElement(const QString &workspaceTitle,
+                           const QString &pageTitle,
+                           const QJsonObject &element)
+{
+    QNetworkRequest request =
+     createRequest(QString("/workspaces/%1/pages/%2/add_element/").arg(workspaceTitle, pageTitle));
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(element).toJson());
+
+    handleResponse(reply, [this, workspaceTitle, pageTitle](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit elementAdded(workspaceTitle, pageTitle, response.object());
+        }
+    });
+}
+
+void ApiClient::updateElement(const QString &workspaceTitle,
+                              const QString &pageTitle,
+                              const QString &elementId,
+                              const QJsonObject &element)
+{
+    QNetworkRequest request = createRequest(QString("/workspaces/%1/pages/%2/update-element/%3/")
+                                             .arg(workspaceTitle, pageTitle, elementId));
+    QNetworkReply *reply =
+     networkManager->sendCustomRequest(request, "PATCH", QJsonDocument(element).toJson());
+    handleResponse(reply, [this, workspaceTitle, pageTitle](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit elementUpdated(workspaceTitle, pageTitle, response.object());
+        }
+    });
+}
+
+void ApiClient::removeElement(const QString &workspaceTitle,
+                              const QString &pageTitle,
+                              const QString &elementId)
+{
+    QNetworkRequest request = createRequest(QString("/workspaces/%1/pages/%2/remove-element/%3/")
+                                             .arg(workspaceTitle, pageTitle, elementId));
+    QNetworkReply *reply = networkManager->deleteResource(request);
+
+    handleResponse(reply, [this, workspaceTitle, pageTitle, elementId](const QJsonDocument &) {
+        emit elementRemoved(workspaceTitle, pageTitle, elementId);
+    });
+}
+
+// Синхронизация
+void ApiClient::syncWorkspace(const QString &workspaceTitle, const QJsonObject &changes)
+{
+    QNetworkRequest request = createRequest("/sync/");
+    QJsonObject data;
+    data["workspace_title"] = workspaceTitle;
+    data["changes"] = changes;
+
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit syncCompleted(response.object());
+        }
+    });
+}
+
+void ApiClient::syncUserWorkspaces()
+{
+    QNetworkRequest request = createRequest("/user-sync/");
+    QNetworkReply *reply = networkManager->post(request, QByteArray());
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit syncCompleted(response.object());
+        }
+    });
+}
+
+// Пользователь
+void ApiClient::getCurrentUser()
+{
+    QNetworkRequest request = createRequest("/users/me/");
+    QNetworkReply *reply = networkManager->get(request);
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            QJsonObject user = response.object();
+            _username = user["username"].toString();
+        }
+    });
+}
+
+void ApiClient::updateUser(const QJsonObject &userData)
+{
+    QNetworkRequest request = createRequest("/users/me/");
+    QNetworkReply *reply = networkManager->put(request, QJsonDocument(userData).toJson());
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            QJsonObject user = response.object();
+            _username = user["username"].toString();
+        }
+    });
+}
+
+void ApiClient::deleteUser()
+{
+    QNetworkRequest request = createRequest("/users/me/");
+    QNetworkReply *reply = networkManager->deleteResource(request);
+
+    handleResponse(reply, [this](const QJsonDocument &) {
+        authToken.clear();
+        _username.clear();
+    });
+}
+
+void ApiClient::postUserSync(const QJsonArray &localWorkspaces)
+{
+    QJsonObject data;
+    data["local_workspaces"] = localWorkspaces;
+    QNetworkRequest request = createRequest("/user-sync/");
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(response);
+            QString detail, traceback;
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                detail = obj.value("detail").toString();
+                traceback = obj.value("traceback").toString();
+            }
+            QString errorMsg = detail;
+            if (!traceback.isEmpty()) {
+                errorMsg += "\n" + traceback;
+            }
+            qDebug() << errorMsg;
+            emit syncError(errorMsg);
+            reply->deleteLater();
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isObject()) {
+            qDebug() << "SHITuserSyncDiffReceived";
+            emit userSyncDiffReceived(doc.object());
+        }
+        reply->deleteLater();
+    });
+}
+
+void ApiClient::patchUserSync(const QJsonArray &resolve, const QJsonArray &newWorkspaces)
+{
+    QJsonObject data;
+    data["resolve"] = resolve;
+    data["new"] = newWorkspaces;
+    QNetworkRequest request = createRequest("/user-sync/");
+    QNetworkReply *reply =
+     networkManager->sendCustomRequest(request, "PATCH", QJsonDocument(data).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(response);
+            QString detail, traceback;
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                detail = obj.value("detail").toString();
+                traceback = obj.value("traceback").toString();
+            }
+            QString errorMsg = detail;
+            if (!traceback.isEmpty()) {
+                errorMsg += "\n" + traceback;
+            }
+            qDebug() << errorMsg;
+            emit syncError(errorMsg);
+            reply->deleteLater();
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isArray()) {
+            emit userSyncFinalReceived(doc.array());
+        }
+        reply->deleteLater();
+    });
 }

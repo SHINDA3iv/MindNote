@@ -22,6 +22,7 @@ endif()
 
 # Установка переменных пути к исходникам
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+set(RESOURCES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 
 # Сбор всех исходных файлов
 file(GLOB_RECURSE PROJECT_SOURCES
@@ -29,23 +30,13 @@ file(GLOB_RECURSE PROJECT_SOURCES
     ${SRC_DIR}/*.h
 )
 
-# Рекурсивный поиск поддиректорий
-file(GLOB_RECURSE SRC_SUBDIRS LIST_DIRECTORIES TRUE "${SRC_DIR}/*")
-list(REMOVE_ITEM SRC_SUBDIRS ${PROJECT_SOURCES})
-
-# qt_add_resources(PROJECT_SOURCES
-#     "application_resources"
-#     PREFIX "/"
-#     FILES
-#         resources/icons/add.png
-#         resources/icons/delete.png
-#         resources/icons/edit.png
-#         resources/icons/sync.png
-#         resources/icons/logout.png
-# )
+# Добавление ресурсов
+set(RESOURCE_FILES
+    ${RESOURCES_DIR}/resources.qrc
+)
 
 # Создание исполняемого файла
-add_executable(Desktop ${PROJECT_SOURCES})
+add_executable(Desktop ${PROJECT_SOURCES} ${RESOURCE_FILES})
 
 # Подключение необходимых компонентов Qt
 target_link_libraries(Desktop PRIVATE
@@ -54,11 +45,20 @@ target_link_libraries(Desktop PRIVATE
 )
 
 # Добавление директорий включения заголовочных файлов
-foreach(DIR ${SRC_SUBDIRS})
-    if(IS_DIRECTORY ${DIR})
-        target_include_directories(Desktop PRIVATE ${DIR})
-    endif()
-endforeach()
+target_include_directories(Desktop PRIVATE
+    ${SRC_DIR}
+    ${SRC_DIR}/view
+    ${SRC_DIR}/settings
+    ${SRC_DIR}/theme
+    ${SRC_DIR}/data
+    ${SRC_DIR}/data/elements
+    ${SRC_DIR}/api
+    ${Qt${QT_VERSION_MAJOR}Widgets_INCLUDE_DIRS}
+    ${Qt${QT_VERSION_MAJOR}Network_INCLUDE_DIRS}
+)
+
+# Копирование ресурсов в директорию сборки
+file(COPY ${RESOURCES_DIR}/icons DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources)
 
 # Установка свойств для разных платформ
 set_target_properties(Desktop PROPERTIES
