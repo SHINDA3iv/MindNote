@@ -92,12 +92,6 @@ Workspace::Workspace(const QString &title, QWidget *parent) :
     toolMenu->addAction(QIcon::fromTheme("checkbox"), "Добавить checkbox", this, [this]() {
         emit addItemByType("CheckboxItem");
     });
-    toolMenu->addAction(QIcon::fromTheme("list"), "Добавить нумерованный список", this, [this]() {
-        emit addItemByType("OrderedListItem");
-    });
-    toolMenu->addAction(QIcon::fromTheme("list"), "Добавить ненумерованный список", this, [this]() {
-        emit addItemByType("UnorderedListItem");
-    });
     toolMenu->addAction(QIcon::fromTheme("image"), "Добавить изображение", this, [this]() {
         emit addItemByType("ImageItem");
     });

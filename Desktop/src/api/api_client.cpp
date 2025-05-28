@@ -80,9 +80,27 @@ void ApiClient::login(const QString &username, const QString &password)
             QJsonObject obj = response.object();
             if (obj.contains("auth_token")) {
                 authToken = obj["auth_token"].toString();
-                qDebug() << "SHITloginSuccess";
                 emit loginSuccess(authToken);
             }
+        }
+    });
+}
+
+void ApiClient::registerUser(const QString &email, const QString &password, const QString &username)
+{
+    QJsonObject data;
+    data["email"] = email;
+    data["password"] = password;
+    data["username"] = username;
+
+    QNetworkRequest request = createRequest("/users/");
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
+
+    handleResponse(reply, [this](const QJsonDocument &response) {
+        if (response.isObject()) {
+            emit registerSuccess();
+        } else {
+            emit registerError("Registration failed");
         }
     });
 }
@@ -316,25 +334,6 @@ void ApiClient::deleteUser()
     });
 }
 
-void ApiClient::registerUser(const QString &email, const QString &password, const QString &username)
-{
-    QJsonObject data;
-    data["email"] = email;
-    data["password"] = password;
-    data["username"] = username;
-
-    QNetworkRequest request = createRequest("/users/");
-    QNetworkReply *reply = networkManager->post(request, QJsonDocument(data).toJson());
-
-    handleResponse(reply, [this](const QJsonDocument &response) {
-        if (response.isObject()) {
-            emit registerSuccess();
-        } else {
-            emit registerError("Registration failed");
-        }
-    });
-}
-
 void ApiClient::postUserSync(const QJsonArray &localWorkspaces)
 {
     QJsonObject data;
@@ -375,7 +374,8 @@ void ApiClient::patchUserSync(const QJsonArray &resolve, const QJsonArray &newWo
     data["resolve"] = resolve;
     data["new"] = newWorkspaces;
     QNetworkRequest request = createRequest("/user-sync/");
-    QNetworkReply *reply = networkManager->sendCustomRequest(request, "PATCH", QJsonDocument(data).toJson());
+    QNetworkReply *reply =
+     networkManager->sendCustomRequest(request, "PATCH", QJsonDocument(data).toJson());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError) {
             QByteArray response = reply->readAll();
