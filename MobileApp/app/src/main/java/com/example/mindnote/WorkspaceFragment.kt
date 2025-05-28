@@ -1,9 +1,15 @@
 package com.example.mindnote
 
+import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.text.Html
+import android.text.SpannableStringBuilder
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -13,26 +19,33 @@ import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
+import androidx.lifecycle.lifecycleScope
 import com.example.mindnote.data.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
 
 class WorkspaceFragment : Fragment() {
     private lateinit var workspaceName: String
     private lateinit var container: LinearLayout
     private lateinit var viewModel: MainViewModel
     private var currentWorkspace: Workspace? = null
+    private val imageCache = ConcurrentHashMap<String, Bitmap>()
+    private var isDestroyed = false
+    private var isContentLoaded = false
+    private var selectedIconUri: Uri? = null
 
-    companion object {
-        private const val PICK_IMAGE_REQUEST = 1
-        private const val PICK_FILE_REQUEST = 2
-        
-        fun newInstance(workspaceName: String): WorkspaceFragment {
-            val fragment = WorkspaceFragment()
-            val args = Bundle()
-            args.putString("WORKSPACE_NAME", workspaceName)
-            fragment.arguments = args
-            return fragment
+    private val pickIconLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                // Handle the selected icon URI
+                Log.d("MindNote", "Selected custom icon URI: $uri")
+            }
         }
     }
 
@@ -44,30 +57,42 @@ class WorkspaceFragment : Fragment() {
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
         val view = inflater.inflate(R.layout.fragment_workspace, container, false)
-        (activity as MainActivity).supportActionBar?.title = workspaceName
         this.container = view.findViewById(R.id.container)
-
+        
         // Find the current workspace
-        currentWorkspace = viewModel.getWorkspaceByName(workspaceName)
+        currentWorkspace = viewModel.getWorkspaceById(workspaceName) ?: viewModel.getWorkspaceByName(workspaceName)
         currentWorkspace?.let { workspace ->
             viewModel.setCurrentWorkspace(workspace)
-            loadWorkspaceContent(workspace)
+            if (!isContentLoaded) {
+                loadWorkspaceContent(workspace)
+                isContentLoaded = true
+            }
+            // Устанавливаем заголовок
+            (activity as MainActivity).supportActionBar?.title = workspace.name
         }
 
         // Observe current workspace changes
         viewModel.currentWorkspace.observe(viewLifecycleOwner) { workspace ->
-            if (workspace.name == workspaceName) {
+            if (workspace.id == workspaceName || workspace.name == workspaceName) {
                 currentWorkspace = workspace
-                loadWorkspaceContent(workspace)
+                if (!isContentLoaded) {
+                    loadWorkspaceContent(workspace)
+                    isContentLoaded = true
+                }
+                // Обновляем заголовок при изменении рабочего пространства
+                (activity as MainActivity).supportActionBar?.title = workspace.name
                 Log.d("MindNote", "WorkspaceFragment: Observed workspace '${workspace.name}' with ${workspace.items.size} items")
             }
         }
 
         viewModel.workspaces.observe(viewLifecycleOwner) { workspaces ->
-            val updatedWorkspace = workspaces.find { it.name == workspaceName }
+            val updatedWorkspace = workspaces.find { it.id == workspaceName || it.name == workspaceName }
             if (updatedWorkspace != null && (currentWorkspace == null || updatedWorkspace.items.size != currentWorkspace?.items?.size)) {
                 currentWorkspace = updatedWorkspace
-                loadWorkspaceContent(updatedWorkspace)
+                if (!isContentLoaded) {
+                    loadWorkspaceContent(updatedWorkspace)
+                    isContentLoaded = true
+                }
                 Log.d("MindNote", "WorkspaceFragment: Observed workspaces update, '${updatedWorkspace.name}' now has ${updatedWorkspace.items.size} items")
             }
         }
@@ -78,78 +103,336 @@ class WorkspaceFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         Log.d("MindNote", "WorkspaceFragment: onResume for workspace '${currentWorkspace?.name}'")
-        // Обновляем текущее рабочее пространство из хранилища
-        currentWorkspace?.let { workspace ->
-            currentWorkspace = viewModel.getWorkspaceByName(workspace.name)
-            currentWorkspace?.let { 
-                loadWorkspaceContent(it)
+        // Не перезагружаем контент при возвращении из просмотра файла
+        if (!isContentLoaded) {
+            currentWorkspace?.let { workspace ->
+                val updatedWorkspace = viewModel.getWorkspaceById(workspace.id) ?: viewModel.getWorkspaceByName(workspace.name)
+                if (updatedWorkspace != null) {
+                    currentWorkspace = updatedWorkspace
+                    loadWorkspaceContent(updatedWorkspace)
+                    isContentLoaded = true
+                    Log.d("MindNote", "WorkspaceFragment: Reloaded workspace '${updatedWorkspace.name}' with ${updatedWorkspace.items.size} items")
+                }
             }
         }
     }
 
     private fun loadWorkspaceContent(workspace: Workspace) {
         Log.d("MindNote", "WorkspaceFragment: Loading content for '${workspace.name}', ${workspace.items.size} items")
+        
+        // Очищаем контейнер перед загрузкой
         container.removeAllViews()
+        
+        // Загружаем все элементы
         workspace.items.forEach { item ->
             when (item) {
                 is ContentItem.TextItem -> addTextField(item)
                 is ContentItem.CheckboxItem -> addCheckboxItem(item)
-                is ContentItem.NumberedListItem -> addNumberedListItem(item)
-                is ContentItem.BulletListItem -> addBulletListItem(item)
-                is ContentItem.ImageItem -> addImageView(item)
                 is ContentItem.FileItem -> addFileItem(item)
-                is ContentItem.SubWorkspaceLink -> addSubWorkspaceLink(item)
+                is ContentItem.ImageItem -> addImageView(item)
+                is ContentItem.NestedPageItem -> addNestedPageItem(item)
             }
         }
     }
 
-    fun addTextField(item: ContentItem.TextItem? = null) {
-        val editText = EditText(context)
-        editText.layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        item?.let { editText.setText(it.text) }
-        
-        editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val text = editText.text.toString()
-                if (item != null) {
-                    item.text = text
-                    currentWorkspace?.let { 
-                        viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces()
-                        Log.d("MindNote", "Обновлен текстовый элемент в '${it.name}'")
-                    }
+    private suspend fun loadImage(uriString: String): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            // Проверяем кэш
+            imageCache[uriString]?.let { return@withContext it }
+
+            val uri = Uri.parse(uriString)
+            context?.contentResolver?.openInputStream(uri)?.use { inputStream ->
+                // Сначала получаем размеры изображения
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeStream(inputStream, null, options)
+
+                // Вычисляем коэффициент масштабирования
+                val maxWidth = resources.displayMetrics.widthPixels
+                val maxHeight = resources.displayMetrics.heightPixels
+                val widthRatio = options.outWidth.toFloat() / maxWidth
+                val heightRatio = options.outHeight.toFloat() / maxHeight
+                val sampleSize = if (widthRatio > 1 || heightRatio > 1) {
+                    maxOf(widthRatio, heightRatio).toInt()
                 } else {
-                    val newItem = ContentItem.TextItem(text)
-                    currentWorkspace?.let { 
-                        viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces()
-                        Log.d("MindNote", "Добавлен новый текстовый элемент в '${it.name}'")
+                    1
+                }
+
+                // Загружаем изображение с учетом масштабирования
+                val loadOptions = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                }
+
+                context?.contentResolver?.openInputStream(uri)?.use { inputStream2 ->
+                    val bitmap = BitmapFactory.decodeStream(inputStream2, null, loadOptions)
+                    if (bitmap != null) {
+                        // Сохраняем в кэш
+                        imageCache[uriString] = bitmap
                     }
+                    bitmap
                 }
             }
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error loading image: $uriString", e)
+            null
         }
+    }
+
+    fun addTextField(item: ContentItem.TextItem? = null) {
+        val textItemView = layoutInflater.inflate(R.layout.formatted_text_item, null)
+        val editText = textItemView.findViewById<EditText>(R.id.formattedText)
+        val formattingToolbar = textItemView.findViewById<LinearLayout>(R.id.formattingToolbar)
         
-        // Добавляем дополнительное событие для сохранения при вводе текста
+        // Устанавливаем текст с поддержкой HTML
+        item?.let {
+            editText.setText(Html.fromHtml(it.text, Html.FROM_HTML_MODE_COMPACT))
+        }
+
+        // Показываем панель форматирования при выделении текста
         editText.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {
-                s?.toString()?.let { text ->
-                    if (item != null) {
-                        item.text = text
-                        // Обновляем, но не сохраняем при каждом изменении текста
-                        currentWorkspace?.let { 
-                            viewModel.updateContentItem(it, item)
-                        }
-                    }
+                // Проверяем, есть ли выделение текста
+                if (editText.selectionStart != editText.selectionEnd) {
+                    formattingToolbar.visibility = View.VISIBLE
+                } else {
+                    formattingToolbar.visibility = View.GONE
                 }
             }
         })
-        
-        container.addView(editText)
+
+        // Обработчики кнопок форматирования
+        textItemView.findViewById<ImageButton>(R.id.btnBold).setOnClickListener {
+            applyFormat(editText, "<b>", "</b>")
+        }
+
+        textItemView.findViewById<ImageButton>(R.id.btnItalic).setOnClickListener {
+            applyFormat(editText, "<i>", "</i>")
+        }
+
+        textItemView.findViewById<ImageButton>(R.id.btnBulletList).setOnClickListener {
+            applyListFormat(editText, "<ul><li>", "</li></ul>")
+            Log.d("text", "unordered list")
+        }
+
+        textItemView.findViewById<ImageButton>(R.id.btnNumberedList).setOnClickListener {
+            applyListFormat(editText, "<ol><li>", "</li></ol>")
+            Log.d("text", "ordered list")
+        }
+
+        textItemView.findViewById<ImageButton>(R.id.btnHeading).setOnClickListener {
+            showHeadingDialog(editText)
+        }
+
+        // Скрываем панель форматирования при потере фокуса
+        editText.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                formattingToolbar.visibility = View.GONE
+                saveFormattedText(editText, item)
+            }
+        }
+
+        // Добавляем обработчик выделения текста
+        editText.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_UP) {
+                // Небольшая задержка, чтобы дать системе время обновить выделение
+                editText.postDelayed({
+                    if (editText.selectionStart != editText.selectionEnd) {
+                        formattingToolbar.visibility = View.VISIBLE
+                    } else {
+                        formattingToolbar.visibility = View.GONE
+                    }
+                }, 100)
+            }
+            false
+        }
+
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(textItemView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item?.id ?: "")
+                container.removeView(swipeContainer)
+            }
+        }
+
+        container.addView(swipeContainer)
+    }
+
+    private fun applyFormat(editText: EditText, startTag: String, endTag: String) {
+        val start = editText.selectionStart
+        val end = editText.selectionEnd
+        if (start < end) {
+            val selectedText = editText.text.subSequence(start, end).toString()
+            val lines = selectedText.split("\n")
+            val formattedLines = lines.map { line ->
+                if (line.isNotBlank()) {
+                    val spannedLine = Html.fromHtml(line, Html.FROM_HTML_MODE_COMPACT)
+                    val lineHtml = Html.toHtml(spannedLine, Html.TO_HTML_PARAGRAPH_LINES_CONSECUTIVE)
+
+                    // Проверяем, содержит ли строка только указанный тег
+                    val hasOnlyCurrentTag = when (startTag) {
+                        "<b>" -> lineHtml == "<b>$line</b>"
+                        "<i>" -> lineHtml == "<i>$line</i>"
+                        else -> false
+                    }
+
+                    if (hasOnlyCurrentTag) {
+                        // Убираем тег, если он полностью оборачивает строку
+                        spannedLine.toString()
+                    } else {
+                        // Добавляем тег, не трогая другие
+                        val wrapped = StringBuilder()
+                            .append(startTag)
+                            .append(line)
+                            .append(endTag)
+                            .toString()
+                        val combined = SpannableStringBuilder(Html.fromHtml(wrapped, Html.FROM_HTML_MODE_COMPACT))
+                        combined
+                    }
+                } else {
+                    line
+                }
+            }
+
+            val spannable = SpannableStringBuilder()
+            formattedLines.forEachIndexed { index, line ->
+                spannable.append(line)
+                if (index != formattedLines.lastIndex) {
+                    spannable.append("\n")
+                }
+            }
+
+            editText.text.replace(start, end, spannable)
+        }
+    }
+
+    private fun applyListFormat(editText: EditText, startTag: String, endTag: String) {
+        val start = editText.selectionStart
+        val end = editText.selectionEnd
+        if (start < end) {
+            var selectedText = editText.text.subSequence(start, end).toString()
+            val lines = selectedText.split("\n")
+            val isNumberedList = lines.all { it.matches(Regex("""^\d+\.\s.*$""")) }
+            val isBulletList = lines.all { it.matches(Regex("""^•\s.*$""")) }
+
+            // Если стиль совпадает — убрать маркеры
+            if ((startTag.contains("ul") && isBulletList) || (startTag.contains("ol") && isNumberedList)) {
+                val unformattedLines = lines.map { line ->
+                    when {
+                        isNumberedList -> line.replace(Regex("""^\d+\.\s"""), "")
+                        isBulletList -> line.replace(Regex("""^•\s"""), "")
+                        else -> line
+                    }
+                }
+                val unformattedText = unformattedLines.joinToString("\n")
+                editText.text.replace(start, end, unformattedText)
+                return
+            }
+
+            // Иначе очистить старый стиль
+            val cleanedLines = lines.map { line ->
+                when {
+                    isNumberedList -> line.replace(Regex("""^\d+\.\s"""), "")
+                    isBulletList -> line.replace(Regex("""^•\s"""), "")
+                    else -> line
+                }
+            }
+
+            // Получить последнее число в нумерованном списке до текущей позиции
+            val lastNumber = if (startTag.contains("ol")) {
+                val textBeforeSelection = editText.text.subSequence(0, start).toString()
+                val linesBefore = textBeforeSelection.split("\n").reversed()
+
+                var lastNum = 0
+                var foundList = false
+
+                for (line in linesBefore) {
+                    if (line.isBlank()) break
+                    val matchResult = Regex("""^(\d+)\.\s.*$""").find(line)
+                    if (matchResult != null) {
+                        val num = matchResult.groupValues[1].toInt()
+                        if (!foundList) {
+                            lastNum = num
+                            foundList = true
+                        } else if (num == lastNum - 1) {
+                            lastNum = num
+                        } else {
+                            break
+                        }
+                    } else if (foundList) {
+                        break
+                    }
+                }
+
+                lastNum
+            } else 0
+
+            // Формируем новый список
+            val formattedLines = if (startTag.contains("ol")) {
+                cleanedLines.mapIndexed { index, line ->
+                    if (line.isNotEmpty()) "${lastNumber + index + 1}. $line" else line
+                }
+            } else {
+                cleanedLines.map { line ->
+                    if (line.isNotEmpty()) "• $line" else line
+                }
+            }
+
+            val formattedText = formattedLines.joinToString("\n")
+            editText.text.replace(start, end, formattedText)
+        }
+    }
+
+    private fun showHeadingDialog(editText: EditText) {
+        val start = editText.selectionStart
+        val end = editText.selectionEnd
+        if (start < end) {
+            val selectedText = editText.text.subSequence(start, end).toString()
+            val htmlText = Html.toHtml(editText.text, Html.TO_HTML_PARAGRAPH_LINES_CONSECUTIVE)
+            
+            // Проверяем, есть ли уже форматирование заголовка
+            val isHeading = htmlText.contains("<h1>") || htmlText.contains("<h2>") || htmlText.contains("<h3>")
+            
+            if (isHeading) {
+                // Если форматирование уже есть, убираем его
+                editText.text.replace(start, end, selectedText)
+                return
+            }
+            
+            // Если форматирования нет, показываем диалог выбора уровня
+            val levels = arrayOf("Заголовок 1", "Заголовок 2", "Заголовок 3")
+            AlertDialog.Builder(requireContext())
+                .setTitle("Выберите уровень заголовка")
+                .setItems(levels) { _, which ->
+                    val level = which + 1
+                    val formattedText = when (level) {
+                        1 -> "<h1 style='font-size: 24sp;'>$selectedText</h1>"
+                        2 -> "<h2 style='font-size: 20sp;'>$selectedText</h2>"
+                        else -> "<h3 style='font-size: 18sp;'>$selectedText</h3>"
+                    }
+                    editText.text.replace(start, end, Html.fromHtml(formattedText, Html.FROM_HTML_MODE_COMPACT))
+                }
+                .show()
+        }
+    }
+
+    private fun saveFormattedText(editText: EditText, item: ContentItem.TextItem?) {
+        val htmlText = Html.toHtml(editText.text, Html.TO_HTML_PARAGRAPH_LINES_CONSECUTIVE)
+        if (item != null) {
+            item.text = htmlText
+            currentWorkspace?.let { 
+                viewModel.updateContentItem(it, item)
+            }
+        } else {
+            val newItem = ContentItem.TextItem(htmlText)
+            currentWorkspace?.let { 
+                viewModel.addContentItem(it, newItem)
+            }
+        }
     }
 
     fun addCheckboxItem(item: ContentItem.CheckboxItem? = null) {
@@ -157,294 +440,409 @@ class WorkspaceFragment : Fragment() {
         val checkbox = checkboxItemView.findViewById<CheckBox>(R.id.checkbox)
         val editText = checkboxItemView.findViewById<EditText>(R.id.editTextCheckbox)
 
+        // Сохраняем ссылку на текущий элемент
+        var currentItem: ContentItem.CheckboxItem? = item
+
         item?.let {
             editText.setText(it.text)
             checkbox.isChecked = it.isChecked
+            Log.d("MindNote", "Loading checkbox item: id=${it.id}, text='${it.text}', isChecked=${it.isChecked}")
         }
 
         checkbox.setOnCheckedChangeListener { _, isChecked ->
-            if (item != null) {
-                item.isChecked = isChecked
-                currentWorkspace?.let { 
-                    viewModel.updateContentItem(it, item)
-                    viewModel.saveWorkspaces()
+            Log.d("MindNote", "Checkbox state changed: isChecked=$isChecked")
+            currentItem?.let { checkboxItem ->
+                // Создаем новый элемент с обновленным состоянием
+                val updatedItem = checkboxItem.copy(isChecked = isChecked)
+                currentWorkspace?.let { workspace -> 
+                    // Обновляем элемент в рабочем пространстве
+                    viewModel.updateContentItem(workspace, updatedItem)
+                    // Обновляем ссылку на текущий элемент
+                    currentItem = updatedItem
+                    Log.d("MindNote", "Updated checkbox state in workspace '${workspace.name}': id=${updatedItem.id}")
                 }
-            }
-        }
-
-        editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
+            } ?: run {
+                // Если это новый элемент, создаем его
                 val text = editText.text.toString()
-                if (item != null) {
-                    item.text = text
-                    currentWorkspace?.let { 
-                        viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces()
-                    }
-                } else {
-                    val newItem = ContentItem.CheckboxItem(text, checkbox.isChecked)
-                    currentWorkspace?.let { 
-                        viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces()
-                    }
+                val newItem = ContentItem.CheckboxItem(text, isChecked)
+                currentWorkspace?.let { workspace ->
+                    viewModel.addContentItem(workspace, newItem)
+                    currentItem = newItem // Обновляем ссылку на текущий элемент
+                    Log.d("MindNote", "Added new checkbox item to workspace '${workspace.name}': id=${newItem.id}")
                 }
             }
         }
 
-        checkboxItemView.setOnLongClickListener {
-            showPopupMenuForItem(checkboxItemView, item)
-            true
-        }
-
-        container.addView(checkboxItemView)
-    }
-
-    fun addNumberedListItem(item: ContentItem.NumberedListItem? = null) {
-        val listItemView = layoutInflater.inflate(R.layout.numbered_list_item, null)
-        val numberText = listItemView.findViewById<TextView>(R.id.numberText)
-        val editText = listItemView.findViewById<EditText>(R.id.editTextListItem)
-
-        val number = (container.childCount + 1).toString()
-        numberText.text = number
-
-        item?.let {
-            editText.setText(it.text)
-        }
-
-        editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val text = editText.text.toString()
-                if (item != null) {
-                    item.text = text
-                    currentWorkspace?.let { 
-                        viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces()
-                    }
-                } else {
-                    val newItem = ContentItem.NumberedListItem(text, number.toInt())
-                    currentWorkspace?.let { 
-                        viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces()
-                    }
-                }
-            }
-        }
-
-        listItemView.setOnLongClickListener {
-            showPopupMenuForItem(listItemView, item)
-            true
-        }
-
-        container.addView(listItemView)
-    }
-
-    fun addBulletListItem(item: ContentItem.BulletListItem? = null) {
-        val listItemView = layoutInflater.inflate(R.layout.bullet_list_item, null)
-        val editText = listItemView.findViewById<EditText>(R.id.editTextListItem)
-
-        item?.let {
-            editText.setText(it.text)
-        }
-
-        editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val text = editText.text.toString()
-                if (item != null) {
-                    item.text = text
-                    currentWorkspace?.let { 
-                        viewModel.updateContentItem(it, item)
-                        viewModel.saveWorkspaces()
-                    }
-                } else {
-                    val newItem = ContentItem.BulletListItem(text)
-                    currentWorkspace?.let { 
-                        viewModel.addContentItem(it, newItem)
-                        viewModel.saveWorkspaces()
+        // Добавляем TextWatcher для сохранения текста чекбокса
+        editText.addTextChangedListener(object : android.text.TextWatcher {
+            private var lastSavedText = editText.text.toString()
+            private var saveHandler = Handler(android.os.Looper.getMainLooper())
+            private var saveRunnable: Runnable? = null
+            
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                s?.toString()?.let { text ->
+                    if (text != lastSavedText) {
+                        // Отменяем предыдущее сохранение, если оно было запланировано
+                        saveRunnable?.let { saveHandler.removeCallbacks(it) }
+                        
+                        // Создаем новое сохранение с задержкой
+                        saveRunnable = Runnable {
+                            lastSavedText = text
+                            currentItem?.let { checkboxItem ->
+                                // Создаем новый элемент с обновленным текстом и текущим состоянием чекбокса
+                                val updatedItem = checkboxItem.copy(
+                                    text = text,
+                                    isChecked = checkbox.isChecked
+                                )
+                                currentWorkspace?.let { workspace -> 
+                                    viewModel.updateContentItem(workspace, updatedItem)
+                                    // Обновляем ссылку на текущий элемент
+                                    currentItem = updatedItem
+                                    Log.d("MindNote", "Updated checkbox text in workspace '${workspace.name}': id=${updatedItem.id}, isChecked=${checkbox.isChecked}")
+                                }
+                            } ?: run {
+                                val newItem = ContentItem.CheckboxItem(text, checkbox.isChecked)
+                                currentWorkspace?.let { workspace -> 
+                                    viewModel.addContentItem(workspace, newItem)
+                                    currentItem = newItem // Обновляем ссылку на текущий элемент
+                                    Log.d("MindNote", "Added new checkbox item with text to workspace '${workspace.name}': id=${newItem.id}, isChecked=${checkbox.isChecked}")
+                                }
+                            }
+                        }
+                        // Запускаем сохранение с задержкой в 500 мс
+                        saveHandler.postDelayed(saveRunnable!!, 500)
                     }
                 }
             }
+        })
+
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(checkboxItemView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item?.id ?: "")
+                container.removeView(swipeContainer)
+            }
         }
 
-        listItemView.setOnLongClickListener {
-            showPopupMenuForItem(listItemView, item)
-            true
-        }
-
-        container.addView(listItemView)
+        container.addView(swipeContainer)
     }
 
     fun addImageView(item: ContentItem.ImageItem? = null) {
+        if (item == null) return
+
         val imageView = ImageView(context)
         imageView.layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        )
+        ).apply {
+            setMargins(0, 8, 0, 8)
+        }
         imageView.adjustViewBounds = true
         imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+        imageView.isClickable = true
+        imageView.isFocusable = true
+        imageView.isFocusableInTouchMode = true
 
-        item?.let {
+        // Сначала показываем плейсхолдер
+        imageView.setImageResource(android.R.drawable.ic_menu_report_image)
+
+        // Загружаем изображение в фоновом потоке
+        viewLifecycleOwner.lifecycleScope.launch {
             try {
-                imageView.setImageURI(it.imageUri)
-                Log.d("MindNote", "Set image URI: ${it.imageUri}")
+                val bitmap = loadImage(item.imageUri.toString())
+                if (bitmap != null && !isDestroyed) {
+                    withContext(Dispatchers.Main) {
+                        imageView.setImageBitmap(bitmap)
+                    }
+                } else {
+                    Log.e("MindNote", "Failed to load image: ${item.imageUri}")
+                    withContext(Dispatchers.Main) {
+                        imageView.setImageResource(android.R.drawable.ic_menu_report_image)
+                    }
+                }
             } catch (e: Exception) {
-                Log.e("MindNote", "Failed to set image URI: ${it.imageUri}", e)
-                // Если не удалось загрузить изображение, устанавливаем placeholder
-                imageView.setImageResource(android.R.drawable.ic_menu_report_image)
-            }
-
-            if (currentWorkspace != null && item.id.isNotEmpty()) {
-                viewModel.updateContentItem(currentWorkspace!!, item)
-                viewModel.saveWorkspaces()
-                Log.d("MindNote", "Добавлено изображение в '${currentWorkspace!!.name}'")
+                Log.e("MindNote", "Failed to load image: ${item.imageUri}", e)
+                withContext(Dispatchers.Main) {
+                    imageView.setImageResource(android.R.drawable.ic_menu_report_image)
+                }
             }
         }
 
-        imageView.setOnLongClickListener {
-            showPopupMenuForItem(imageView, item)
-            true
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(imageView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item.id)
+                container.removeView(swipeContainer)
+            }
         }
 
-        container.addView(imageView)
+        container.addView(swipeContainer)
     }
 
     fun addFileItem(item: ContentItem.FileItem? = null) {
-        val fileItemView = layoutInflater.inflate(R.layout.file_item, null)
-        val fileNameText = fileItemView.findViewById<TextView>(R.id.fileNameText)
-        val fileSizeText = fileItemView.findViewById<TextView>(R.id.fileSizeText)
+        if (item == null) return
 
-        item?.let {
-            fileNameText.text = it.fileName
-            fileSizeText.text = formatFileSize(it.fileSize)
+        try {
+            val fileButtonView = layoutInflater.inflate(R.layout.file_button_item, null)
+            val fileButton = fileButtonView.findViewById<Button>(R.id.fileButton)
 
-            if (currentWorkspace != null && item.id.isNotEmpty()) {
-                viewModel.updateContentItem(currentWorkspace!!, item)
-            }
-        }
+            // Устанавливаем текст кнопки
+            fileButton.text = item.fileName
 
-        fileItemView.setOnClickListener {
-            item?.let { fileItem ->
+            // Обработка нажатия на кнопку
+            fileButton.setOnClickListener {
                 try {
                     val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(fileItem.fileUri, getMimeType(fileItem.fileName))
+                        setDataAndType(item.fileUri, getMimeType(item.fileName))
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     startActivity(intent)
                 } catch (e: Exception) {
-                    Log.e("MindNote", "Failed to open file: ${fileItem.fileUri}", e)
+                    Log.e("MindNote", "Failed to open file: ${item.fileUri}", e)
                     Toast.makeText(context, "Не удалось открыть файл", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
 
-        fileItemView.setOnLongClickListener {
-            showPopupMenuForItem(fileItemView, item)
-            true
-        }
+            // Create swipe container
+            val swipeContainer = SwipeContainer(requireContext())
+            swipeContainer.addItemView(fileButtonView)
+            swipeContainer.setOnDeleteListener {
+                currentWorkspace?.let { workspace ->
+                    viewModel.removeContentItem(workspace, item.id)
+                    container.removeView(swipeContainer)
+                }
+            }
 
-        container.addView(fileItemView)
+            container.addView(swipeContainer)
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error adding file item", e)
+            Toast.makeText(context, "Ошибка при добавлении файла: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    private fun showPopupMenuForItem(view: View, item: ContentItem?) {
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu)
+    private fun addNestedPageItem(item: ContentItem.NestedPageItem? = null) {
+        if (item == null) return
+
+        val nestedPageView = layoutInflater.inflate(R.layout.nested_page_item, null)
+        val pageNameView = nestedPageView.findViewById<TextView>(R.id.pageName)
+        val pageIconView = nestedPageView.findViewById<ImageView>(R.id.pageIcon)
         
-        popupMenu.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.popup_option1 -> {
-                    // Добавить текстовое поле
-                    addTextField()
-                    true
-                }
-                R.id.popup_option2 -> {
-                    // Добавить чекбокс
-                    addCheckboxItem()
-                    true
-                }
-                R.id.popup_option3 -> {
-                    // Добавить изображение
-                    val intent = Intent(Intent.ACTION_PICK)
-                    intent.type = "image/*"
-                    startActivityForResult(intent, PICK_IMAGE_REQUEST)
-                    true
-                }
-                R.id.popup_option4 -> {
-                    // Добавить файл
-                    val intent = Intent(Intent.ACTION_GET_CONTENT)
-                    intent.type = "*/*"
-                    intent.addCategory(Intent.CATEGORY_OPENABLE)
-                    startActivityForResult(intent, PICK_FILE_REQUEST)
-                    true
-                }
-                R.id.popup_option5 -> {
-                    // Добавить нумерованный список
-                    addNumberedListItem()
-                    true
-                }
-                R.id.popup_option6 -> {
-                    // Добавить маркированный список
-                    addBulletListItem()
-                    true
-                }
-                R.id.popup_option7 -> {
-                    // Добавить ссылку на подпространство
-                    addSubWorkspaceLink()
-                    true
-                }
-                else -> false
+        pageNameView.text = item.pageName
+        
+        // Устанавливаем иконку из самой ссылки
+        item.iconUri?.let { uri ->
+            try {
+                val inputStream = requireContext().contentResolver.openInputStream(uri)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                pageIconView.setImageBitmap(bitmap)
+            } catch (e: Exception) {
+                Log.e("MindNote", "Error loading icon: ${uri}", e)
+                pageIconView.setImageResource(android.R.drawable.ic_menu_agenda)
             }
-        }
-        popupMenu.show()
-    }
-
-    private fun addSubWorkspaceLink(item: ContentItem.SubWorkspaceLink? = null) {
-        val linkView = layoutInflater.inflate(R.layout.subworkspace_link_item, null)
-        val editText = linkView.findViewById<EditText>(R.id.editTextLink)
-        val workspaceId = item?.workspaceId ?: ""
-        val displayName = item?.displayName ?: ""
-
-        editText.setText(displayName)
-
-        editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val text = editText.text.toString()
-                if (item != null) {
-                    // Create a new item with updated display name
-                    val updatedItem = ContentItem.SubWorkspaceLink(
-                        workspaceId = item.workspaceId,
-                        displayName = text,
-                        id = item.id
-                    )
-                    currentWorkspace?.let { workspace -> 
-                        viewModel.updateContentItem(workspace, updatedItem)
-                        viewModel.saveWorkspaces()
-                    }
-                } else {
-                    val newItem = ContentItem.SubWorkspaceLink(workspaceId, text)
-                    currentWorkspace?.let { workspace -> 
-                        viewModel.addContentItem(workspace, newItem)
-                        viewModel.saveWorkspaces()
-                    }
+        } ?: run {
+            // Если иконка не установлена, используем иконку из рабочего пространства
+            val workspace = viewModel.getWorkspaceById(item.pageId)
+            workspace?.iconUri?.let { uri ->
+                try {
+                    val inputStream = requireContext().contentResolver.openInputStream(uri)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    pageIconView.setImageBitmap(bitmap)
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error loading workspace icon: ${uri}", e)
+                    pageIconView.setImageResource(android.R.drawable.ic_menu_agenda)
                 }
+            } ?: run {
+                pageIconView.setImageResource(android.R.drawable.ic_menu_agenda)
             }
         }
 
-        linkView.setOnClickListener {
-            // Navigate to the linked workspace
-            val workspace = viewModel.getWorkspaceByName(workspaceId)
-            workspace?.let { ws ->
-                val bundle = Bundle().apply {
-                    putString("workspaceId", ws.id)
-                }
-                findNavController().navigate(R.id.workspaceDetailFragment, bundle)
-            }
-        }
-
-        linkView.setOnLongClickListener {
-            showPopupMenuForItem(linkView, item)
+        // Добавляем обработчик долгого нажатия для контекстного меню
+        nestedPageView.setOnLongClickListener { view ->
+            showLinkContextMenu(view, item)
             true
         }
 
-        container.addView(linkView)
+        nestedPageView.setOnClickListener {
+            // Navigate to the nested page
+            val targetWorkspace = viewModel.getWorkspaceById(item.pageId)
+            targetWorkspace?.let { workspace ->
+                // Обновляем текущее рабочее пространство
+                viewModel.setCurrentWorkspace(workspace)
+                
+                // Открываем фрагмент
+                val fragment = WorkspaceFragment.newInstance(workspace.id)
+                parentFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, fragment)
+                    .addToBackStack(null)
+                    .commit()
+                
+                // Обновляем путь в toolbar
+                (activity as? MainActivity)?.updateToolbarWithPath(workspace)
+            }
+        }
+
+        // Create swipe container
+        val swipeContainer = SwipeContainer(requireContext())
+        swipeContainer.addItemView(nestedPageView)
+        swipeContainer.setOnDeleteListener {
+            currentWorkspace?.let { workspace ->
+                viewModel.removeContentItem(workspace, item.id)
+                container.removeView(swipeContainer)
+            }
+        }
+
+        container.addView(swipeContainer)
+    }
+
+    fun showCreateNestedPageDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_menu_item, null)
+        val editText = dialogView.findViewById<EditText>(R.id.editTextMenuItem)
+        val iconButton = dialogView.findViewById<Button>(R.id.buttonSelectIcon)
+
+        iconButton.setOnClickListener {
+            (activity as? MainActivity)?.showIconSelectionDialog { uri ->
+                selectedIconUri = uri
+                uri?.let { previewUri ->
+                    try {
+                        val inputStream = requireContext().contentResolver.openInputStream(previewUri)
+                        val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                        iconButton.setCompoundDrawablesWithIntrinsicBounds(
+                            android.graphics.drawable.BitmapDrawable(resources, bitmap),
+                            null, null, null
+                        )
+                    } catch (e: Exception) {
+                        Log.e("MindNote", "Error loading icon preview", e)
+                    }
+                }
+            }
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Создание вложенной страницы")
+            .setView(dialogView)
+            .setPositiveButton("Создать") { _, _ ->
+                val pageName = editText.text.toString().trim()
+                if (pageName.isNotEmpty()) {
+                    // Устанавливаем иконку по умолчанию, если не выбрана другая
+                    if (selectedIconUri == null) {
+                        selectedIconUri = (activity as? MainActivity)?.getDefaultWorkspaceIconUri()
+                    }
+                    createNestedPage(pageName, selectedIconUri)
+                    selectedIconUri = null
+                } else {
+                    Toast.makeText(context, "Имя страницы не может быть пустым", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Отмена") { _, _ -> 
+                selectedIconUri = null
+            }
+            .show()
+    }
+
+    private fun showIconSelectionDialog(onIconSelected: ((Uri?) -> Unit)? = null) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_select_icon, null)
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Выберите иконку")
+            .setView(dialogView)
+            .setNegativeButton("Отмена", null)
+            .create()
+
+        // Обработчики для стандартных иконок
+        val iconButtons = listOf(
+            dialogView.findViewById<ImageButton>(R.id.icon1),
+            dialogView.findViewById<ImageButton>(R.id.icon2),
+            dialogView.findViewById<ImageButton>(R.id.icon3),
+            dialogView.findViewById<ImageButton>(R.id.icon4),
+            dialogView.findViewById<ImageButton>(R.id.icon5),
+            dialogView.findViewById<ImageButton>(R.id.icon6),
+            dialogView.findViewById<ImageButton>(R.id.icon7),
+            dialogView.findViewById<ImageButton>(R.id.icon8)
+        )
+
+        iconButtons.forEachIndexed { index, button ->
+            button.setOnClickListener {
+                try {
+                    // Получаем ID ресурса иконки
+                    val typedArray = resources.obtainTypedArray(R.array.workspace_icons)
+                    val iconResId = typedArray.getResourceId(index, 0)
+                    typedArray.recycle()
+
+                    if (iconResId == 0) {
+                        throw Exception("Не удалось получить ресурс иконки")
+                    }
+
+                    // Создаем директорию для иконок
+                    val iconsDir = File(requireContext().filesDir, "icons")
+                    if (!iconsDir.exists() && !iconsDir.mkdirs()) {
+                        throw Exception("Не удалось создать директорию для иконок")
+                    }
+
+                    // Сохраняем иконку
+                    val file = File(iconsDir, "icon_$index.png")
+                    
+                    // Получаем векторный drawable
+                    val drawable = resources.getDrawable(iconResId, requireContext().theme)
+                    
+                    // Создаем bitmap с поддержкой прозрачности
+                    val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bitmap)
+                    
+                    // Очищаем canvas прозрачным цветом
+                    canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+                    
+                    // Устанавливаем границы drawable
+                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                    
+                    // Рисуем drawable на canvas
+                    drawable.draw(canvas)
+
+                    // Сохраняем bitmap в файл
+                    file.outputStream().use { out ->
+                        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                            throw Exception("Не удалось сохранить иконку")
+                        }
+                    }
+
+                    // Освобождаем память
+                    bitmap.recycle()
+
+                    // Создаем URI через FileProvider
+                    val iconUri = androidx.core.content.FileProvider.getUriForFile(
+                        requireContext(),
+                        "${requireContext().packageName}.fileprovider",
+                        file
+                    )
+
+                    // Вызываем callback если он предоставлен
+                    onIconSelected?.invoke(iconUri)
+
+                    // Показываем уведомление об успешном выборе
+                    Toast.makeText(requireContext(), "Иконка выбрана", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error saving icon", e)
+                    Toast.makeText(requireContext(), "Ошибка при сохранении иконки: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        // Обработчик для кнопки выбора своей иконки
+        dialogView.findViewById<Button>(R.id.buttonCustomIcon).setOnClickListener {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+            }
+            pickIconLauncher.launch(intent)
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun formatFileSize(size: Long): String {
@@ -463,6 +861,9 @@ class WorkspaceFragment : Fragment() {
             fileName.endsWith(".xls") || fileName.endsWith(".xlsx") -> "application/vnd.ms-excel"
             fileName.endsWith(".ppt") || fileName.endsWith(".pptx") -> "application/vnd.ms-powerpoint"
             fileName.endsWith(".txt") -> "text/plain"
+            fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") -> "image/jpeg"
+            fileName.endsWith(".png") -> "image/png"
+            fileName.endsWith(".gif") -> "image/gif"
             else -> "application/octet-stream"
         }
     }
@@ -470,49 +871,153 @@ class WorkspaceFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         Log.d("MindNote", "WorkspaceFragment: onPause for workspace '${currentWorkspace?.name}'")
-        // Сохраняем состояние текущего рабочего пространства
-        currentWorkspace?.let { workspace ->
-            viewModel.saveWorkspaces()
-        }
     }
 
     override fun onStop() {
         super.onStop()
         Log.d("MindNote", "WorkspaceFragment: onStop for workspace '${currentWorkspace?.name}'")
-        // Сохраняем состояние текущего рабочего пространства
-        currentWorkspace?.let { workspace ->
-            viewModel.saveWorkspaces()
-        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        isDestroyed = true
+        isContentLoaded = false
+        // Очищаем кэш изображений
+        imageCache.clear()
         Log.d("MindNote", "WorkspaceFragment: onDestroy for workspace '${currentWorkspace?.name}'")
-        // Сохраняем состояние текущего рабочего пространства
-        currentWorkspace?.let { workspace ->
-            viewModel.saveWorkspaces()
-        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        
-        // Настраиваем таймер автосохранения
-        val handler = Handler(android.os.Looper.getMainLooper())
-        val runnable = object : Runnable {
-            override fun run() {
-                forceContentSave()
-                handler.postDelayed(this, 10000) // автосохранение каждые 10 секунд
-            }
-        }
-        handler.postDelayed(runnable, 10000)
     }
 
-    // Общий метод для принудительного сохранения содержимого
-    private fun forceContentSave() {
+    companion object {
+        private const val PICK_ICON_REQUEST_CODE = 1001
+        private const val PICK_ICON_REQUEST = 1002
+
+        fun newInstance(workspaceName: String): WorkspaceFragment {
+            val fragment = WorkspaceFragment()
+            val args = Bundle()
+            args.putString("WORKSPACE_NAME", workspaceName)
+            fragment.arguments = args
+            return fragment
+        }
+    }
+
+    private fun showLoadingDialog(): AlertDialog {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_loading, null)
+        val dialog = AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+        dialog.show()
+        return dialog
+    }
+
+    private fun showLinkContextMenu(view: View, link: ContentItem.NestedPageItem) {
+        val popupMenu = PopupMenu(requireContext(), view)
+        popupMenu.menuInflater.inflate(R.menu.link_context_menu, popupMenu.menu)
+        
+        popupMenu.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_rename_link -> {
+                    showRenameLinkDialog(link)
+                    true
+                }
+                R.id.menu_change_link_icon -> {
+                    showIconSelectionDialog { selectedIconUri ->
+                        selectedIconUri?.let { uri ->
+                            viewModel.updateLinkIcon(currentWorkspace!!, link.id, uri)
+                            // Сразу обновляем отображение иконки
+                            val updatedWorkspace = viewModel.getWorkspaceById(currentWorkspace!!.id)
+                            updatedWorkspace?.let { workspace ->
+                                val updatedLink = workspace.items.find { it.id == link.id } as? ContentItem.NestedPageItem
+                                updatedLink?.let { updated ->
+                                    // Находим и обновляем view ссылки
+                                    for (i in 0 until container.childCount) {
+                                        val swipeContainer = container.getChildAt(i) as? SwipeContainer
+                                        val nestedPageView = swipeContainer?.getChildAt(0) as? View
+                                        val pageIconView = nestedPageView?.findViewById<ImageView>(R.id.pageIcon)
+                                        if (pageIconView != null) {
+                                            try {
+                                                val inputStream = requireContext().contentResolver.openInputStream(uri)
+                                                val bitmap = BitmapFactory.decodeStream(inputStream)
+                                                pageIconView.setImageBitmap(bitmap)
+                                                break
+                                            } catch (e: Exception) {
+                                                Log.e("MindNote", "Error updating icon", e)
+                                            }
+                                        }
+                                    }
+
+                                    // Обновляем иконку в боковом меню
+                                    val targetWorkspace = viewModel.getWorkspaceById(updated.pageId)
+                                    targetWorkspace?.let { target ->
+                                        target.iconUri = uri
+                                        viewModel.updateWorkspace(target)
+                                        // Обновляем боковое меню
+                                        (activity as? MainActivity)?.updateWorkspaceIcon(target)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+        popupMenu.show()
+    }
+
+    private fun showRenameLinkDialog(link: ContentItem.NestedPageItem) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_rename_workspace, null)
+        val editText = dialogView.findViewById<EditText>(R.id.editTextWorkspaceName)
+        editText.setText(link.pageName)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Переименовать ссылку")
+            .setView(dialogView)
+            .setPositiveButton("Сохранить") { _, _ ->
+                val newName = editText.text.toString()
+                if (newName.isNotEmpty() && newName != link.pageName) {
+                    // Сначала обновляем название в UI
+                    for (i in 0 until container.childCount) {
+                        val swipeContainer = container.getChildAt(i) as? SwipeContainer
+                        val nestedPageView = swipeContainer?.getChildAt(0) as? View
+                        val pageNameView = nestedPageView?.findViewById<TextView>(R.id.pageName)
+                        if (pageNameView?.text == link.pageName) {
+                            pageNameView.text = newName
+                            break
+                        }
+                    }
+
+                    // Затем обновляем в модели данных
+                    viewModel.renameLink(currentWorkspace!!, link.id, newName)
+                    
+                    // Обновляем заголовок, если это текущее рабочее пространство
+                    if (currentWorkspace?.id == link.pageId) {
+                        (activity as MainActivity).supportActionBar?.title = newName
+                    }
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun createNestedPage(pageName: String, iconUri: Uri?) {
+        // Создаем новое рабочее пространство для вложенной страницы
+        val nestedWorkspace = viewModel.createWorkspace(pageName, iconUri)
+        // Создаем элемент вложенной страницы
+        val nestedPageItem = ContentItem.NestedPageItem(
+            pageName = pageName,
+            pageId = nestedWorkspace.id,
+            iconUri = iconUri
+        )
+        // Добавляем элемент в текущее рабочее пространство
         currentWorkspace?.let { workspace ->
-            viewModel.saveWorkspaces()
-            Log.d("MindNote", "Принудительное сохранение рабочего пространства '${workspace.name}'")
+            viewModel.addContentItem(workspace, nestedPageItem)
+            addNestedPageItem(nestedPageItem)
         }
     }
 }

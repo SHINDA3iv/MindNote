@@ -4,6 +4,7 @@
     <item
         android:id="@+id/popup_option1"
         android:title="Текстовый блок" />
+        android:title="Текст" />
     <item
         android:id="@+id/popup_option2"
         android:title="Чекбокс" />
@@ -19,7 +20,5 @@
     <item
         android:id="@+id/popup_option6"
         android:title="Маркированный список" />
-    <item
-        android:id="@+id/popup_option7"
-        android:title="Подключить подпространство" />
+        android:title="Страница" />
 </menu> 

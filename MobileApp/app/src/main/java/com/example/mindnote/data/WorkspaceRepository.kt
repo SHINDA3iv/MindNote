@@ -20,237 +20,153 @@ import java.lang.reflect.Type
 
 /**
  * Централизованное хранилище всех данных рабочих пространств
- * Обеспечивает надежное сохранение и загрузку данных
  */
 class WorkspaceRepository private constructor(private val context: Context) {
-    private val _workspaces = MutableLiveData<List<Workspace>>()
+    private val _workspaces = MutableLiveData<List<Workspace>>(emptyList())
     val workspaces: LiveData<List<Workspace>> = _workspaces
-    
-    private val gson: Gson = GsonBuilder()
-        .registerTypeAdapter(Uri::class.java, UriTypeAdapter())
-        .registerTypeAdapter(ContentItem::class.java, ContentItemTypeAdapter())
-        .setPrettyPrinting()
-        .create()
-    
-    init {
-        Log.d("StartAppTag", "Initializing WorkspaceRepository")
-        try {
-            loadWorkspaces()
-            Log.d("StartAppTag", "WorkspaceRepository initialized successfully")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error initializing WorkspaceRepository", e)
-            throw e
-        }
-    }
-    
-    // Метод загрузки всех рабочих пространств
-    fun loadWorkspaces() {
-        Log.d("StartAppTag", "Loading workspaces from storage")
-        try {
-            val file = File(context.filesDir, "workspaces.json")
-            if (file.exists()) {
-                val json = file.readText()
-                Log.d("StartAppTag", "Found workspaces file, size: ${json.length} bytes")
-                val type = object : TypeToken<List<Workspace>>() {}.type
-                val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type) ?: emptyList()
-                _workspaces.postValue(loadedWorkspaces)
-                Log.d("StartAppTag", "Successfully loaded ${loadedWorkspaces.size} workspaces")
-            } else {
-                _workspaces.postValue(emptyList())
-                Log.d("StartAppTag", "No workspaces file found, initializing empty list")
-            }
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error loading workspaces from main file", e)
-            
-            try {
-                Log.d("StartAppTag", "Attempting to restore from backup")
-                val backupFile = File(context.filesDir, "workspaces_backup.json")
-                if (backupFile.exists()) {
-                    val json = backupFile.readText()
-                    val type = object : TypeToken<List<Workspace>>() {}.type
-                    val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type) ?: emptyList()
-                    _workspaces.postValue(loadedWorkspaces)
-                    Log.d("StartAppTag", "Successfully restored ${loadedWorkspaces.size} workspaces from backup")
-                } else {
-                    _workspaces.postValue(emptyList())
-                    Log.d("StartAppTag", "No backup file found, initializing empty list")
-                }
-            } catch (e2: Exception) {
-                Log.e("StartAppTag", "Error restoring from backup", e2)
-                _workspaces.postValue(emptyList())
-            }
-        }
-    }
-    
-    // Метод сохранения всех рабочих пространств
-    fun saveWorkspaces() {
-        Log.d("StartAppTag", "Saving workspaces to storage")
-        try {
-            val currentWorkspaces = _workspaces.value ?: emptyList()
-            Log.d("StartAppTag", "Preparing to save ${currentWorkspaces.size} workspaces")
-            
-            val json = gson.toJson(currentWorkspaces)
-            
-            val file = File(context.filesDir, "workspaces.json")
-            file.writeText(json)
-            
-            val backupFile = File(context.filesDir, "workspaces_backup.json")
-            backupFile.writeText(json)
 
-            Log.d("StartAppTag", "Successfully saved workspaces to main file and backup")
-            if (currentWorkspaces.isNotEmpty()) {
-                Log.d("StartAppTag", "First workspace has ${currentWorkspaces[0].items.size} items")
-                if (currentWorkspaces.size > 1) {
-                    Log.d("StartAppTag", "Second workspace has ${currentWorkspaces[1].items.size} items")
+    init {
+        loadWorkspaces()  // Загружаем сохраненные рабочие пространства при инициализации
+    }
+
+    companion object {
+        @Volatile
+        private var INSTANCE: WorkspaceRepository? = null
+
+        fun getInstance(context: Context): WorkspaceRepository {
+            return INSTANCE ?: synchronized(this) {
+                try {
+                    if (context == null) {
+                        throw IllegalArgumentException("Context cannot be null")
+                    }
+                    INSTANCE ?: WorkspaceRepository(context.applicationContext).also { INSTANCE = it }
+                } catch (e: Exception) {
+                    Log.e("MindNote", "Error creating WorkspaceRepository instance", e)
+                    throw e
                 }
             }
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error saving workspaces", e)
-            throw e
         }
     }
-    
+
     // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
-        Log.d("StartAppTag", "Creating new workspace: $name")
-        try {
-            val workspace = Workspace(name, iconUri?.toString() ?: "")
-            val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
-            currentList.add(workspace)
-            _workspaces.postValue(currentList)
-            saveWorkspaces()
-            Log.d("StartAppTag", "Successfully created new workspace: $name")
-            return workspace
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error creating workspace: $name", e)
-            throw e
-        }
+        val workspace = Workspace(name, iconUri)
+        val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
+        currentList.add(workspace)
+        _workspaces.postValue(currentList)
+        return workspace
     }
     
     // Обновление существующего рабочего пространства
     fun updateWorkspace(workspace: Workspace) {
-        Log.d("StartAppTag", "Updating workspace: ${workspace.name}")
-        try {
-            val currentList = _workspaces.value?.toMutableList() ?: mutableListOf()
-            val index = currentList.indexOfFirst { it.id == workspace.id }
-            if (index != -1) {
-                currentList[index] = workspace
-                _workspaces.postValue(currentList)
-                saveWorkspaces()
-                Log.d("StartAppTag", "Successfully updated workspace: ${workspace.name}")
-            } else {
-                Log.w("StartAppTag", "Workspace not found for update: ${workspace.name}")
-            }
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error updating workspace: ${workspace.name}", e)
-            throw e
+        val currentWorkspaces = _workspaces.value?.toMutableList() ?: mutableListOf()
+        val index = currentWorkspaces.indexOfFirst { it.id == workspace.id }
+        if (index != -1) {
+            currentWorkspaces[index] = workspace
+            _workspaces.value = currentWorkspaces
+            Log.d("MindNote", "WorkspaceRepository: Updated workspace ${workspace.name}")
         }
     }
     
     // Получение рабочего пространства по имени
     fun getWorkspaceByName(name: String): Workspace? {
-        Log.d("StartAppTag", "Getting workspace by name: $name")
-        return try {
-            val workspace = _workspaces.value?.find { it.name == name }
-            if (workspace != null) {
-                Log.d("StartAppTag", "Found workspace: $name")
-            } else {
-                Log.d("StartAppTag", "Workspace not found: $name")
-            }
-            workspace
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error getting workspace by name: $name", e)
-            null
-        }
+        return _workspaces.value?.find { it.name == name }
     }
     
     // Получение рабочего пространства по ID
     fun getWorkspaceById(id: String): Workspace? {
-        Log.d("StartAppTag", "Getting workspace by ID: $id")
-        return try {
-            val workspace = _workspaces.value?.find { it.id == id }
-            if (workspace != null) {
-                Log.d("StartAppTag", "Found workspace with ID: $id")
-            } else {
-                Log.d("StartAppTag", "Workspace not found with ID: $id")
-            }
-            workspace
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error getting workspace by ID: $id", e)
-            null
-        }
+        val workspace = _workspaces.value?.find { it.id == id }
+        Log.d("MindNote", "WorkspaceRepository: Looking for workspace with ID '$id', found: ${workspace?.name}, total workspaces: ${_workspaces.value?.size}")
+        return workspace
     }
-    
+
     // Добавление элемента содержимого в рабочее пространство
     fun addContentItem(workspace: Workspace, item: ContentItem) {
-        Log.d("StartAppTag", "Adding content item to workspace: ${workspace.name}")
-        try {
-            val current = getWorkspaceById(workspace.id) ?: workspace
-            current.addItem(item)
-            updateWorkspace(current)
-            Log.d("StartAppTag", "Successfully added item to workspace '${current.name}', now has ${current.items.size} items")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error adding content item to workspace: ${workspace.name}", e)
-            throw e
+        val currentWorkspace = _workspaces.value?.find { it.id == workspace.id }
+        currentWorkspace?.let {
+            it.addItem(item)
+            updateWorkspace(it)
+            Log.d("MindNote", "WorkspaceRepository: Added item ${item.id} to workspace ${workspace.name}")
         }
     }
     
     // Удаление элемента содержимого из рабочего пространства
     fun removeContentItem(workspace: Workspace, itemId: String) {
-        Log.d("StartAppTag", "Removing content item from workspace: ${workspace.name}")
         try {
-            val current = getWorkspaceById(workspace.id) ?: workspace
-            val itemToRemove = current.items.find { item ->
-                when (item) {
-                    is ContentItem.TextItem -> item.id == itemId
-                    is ContentItem.CheckboxItem -> item.id == itemId
-                    is ContentItem.NumberedListItem -> item.id == itemId
-                    is ContentItem.BulletListItem -> item.id == itemId
-                    is ContentItem.ImageItem -> item.id == itemId
-                    is ContentItem.FileItem -> item.id == itemId
-                    is ContentItem.SubWorkspaceLink -> item.id == itemId
-                }
-            }
-            
-            if (itemToRemove != null) {
-                current.removeItem(itemId)
-                updateWorkspace(current)
-                Log.d("StartAppTag", "Successfully removed item from workspace '${current.name}', now has ${current.items.size} items")
-            } else {
-                Log.w("StartAppTag", "Item not found for removal in workspace: ${workspace.name}")
+            val currentWorkspace = _workspaces.value?.find { it.id == workspace.id }
+            currentWorkspace?.let {
+                it.removeItem(itemId)
+                updateWorkspace(it)
+                saveWorkspaces() // Сохраняем изменения сразу
+                Log.d("MindNote", "WorkspaceRepository: Removed item $itemId from workspace ${workspace.name}")
             }
         } catch (e: Exception) {
-            Log.e("StartAppTag", "Error removing content item from workspace: ${workspace.name}", e)
+            Log.e("MindNote", "Error removing content item in repository", e)
             throw e
         }
     }
     
     // Обновление элемента содержимого в рабочем пространстве
-    fun updateContentItem(workspace: Workspace, updatedItem: ContentItem) {
-        Log.d("StartAppTag", "Updating content item in workspace: ${workspace.name}")
+    fun updateContentItem(workspace: Workspace, item: ContentItem) {
+        when (item) {
+            is ContentItem.TextItem -> workspace.updateItem(item)
+            is ContentItem.CheckboxItem -> workspace.updateItem(item)
+            is ContentItem.ImageItem -> workspace.updateItem(item)
+            is ContentItem.FileItem -> workspace.updateItem(item)
+            is ContentItem.NestedPageItem -> workspace.updateItem(item)
+        }
+        updateWorkspace(workspace)
+    }
+
+    // Загрузка сохраненных рабочих пространств
+    private fun loadWorkspaces() {
+        val gson = GsonBuilder()
+            .registerTypeAdapter(Uri::class.java, UriTypeAdapter())
+            .registerTypeAdapter(ContentItem::class.java, ContentItemTypeAdapter())
+            .create()
+
         try {
-            val current = getWorkspaceById(workspace.id) ?: workspace
-            current.updateItem(updatedItem)
-            updateWorkspace(current)
-            Log.d("StartAppTag", "Successfully updated content item in workspace: ${workspace.name}")
+            val file = File(context.filesDir, "workspaces.json")
+            if (file.exists()) {
+                val json = file.readText()
+                val type = object : TypeToken<List<Workspace>>() {}.type
+                val loadedWorkspaces = gson.fromJson<List<Workspace>>(json, type)
+                _workspaces.value = loadedWorkspaces
+                Log.d("MindNote", "Workspaces loaded successfully: ${loadedWorkspaces.size} workspaces")
+            }
         } catch (e: Exception) {
-            Log.e("StartAppTag", "Error updating content item in workspace: ${workspace.name}", e)
-            throw e
+            Log.e("MindNote", "Error loading workspaces", e)
         }
     }
-    
-    companion object {
-        @Volatile
-        private var INSTANCE: WorkspaceRepository? = null
-        
-        fun getInstance(context: Context): WorkspaceRepository {
-            Log.d("StartAppTag", "Getting WorkspaceRepository instance")
-            return INSTANCE ?: synchronized(this) {
-                Log.d("StartAppTag", "Creating new WorkspaceRepository instance")
-                val instance = WorkspaceRepository(context)
-                INSTANCE = instance
-                instance
-            }
+
+    // Сохранение всех рабочих пространств
+    fun saveWorkspaces() {
+        val gson = GsonBuilder()
+            .registerTypeAdapter(Uri::class.java, UriTypeAdapter())
+            .registerTypeAdapter(ContentItem::class.java, ContentItemTypeAdapter())
+            .create()
+
+        try {
+            val json = gson.toJson(_workspaces.value)
+            val file = File(context.filesDir, "workspaces.json")
+            file.writeText(json)
+            Log.d("MindNote", "Workspaces saved successfully")
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error saving workspaces", e)
+        }
+    }
+
+    // Удаление рабочего пространства
+    fun deleteWorkspace(workspace: Workspace) {
+        try {
+            val currentWorkspaces = _workspaces.value?.toMutableList() ?: mutableListOf()
+            currentWorkspaces.removeIf { it.id == workspace.id }
+            _workspaces.value = currentWorkspaces
+            saveWorkspaces() // Сохраняем изменения сразу
+            Log.d("MindNote", "WorkspaceRepository: Deleted workspace ${workspace.name}")
+        } catch (e: Exception) {
+            Log.e("MindNote", "Error deleting workspace in repository", e)
+            throw e
         }
     }
 }
@@ -292,17 +208,6 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("isChecked", src.isChecked)
                 jsonObject.addProperty("id", src.id)
             }
-            is ContentItem.NumberedListItem -> {
-                jsonObject.addProperty("type", "NumberedListItem")
-                jsonObject.addProperty("text", src.text)
-                jsonObject.addProperty("number", src.number)
-                jsonObject.addProperty("id", src.id)
-            }
-            is ContentItem.BulletListItem -> {
-                jsonObject.addProperty("type", "BulletListItem")
-                jsonObject.addProperty("text", src.text)
-                jsonObject.addProperty("id", src.id)
-            }
             is ContentItem.ImageItem -> {
                 jsonObject.addProperty("type", "ImageItem")
                 jsonObject.addProperty("imageUri", src.imageUri.toString())
@@ -315,11 +220,12 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("fileSize", src.fileSize)
                 jsonObject.addProperty("id", src.id)
             }
-            is ContentItem.SubWorkspaceLink -> {
-                jsonObject.addProperty("type", "SubWorkspaceLink")
-                jsonObject.addProperty("workspaceId", src.workspaceId)
-                jsonObject.addProperty("displayName", src.displayName)
+            is ContentItem.NestedPageItem -> {
+                jsonObject.addProperty("type", "NestedPageItem")
+                jsonObject.addProperty("pageName", src.pageName)
+                jsonObject.addProperty("pageId", src.pageId)
                 jsonObject.addProperty("id", src.id)
+                src.iconUri?.let { jsonObject.addProperty("iconUri", it.toString()) }
             }
             null -> return JsonObject()
         }
@@ -340,28 +246,20 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 isChecked = jsonObject.get("isChecked")?.asBoolean ?: false,
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
-            "NumberedListItem" -> ContentItem.NumberedListItem(
-                text = jsonObject.get("text")?.asString ?: "",
-                number = jsonObject.get("number")?.asInt ?: 0,
-                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
-            )
-            "BulletListItem" -> ContentItem.BulletListItem(
-                text = jsonObject.get("text")?.asString ?: "",
-                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
-            )
             "ImageItem" -> ContentItem.ImageItem(
-                imageUri = jsonObject.get("imageUri")?.asString?.let { Uri.parse(it) } ?: Uri.EMPTY,
+                imageUri = Uri.parse(jsonObject.get("imageUri")?.asString),
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             "FileItem" -> ContentItem.FileItem(
                 fileName = jsonObject.get("fileName")?.asString ?: "",
-                fileUri = jsonObject.get("fileUri")?.asString?.let { Uri.parse(it) } ?: Uri.EMPTY,
+                fileUri = Uri.parse(jsonObject.get("fileUri")?.asString),
                 fileSize = jsonObject.get("fileSize")?.asLong ?: 0L,
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
-            "SubWorkspaceLink" -> ContentItem.SubWorkspaceLink(
-                workspaceId = jsonObject.get("workspaceId")?.asString ?: "",
-                displayName = jsonObject.get("displayName")?.asString ?: "",
+            "NestedPageItem" -> ContentItem.NestedPageItem(
+                pageName = jsonObject.get("pageName")?.asString ?: "",
+                pageId = jsonObject.get("pageId")?.asString ?: java.util.UUID.randomUUID().toString(),
+                iconUri = jsonObject.get("iconUri")?.asString?.let { Uri.parse(it) },
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             else -> ContentItem.TextItem("")

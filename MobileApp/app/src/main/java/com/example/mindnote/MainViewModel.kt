@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.mindnote.data.ContentItem
 import com.example.mindnote.data.Workspace
 import com.example.mindnote.data.WorkspaceRepository
@@ -21,6 +22,7 @@ import com.google.gson.JsonSerializer
 import com.google.gson.reflect.TypeToken
 import java.io.File
 import java.lang.reflect.Type
+import kotlinx.coroutines.launch
 
 class MainViewModel : ViewModel() {
     private lateinit var repository: WorkspaceRepository
@@ -31,12 +33,14 @@ class MainViewModel : ViewModel() {
     
     // Инициализация репозитория, должна быть вызвана перед использованием
     fun init(context: Context) {
-        Log.d("StartAppTag", "Initializing MainViewModel")
         try {
+            if (context == null) {
+                throw IllegalArgumentException("Context cannot be null")
+            }
             repository = WorkspaceRepository.getInstance(context)
-            Log.d("StartAppTag", "MainViewModel initialized successfully")
+            Log.d("MindNote", "MainViewModel: Initialized successfully")
         } catch (e: Exception) {
-            Log.e("StartAppTag", "Error initializing MainViewModel", e)
+            Log.e("MindNote", "Error initializing MainViewModel", e)
             throw e
         }
     }
@@ -45,151 +49,181 @@ class MainViewModel : ViewModel() {
     val workspaces: LiveData<List<Workspace>> 
         get() = repository.workspaces
     
-    // Сохранение всех рабочих пространств
-    fun saveWorkspaces() {
-        Log.d("StartAppTag", "Saving workspaces")
-        try {
-            repository.saveWorkspaces()
-            Log.d("StartAppTag", "Workspaces saved successfully")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error saving workspaces", e)
-            throw e
-        }
-    }
-    
-    // Обновление рабочих пространств из хранилища
-    fun loadWorkspaces() {
-        Log.d("StartAppTag", "Loading workspaces")
-        try {
-            repository.loadWorkspaces()
-            Log.d("StartAppTag", "Workspaces loaded successfully")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error loading workspaces", e)
-            throw e
-        }
-    }
-    
     // Создание нового рабочего пространства
     fun createWorkspace(name: String, iconUri: Uri? = null): Workspace {
-        Log.d("StartAppTag", "Creating new workspace: $name")
-        try {
-            val workspace = repository.createWorkspace(name, iconUri)
-            Log.d("StartAppTag", "Workspace created successfully: $name")
-            return workspace
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error creating workspace: $name", e)
-            throw e
-        }
+        return repository.createWorkspace(name, iconUri)
     }
     
-    // Обновление существующего рабочего пространства
+    // Обновление рабочего пространства
     fun updateWorkspace(workspace: Workspace) {
-        Log.d("StartAppTag", "Updating workspace: ${workspace.name}")
-        try {
-            repository.updateWorkspace(workspace)
-            Log.d("StartAppTag", "Workspace updated successfully: ${workspace.name}")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error updating workspace: ${workspace.name}", e)
-            throw e
-        }
-    }
-    
-    // Установка текущего рабочего пространства
-    fun setCurrentWorkspace(workspace: Workspace) {
-        Log.d("StartAppTag", "Setting current workspace to: ${workspace.name}")
-        try {
-            workspace.lastAccessed = System.currentTimeMillis()
-            repository.updateWorkspace(workspace)
-            _currentWorkspace.value = workspace
-            Log.d("StartAppTag", "Current workspace set successfully: ${workspace.name} with ${workspace.items.size} items")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error setting current workspace: ${workspace.name}", e)
-            throw e
-        }
+        repository.updateWorkspace(workspace)
     }
     
     // Получение рабочего пространства по имени
     fun getWorkspaceByName(name: String): Workspace? {
-        Log.d("StartAppTag", "Getting workspace by name: $name")
-        return try {
-            val workspace = repository.getWorkspaceByName(name)
-            Log.d("StartAppTag", "Workspace found: $name")
-            workspace
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error getting workspace by name: $name", e)
-            null
-        }
+        return repository.getWorkspaceByName(name)
+    }
+    
+    // Получение рабочего пространства по ID
+    fun getWorkspaceById(id: String): Workspace? {
+        val workspace = repository.getWorkspaceById(id)
+        Log.d("MindNote", "MainViewModel: Looking for workspace with ID '$id', found: ${workspace?.name}")
+        return workspace
+    }
+    
+    // Установка текущего рабочего пространства
+    fun setCurrentWorkspace(workspace: Workspace) {
+        _currentWorkspace.value = workspace
     }
     
     // Добавление нового элемента содержимого в рабочее пространство
     fun addContentItem(workspace: Workspace, item: ContentItem) {
-        Log.d("StartAppTag", "Adding content item to workspace: ${workspace.name}")
-        try {
-            repository.addContentItem(workspace, item)
-            if (_currentWorkspace.value?.id == workspace.id) {
-                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
-            }
-            Log.d("StartAppTag", "Content item added successfully to workspace: ${workspace.name}")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error adding content item to workspace: ${workspace.name}", e)
-            throw e
+        repository.addContentItem(workspace, item)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
         }
     }
     
     // Удаление элемента содержимого из рабочего пространства
     fun removeContentItem(workspace: Workspace, itemId: String) {
-        Log.d("StartAppTag", "Removing content item from workspace: ${workspace.name}")
         try {
+            // Находим элемент перед удалением
+            val item = workspace.items.find { it.id == itemId }
+            
+            // Если это ссылка на подпространство, удаляем и само подпространство
+            if (item is ContentItem.NestedPageItem) {
+                val nestedWorkspace = getWorkspaceById(item.pageId)
+                nestedWorkspace?.let {
+                    // Сначала удаляем все вложенные элементы
+                    it.items.forEach { nestedItem ->
+                        removeContentItem(it, nestedItem.id)
+                    }
+                    // Затем удаляем само подпространство
+                    deleteWorkspace(it)
+                }
+            }
+            
+            // Удаляем элемент из текущего пространства
             repository.removeContentItem(workspace, itemId)
+            
+            // Если это текущее рабочее пространство, обновляем его
             if (_currentWorkspace.value?.id == workspace.id) {
                 _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
             }
-            Log.d("StartAppTag", "Content item removed successfully from workspace: ${workspace.name}")
+            
+            Log.d("MindNote", "MainViewModel: Removed item $itemId from workspace ${workspace.name}")
         } catch (e: Exception) {
-            Log.e("StartAppTag", "Error removing content item from workspace: ${workspace.name}", e)
+            Log.e("MindNote", "Error removing content item", e)
             throw e
         }
     }
     
     // Обновление элемента содержимого в рабочем пространстве
     fun updateContentItem(workspace: Workspace, item: ContentItem) {
-        Log.d("StartAppTag", "Updating content item in workspace: ${workspace.name}")
-        try {
-            repository.updateContentItem(workspace, item)
-            if (_currentWorkspace.value?.id == workspace.id) {
-                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
-            }
-            Log.d("StartAppTag", "Content item updated successfully in workspace: ${workspace.name}")
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error updating content item in workspace: ${workspace.name}", e)
-            throw e
+        when (item) {
+            is ContentItem.TextItem -> workspace.updateItem(item)
+            is ContentItem.CheckboxItem -> workspace.updateItem(item)
+            is ContentItem.ImageItem -> workspace.updateItem(item)
+            is ContentItem.FileItem -> workspace.updateItem(item)
+            is ContentItem.NestedPageItem -> workspace.updateItem(item)
         }
+        repository.updateWorkspace(workspace)
     }
     
     // Получение списка избранных рабочих пространств
     fun getFavorites(): List<Workspace> {
-        Log.d("StartAppTag", "Getting favorite workspaces")
         return workspaces.value?.filter { it.isFavorite } ?: emptyList()
     }
     
     // Переключение статуса "избранное" для рабочего пространства
-    fun toggleFavorite(workspace: Workspace): Boolean {
-        Log.d("StartAppTag", "Toggling favorite status for workspace: ${workspace.name}")
-        try {
-            workspace.isFavorite = !workspace.isFavorite
-            repository.updateWorkspace(workspace)
-            Log.d("StartAppTag", "Favorite status toggled successfully for workspace: ${workspace.name}")
-            return workspace.isFavorite
-        } catch (e: Exception) {
-            Log.e("StartAppTag", "Error toggling favorite status for workspace: ${workspace.name}", e)
-            throw e
-        }
+    fun toggleFavorite(workspace: Workspace) {
+        workspace.isFavorite = !workspace.isFavorite
+        repository.updateWorkspace(workspace)
     }
     
     // Получение недавно использовавшихся рабочих пространств
     fun getRecentlyAccessed(limit: Int = 5): List<Workspace> {
-        Log.d("StartAppTag", "Getting recently accessed workspaces")
         return workspaces.value?.sortedByDescending { it.lastAccessed }?.take(limit) ?: emptyList()
+    }
+
+    // Сохранение всех рабочих пространств
+    private fun saveWorkspaces() {
+        repository.saveWorkspaces()
+    }
+
+    // Переименование рабочего пространства
+    fun renameWorkspace(workspace: Workspace, newName: String) {
+        workspace.name = newName
+        repository.updateWorkspace(workspace)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = workspace
+        }
+    }
+
+    // Обновление иконки рабочего пространства
+    fun updateWorkspaceIcon(workspace: Workspace, iconUri: Uri) {
+        workspace.iconUri = iconUri
+        repository.updateWorkspace(workspace)
+        // Если это текущее рабочее пространство, обновляем его
+        if (_currentWorkspace.value?.id == workspace.id) {
+            _currentWorkspace.value = workspace
+        }
+    }
+
+    // Удаление рабочего пространства
+    fun deleteWorkspace(workspace: Workspace) {
+        viewModelScope.launch {
+            try {
+                repository.deleteWorkspace(workspace)
+                // Если удаляемое пространство было текущим, очищаем его
+                if (_currentWorkspace.value?.id == workspace.id) {
+                    _currentWorkspace.value = null
+                }
+                // Если это было последнее пространство, обновляем список
+                if (workspaces.value?.isEmpty() == true) {
+                    _currentWorkspace.value = null
+                }
+            } catch (e: Exception) {
+                Log.e("MindNote", "Error deleting workspace", e)
+                throw e
+            }
+        }
+    }
+
+    // Переименование ссылки
+    fun renameLink(workspace: Workspace, linkId: String, newName: String) {
+        val link = workspace.items.find { it.id == linkId } as? ContentItem.NestedPageItem
+        link?.let {
+            it.pageName = newName
+            repository.updateContentItem(workspace, it)
+            
+            // Обновляем название в самом рабочем пространстве
+            val targetWorkspace = getWorkspaceById(it.pageId)
+            targetWorkspace?.let { target ->
+                target.name = newName
+                repository.updateWorkspace(target)
+            }
+            
+            // Если это текущее рабочее пространство, обновляем его
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+        }
+    }
+
+    // Обновление иконки ссылки
+    fun updateLinkIcon(workspace: Workspace, linkId: String, iconUri: Uri) {
+        val link = workspace.items.find { it.id == linkId } as? ContentItem.NestedPageItem
+        link?.let {
+            it.iconUri = iconUri
+            repository.updateContentItem(workspace, it)
+            // Если это текущее рабочее пространство, обновляем его
+            if (_currentWorkspace.value?.id == workspace.id) {
+                _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
+            }
+        }
     }
 }
 
@@ -228,17 +262,6 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("isChecked", src.isChecked)
                 jsonObject.addProperty("id", src.id)
             }
-            is ContentItem.NumberedListItem -> {
-                jsonObject.addProperty("type", "NumberedListItem")
-                jsonObject.addProperty("text", src.text)
-                jsonObject.addProperty("number", src.number)
-                jsonObject.addProperty("id", src.id)
-            }
-            is ContentItem.BulletListItem -> {
-                jsonObject.addProperty("type", "BulletListItem")
-                jsonObject.addProperty("text", src.text)
-                jsonObject.addProperty("id", src.id)
-            }
             is ContentItem.ImageItem -> {
                 jsonObject.addProperty("type", "ImageItem")
                 jsonObject.addProperty("imageUri", src.imageUri.toString())
@@ -251,10 +274,10 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 jsonObject.addProperty("fileSize", src.fileSize)
                 jsonObject.addProperty("id", src.id)
             }
-            is ContentItem.SubWorkspaceLink -> {
-                jsonObject.addProperty("type", "SubWorkspaceLink")
-                jsonObject.addProperty("workspaceId", src.workspaceId)
-                jsonObject.addProperty("displayName", src.displayName)
+            is ContentItem.NestedPageItem -> {
+                jsonObject.addProperty("type", "NestedPageItem")
+                jsonObject.addProperty("pageName", src.pageName)
+                jsonObject.addProperty("pageId", src.pageId)
                 jsonObject.addProperty("id", src.id)
             }
             null -> return JsonObject()
@@ -276,15 +299,6 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 isChecked = jsonObject.get("isChecked")?.asBoolean ?: false,
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
-            "NumberedListItem" -> ContentItem.NumberedListItem(
-                text = jsonObject.get("text")?.asString ?: "",
-                number = jsonObject.get("number")?.asInt ?: 0,
-                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
-            )
-            "BulletListItem" -> ContentItem.BulletListItem(
-                text = jsonObject.get("text")?.asString ?: "",
-                id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
-            )
             "ImageItem" -> ContentItem.ImageItem(
                 imageUri = Uri.parse(jsonObject.get("imageUri")?.asString),
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
@@ -295,9 +309,9 @@ class ContentItemTypeAdapter : JsonSerializer<ContentItem>, JsonDeserializer<Con
                 fileSize = jsonObject.get("fileSize")?.asLong ?: 0L,
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
-            "SubWorkspaceLink" -> ContentItem.SubWorkspaceLink(
-                workspaceId = jsonObject.get("workspaceId")?.asString ?: "",
-                displayName = jsonObject.get("displayName")?.asString ?: "",
+            "NestedPageItem" -> ContentItem.NestedPageItem(
+                pageName = jsonObject.get("pageName")?.asString ?: "",
+                pageId = jsonObject.get("pageId")?.asString ?: java.util.UUID.randomUUID().toString(),
                 id = jsonObject.get("id")?.asString ?: java.util.UUID.randomUUID().toString()
             )
             else -> ContentItem.TextItem("")

@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">MindNote</string>
-    <string name="navigation_drawer_open">open\n</string>
-    <string name="navigation_drawer_close">close</string>
+    <string name="navigation_drawer_open">Открыть\n</string>
+    <string name="navigation_drawer_close">Закрыть</string>
     <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
-    <string name="add">add\n</string>
+    <string name="hello_blank_fragment">Это пустой фрагмент</string>
+    <string name="add">Добавить\n</string>
 </resources>

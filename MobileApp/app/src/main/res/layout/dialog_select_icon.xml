@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="4"
+        android:rowCount="3">
+
+        <ImageButton
+            android:id="@+id/icon1"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_workspace"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"/>
+
+        <ImageButton
+            android:id="@+id/icon2"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_home"
+            android:layout_margin="12dp"
+            android:padding="8dp"
+            android:scaleType="fitCenter"/>
+
+        <ImageButton
+            android:id="@+id/icon3"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_star" />
+
+        <ImageButton
+            android:id="@+id/icon4"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_heart" />
+
+        <ImageButton
+            android:id="@+id/icon5"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_paw" />
+
+        <ImageButton
+            android:id="@+id/icon6"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_clock" />
+
+        <ImageButton
+            android:id="@+id/icon7"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_cap" />
+
+        <ImageButton
+            android:id="@+id/icon8"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_dollar" />
+
+        <ImageButton
+            android:id="@+id/icon9"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_gamepad" />
+
+        <ImageButton
+            android:id="@+id/icon10"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_rocket" />
+
+        <ImageButton
+            android:id="@+id/icon11"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_leaf" />
+
+        <ImageButton
+            android:id="@+id/icon12"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="12dp"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_bookmark" />
+    </GridLayout>
+
+    <Button
+        android:id="@+id/buttonCustomIcon"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Выбрать свою иконку" />
+
+</LinearLayout> 

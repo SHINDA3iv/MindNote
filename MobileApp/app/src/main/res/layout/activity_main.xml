@@ -3,48 +3,125 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
+    android:layout_height="match_parent">
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
 
-    <!-- Основной контент -->
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+    <LinearLayout
+    <ScrollView
 
-        <com.google.android.material.appbar.AppBarLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fitsSystemWindows="true">
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
+        <LinearLayout
+
+
+
+
+
+
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-                android:background="?attr/colorPrimary"
-                android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-                app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+            android:title="Рабочее пространство"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light">
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-        </com.google.android.material.appbar.AppBarLayout>
 
-        <androidx.fragment.app.FragmentContainerView
-            android:id="@+id/nav_host_fragment"
-            android:name="androidx.navigation.fragment.NavHostFragment"
+
+
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:title="Рабочее пространство"
+                app:popupTheme="@style/ThemeOverlay.AppCompat.Light">
+            </androidx.appcompat.widget.Toolbar>
+
+        </androidx.appcompat.widget.Toolbar>
+
+        <FrameLayout
+            android:id="@+id/fragment_container"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:defaultNavHost="true"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior"
-            app:navGraph="@navigation/nav_graph" />
+            android:layout_height="match_parent" />
 
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+            <FrameLayout
+                android:id="@+id/fragment_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
 
-    <!-- Боковая панель -->
+        </LinearLayout>
+    </ScrollView>
+
+
+    </LinearLayout>
+
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
+    <LinearLayout
+
+
+
+
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:fitsSystemWindows="true"
         app:headerLayout="@layout/nav_header"
-        app:menu="@menu/activity_main_drawer" />
+        app:menu="@menu/nav_menu" />
+        android:orientation="vertical">
+
+
+
+        <com.google.android.material.navigation.NavigationView
+            android:id="@+id/nav_view"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingTop="0dp"
+            app:headerLayout="@layout/nav_header"
+            app:menu="@menu/nav_menu" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="16dp"
+            android:background="?android:attr/colorBackground"
+            android:elevation="8dp">
+
+            <ImageView
+                android:id="@+id/user_avatar"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_user"
+                android:tint="?attr/colorPrimary"/>
+
+            <TextView
+                android:id="@+id/user_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:text="Гость"
+                android:textSize="16sp"
+                android:textAppearance="?android:textAppearanceMedium"/>
+
+            <Button
+                android:id="@+id/auth_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Войти"
+                android:textSize="14sp"
+                android:minHeight="48dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"/>
+        </LinearLayout>
+    </LinearLayout>
 
 </androidx.drawerlayout.widget.DrawerLayout>
