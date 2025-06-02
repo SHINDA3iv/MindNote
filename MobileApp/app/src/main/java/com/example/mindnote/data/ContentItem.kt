@@ -7,30 +7,34 @@ sealed class ContentItem {
 
     data class TextItem(
         var text: String,
+        var htmlText: String = text,
+        var isFormatted: Boolean = false,
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()
 
     data class CheckboxItem(
         var text: String,
+        var htmlText: String = text,
+        var isFormatted: Boolean = false,
         var isChecked: Boolean = false,
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()
 
     data class ImageItem(
-        var imageUri: Uri,
+        val imageUri: Uri,
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()
 
     data class FileItem(
-        var fileName: String,
-        var fileUri: Uri,
-        var fileSize: Long,
+        val fileName: String,
+        val fileUri: Uri,
+        val fileSize: Long,
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()
 
     data class NestedPageItem(
         var pageName: String,
-        var pageId: String = java.util.UUID.randomUUID().toString(),
+        val pageId: String,
         var iconUri: Uri? = null,
         override val id: String = java.util.UUID.randomUUID().toString()
     ) : ContentItem()

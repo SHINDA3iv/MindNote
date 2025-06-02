@@ -464,7 +464,13 @@ class WorkspaceFragment : Fragment() {
             } ?: run {
                 // Если это новый элемент, создаем его
                 val text = editText.text.toString()
-                val newItem = ContentItem.CheckboxItem(text, isChecked)
+                val newItem = ContentItem.CheckboxItem(
+                    text = text,
+                    htmlText = text,
+                    isFormatted = false,
+                    isChecked = checkbox.isChecked,
+                    id = java.util.UUID.randomUUID().toString()
+                )
                 currentWorkspace?.let { workspace ->
                     viewModel.addContentItem(workspace, newItem)
                     currentItem = newItem // Обновляем ссылку на текущий элемент
@@ -503,7 +509,13 @@ class WorkspaceFragment : Fragment() {
                                     Log.d("MindNote", "Updated checkbox text in workspace '${workspace.name}': id=${updatedItem.id}, isChecked=${checkbox.isChecked}")
                                 }
                             } ?: run {
-                                val newItem = ContentItem.CheckboxItem(text, checkbox.isChecked)
+                                val newItem = ContentItem.CheckboxItem(
+                                    text = text,
+                                    htmlText = text,
+                                    isFormatted = false,
+                                    isChecked = checkbox.isChecked,
+                                    id = java.util.UUID.randomUUID().toString()
+                                )
                                 currentWorkspace?.let { workspace -> 
                                     viewModel.addContentItem(workspace, newItem)
                                     currentItem = newItem // Обновляем ссылку на текущий элемент

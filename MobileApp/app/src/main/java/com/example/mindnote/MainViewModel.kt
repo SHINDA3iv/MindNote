@@ -148,7 +148,8 @@ class MainViewModel : ViewModel() {
     }
 
     // Сохранение всех рабочих пространств
-    private fun saveWorkspaces() {
+    fun saveWorkspaces() {
+        Log.d("MindNote", "MainViewModel: Saving workspaces")
         repository.saveWorkspaces()
     }
 
@@ -224,6 +225,12 @@ class MainViewModel : ViewModel() {
                 _currentWorkspace.value = repository.getWorkspaceById(workspace.id)
             }
         }
+    }
+
+    // Обновление текущего пользователя
+    fun updateCurrentUser(userName: String) {
+        // Notify repository to reload workspaces for the new user
+        repository.reloadWorkspaces()
     }
 }
 

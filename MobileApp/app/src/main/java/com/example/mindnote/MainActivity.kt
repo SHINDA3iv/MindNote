@@ -26,6 +26,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.mindnote.R.id.nav_header_add_button
 import com.example.mindnote.R.id.ws_group
 import com.example.mindnote.data.ContentItem
+import com.example.mindnote.data.UserManager
 import com.example.mindnote.data.Workspace
 import com.example.mindnote.views.ExpandableMenuItem
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -59,6 +60,10 @@ class MainActivity : AppCompatActivity() {
             super.onCreate(savedInstanceState)
             setContentView(R.layout.activity_main)
             enableEdgeToEdge()
+
+            // Initialize UserManager
+            UserManager.init(applicationContext)
+            currentUserName = UserManager.getCurrentUserName()
 
             // Initialize ViewModel first
             viewModel = ViewModelProvider(this)[MainViewModel::class.java]
@@ -296,7 +301,12 @@ class MainActivity : AppCompatActivity() {
                 authButton.text = "Выйти"
             }
             
+            // Update user state in UserManager
+            UserManager.setCurrentUserName(currentUserName)
             userNameText.text = currentUserName
+            
+            // Notify ViewModel of user change to update per-user folder
+            viewModel.updateCurrentUser(currentUserName)
         } else if (resultCode == Activity.RESULT_OK && data != null) {
             when (requestCode) {
                 PICK_IMAGE_REQUEST -> {
@@ -886,18 +896,26 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d("MindNote", "MainActivity: onResume - Current user: ${UserManager.getCurrentUserName()}")
+        // Перезагружаем рабочие пространства при возвращении в приложение
+        viewModel.updateCurrentUser(UserManager.getCurrentUserName())
     }
 
     override fun onPause() {
         super.onPause()
+        Log.d("MindNote", "MainActivity: onPause - Saving current state")
+        // Сохраняем текущее состояние
+        viewModel.saveWorkspaces()
     }
 
     override fun onStop() {
         super.onStop()
+        Log.d("MindNote", "MainActivity: onStop - Application going to background")
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d("MindNote", "MainActivity: onDestroy - Application being destroyed")
     }
 
     fun updateWorkspaceIcon(workspace: Workspace) {

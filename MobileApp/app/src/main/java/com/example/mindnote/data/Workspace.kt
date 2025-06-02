@@ -9,7 +9,8 @@ data class Workspace(
     var isFavorite: Boolean = false,
     var lastAccessed: Long = System.currentTimeMillis(),
     private val _items: MutableList<ContentItem> = mutableListOf(),
-    var id: String = java.util.UUID.randomUUID().toString()
+    var id: String = java.util.UUID.randomUUID().toString(),
+    var created_at: Long = System.currentTimeMillis()
 ) {
     // Создаем копию списка элементов при каждом доступе
     val items: List<ContentItem>
