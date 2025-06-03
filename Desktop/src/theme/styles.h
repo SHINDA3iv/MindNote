@@ -21,6 +21,7 @@ public:
     QString getTooltipStyles() const;
     QString getWorkspaceStyles() const;
     QString getSplitterStyles() const;
+    QString getEditorStyles() const;
 
     void updateColors(const QColor &primaryColor,
                       const QColor &secondaryColor,

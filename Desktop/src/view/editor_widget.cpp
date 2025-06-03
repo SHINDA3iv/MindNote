@@ -8,6 +8,7 @@
 
 EditorWidget::EditorWidget(QWidget *parent) : QWidget(parent), _layout(new QVBoxLayout(this))
 {
+    setObjectName("EditorWidget");
     setLayout(_layout);
     _layout->setContentsMargins(0, 0, 0, 0);
     _layout->setSpacing(0);

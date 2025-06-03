@@ -39,7 +39,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     buttonLayout->addWidget(_resetButton);
     buttonLayout->addWidget(_cancelButton);
 
-    mainLayout->addLayout(buttonLayout);
+    mainLayout->addWidget(buttonWidget);
 
     // Connections
     connect(_applyButton, &QPushButton::clicked, this, &SettingsDialog::onApplyClicked);

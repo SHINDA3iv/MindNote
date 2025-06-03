@@ -36,9 +36,14 @@ QString Styles::getGlobalStyles() const
              font-family: 'Segoe UI', Arial, sans-serif;
              font-size: 14px;
          }
+         a, QLabel[link="true"] {
+             color: %3;
+             text-decoration: underline;
+         }
      )")
      .arg(_backgroundColor.name())
-     .arg(_textColor.name());
+     .arg(_textColor.name())
+     .arg(_secondaryColor.name());
 }
 
 QString Styles::getButtonStyles() const
@@ -52,40 +57,42 @@ QString Styles::getButtonStyles() const
             padding: 8px 16px;
             min-width: 80px;
         }
-
-        QPushButton:hover, QToolButton:hover {
+        QPushButton[secondary="true"] {
             background-color: %4;
-            border-color: %5;
-            color: %5;
+            color: white;
+            border: 1px solid %4;
         }
-
-        QPushButton:pressed, QToolButton:pressed {
+        QPushButton[secondary="true"]:hover {
             background-color: %5;
             border-color: %5;
+        }
+        QPushButton:hover, QToolButton:hover {
+            background-color: %6;
+            border-color: %7;
+            color: %7;
+        }
+        QPushButton:pressed, QToolButton:pressed {
+            background-color: %7;
+            border-color: %7;
             color: %2;
         }
-
         QPushButton:disabled, QToolButton:disabled {
-            background-color: %6;
-            color: %7;
-            border-color: %7;
+            background-color: %8;
+            color: %9;
+            border-color: %9;
         }
-
         QMenuBar::item {
             background-color: transparent;
             padding: 4px 8px;
         }
-
         QMenuBar::item:selected {
-            background-color: %4;
+            background-color: %6;
             border-radius: 4px;
         }
-
         QMenuBar::item:pressed {
-            background-color: %5;
+            background-color: %7;
             border-radius: 4px;
         }
-
         QMenuBar::item:icon {
             padding-left: 8px;
         }
@@ -93,6 +100,8 @@ QString Styles::getButtonStyles() const
      .arg(_surfaceColor.name())
      .arg(_textColor.name())
      .arg(_borderColor.name())
+     .arg(_secondaryColor.name())
+     .arg(_secondaryColor.lighter(120).name())
      .arg(_hoverColor.name())
      .arg(_primaryColor.name())
      .arg(_backgroundColor.name())
@@ -407,4 +416,62 @@ QString Styles::getSplitterStyles() const
     )")
      .arg(_borderColor.name())
      .arg(_primaryColor.name());
+}
+
+QString Styles::getEditorStyles() const
+{
+    return QString(R"(
+        /* Область редактирования пространства */
+        QWidget#EditorWidget, QWidget#Workspace, QWidget[editorArea="true"] {
+            background-color: %1;
+        }
+        QWidget#EditorWidget QLabel, QWidget#Workspace QLabel, QWidget[editorArea="true"] QLabel {
+            color: %2;
+        }
+        QWidget#EditorWidget QToolButton, QWidget#Workspace QToolButton, QWidget[editorArea="true"] QToolButton {
+            background-color: %3;
+            color: white;
+            border: 1px solid %3;
+        }
+        QWidget#EditorWidget QToolButton:hover, QWidget#Workspace QToolButton:hover, QWidget[editorArea="true"] QToolButton:hover {
+            background-color: %6;
+            border-color: %6;
+        }
+        QWidget#EditorWidget QLineEdit, QWidget#Workspace QLineEdit, QWidget[editorArea="true"] QLineEdit {
+            background-color: %5;
+            border: 1px solid %3;
+            color: %2;
+        }
+        QWidget#EditorWidget QCheckBox, QWidget#Workspace QCheckBox, QWidget[editorArea="true"] QCheckBox {
+            color: %2;
+        }
+        QWidget#EditorWidget QCheckBox::indicator:checked, QWidget#Workspace QCheckBox::indicator:checked, QWidget[editorArea="true"] QCheckBox::indicator:checked {
+            background-color: %3;
+            border-color: %3;
+        }
+        QWidget#EditorWidget QComboBox, QWidget#Workspace QComboBox, QWidget[editorArea="true"] QComboBox {
+            background-color: %5;
+            border: 1px solid %3;
+            color: %2;
+        }
+        /* QMenu для toolMenu */
+        QWidget#EditorWidget QMenu::item, QWidget#Workspace QMenu::item, QWidget[editorArea="true"] QMenu::item {
+            background-color: transparent;
+            color: %2;
+        }
+        QWidget#EditorWidget QMenu::item:selected, QWidget#Workspace QMenu::item:selected, QWidget[editorArea="true"] QMenu::item:selected {
+            background-color: %3;
+            color: white;
+        }
+        QWidget#EditorWidget QMenu::item:pressed, QWidget#Workspace QMenu::item:pressed, QWidget[editorArea="true"] QMenu::item:pressed {
+            background-color: %4;
+            color: white;
+        }
+    )")
+        .arg(_secondaryColor.name())
+        .arg(_textColor.name())
+        .arg(_secondaryColor.darker(110).name())
+        .arg(_secondaryColor.lighter(120).name())
+        .arg(_surfaceColor.name())
+        .arg(_secondaryColor.lighter(105).name());
 }

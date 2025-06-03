@@ -27,6 +27,7 @@ Workspace::Workspace(const QString &title, QWidget *parent) :
     _createdAt(QDateTime::currentDateTime().toString(Qt::ISODate)),
     _iconLabel(new QLabel(this))
 {
+    setObjectName("Workspace");
     this->setStyleSheet(R"(
         QWidget {
             margin:4px;

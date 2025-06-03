@@ -23,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     centralWidget()->setContentsMargins(5, 10, 10, 5);
 
     createMenus();
+    menuBar()->setStyleSheet("QMenuBar { padding-top: 8px; }");
     restoreWindowState();
     ThemeManager::instance().applyTheme();
 

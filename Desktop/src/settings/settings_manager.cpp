@@ -25,7 +25,7 @@ void SettingsManager::loadDefaults()
         setPrimaryColor(QColor("#1976D2"));
     }
     if (!_settings.contains("theme/secondaryColor")) {
-        setSecondaryColor(QColor("#FFA000"));
+        setSecondaryColor(QColor("#4CAF50"));
     }
     if (!_settings.contains("theme/darkMode")) {
         setDarkMode(false);
