@@ -1,0 +1,39 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="SyncManager_showConflictDialog">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <!-- Старт -->
+        <mxCell id="show1" value="Показать пользователю диалог выбора стратегии синхронизации" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="20" width="400" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="get1" value="Получить выбор пользователя" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="apply1" value="Применить выбранную стратегию синхронизации" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="140" width="340" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="update1" value="Обновить интерфейс" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="200" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="420" y="280" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <!-- Связи -->
+        <mxCell id="s1" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="show1" target="get1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s2" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="get1" target="apply1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="apply1" target="update1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s4" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="update1" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile> 

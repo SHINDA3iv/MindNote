@@ -1,0 +1,45 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Workspace_serialize">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <!-- Старт -->
+        <mxCell id="create1" value="Создать структуру для хранения данных рабочего пространства" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="20" width="340" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="add1" value="Добавить название, статус и дату создания" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="loop1" value="Для каждого элемента добавить его данные" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="140" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="loop2" value="Для каждого вложенного пространства добавить его данные" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="200" width="340" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="return1" value="Вернуть итоговую структуру" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="260" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="420" y="340" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <!-- Связи -->
+        <mxCell id="s1" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="create1" target="add1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s2" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="add1" target="loop1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="loop1" target="loop2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s4" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="loop2" target="return1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s5" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="return1" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile> 

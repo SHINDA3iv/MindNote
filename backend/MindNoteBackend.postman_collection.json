@@ -1,0 +1,1050 @@
+{
+  "info": {
+    "_postman_id": "mindnote-backend-collection",
+    "name": "MindNote Backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Коллекция тестовых запросов для MindNote Backend API (Django, DRF, Djoser)"
+  },
+  "item": [
+    {
+      "name": "Auth & Users",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.collectionVariables.set('unique_username', 'testuser' + ts);",
+                  "pm.collectionVariables.set('unique_email', 'test' + ts + '@example.com');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 or 400 (already exists)\", function () {",
+                  "    pm.expect([201,400]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.test(\"Response has username\", function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('username');",
+                  "  });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{unique_username}}\",\n  \"password\": \"testpassword123\",\n  \"email\": \"{{unique_email}}\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/users/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "users", ""]
+            }
+          }
+        },
+        {
+          "name": "Register - invalid email",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"baduser\",\n  \"password\": \"testpassword123\",\n  \"email\": \"notanemail\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/users/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "users", ""]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test(\"Status code is 400\", function () {",
+                "    pm.response.to.have.status(400);",
+                "});",
+                "pm.test(\"Error for email\", function () {",
+                "    pm.expect(pm.response.json()).to.have.property('email');",
+                "});"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "Register - empty username",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"\",\n  \"password\": \"testpassword123\",\n  \"email\": \"emptyuser@example.com\"\n}"
+            },
+            "url": { "raw": "http://localhost:8000/api/users/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "users", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () {", "    pm.response.to.have.status(400);", "});", "pm.test(\"Error for username\", function () {", "    pm.expect(pm.response.json()).to.have.property('username');", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Register - short password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"shortpassuser\",\n  \"password\": \"123\",\n  \"email\": \"shortpass@example.com\"\n}"
+            },
+            "url": { "raw": "http://localhost:8000/api/users/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "users", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () {", "    pm.response.to.have.status(400);", "});", "pm.test(\"Error for password\", function () {", "    pm.expect(pm.response.json()).to.have.property('password');", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Login (Token Auth)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.body.update(JSON.stringify({",
+                  "  username: pm.collectionVariables.get('unique_username'),",
+                  "  password: 'testpassword123'",
+                  "}));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.collectionVariables.set('token', data.auth_token || data.token);",
+                  "pm.test(\"Token is present\", function () {",
+                  "    pm.expect(data.auth_token || data.token).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"testpassword123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/auth/token/login/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "auth", "token", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "Login - wrong password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"wrongpassword\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/auth/token/login/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "auth", "token", "login", ""]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test(\"Status code is 400\", function () {",
+                "    pm.response.to.have.status(400);",
+                "});"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "Login - empty password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"\"\n}"
+            },
+            "url": { "raw": "http://localhost:8000/api/auth/token/login/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "auth", "token", "login", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () {", "    pm.response.to.have.status(400);", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response has username\", function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('username');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/users/me/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "users", "me", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Workspaces",
+      "item": [
+        {
+          "name": "List Workspaces",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/workspaces/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "workspaces", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Workspace",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.collectionVariables.set('unique_workspace_title', 'My Workspace ' + ts);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.collectionVariables.set('workspace_title', data.title);",
+                  "if (data.id) { pm.collectionVariables.set('workspace_id', data.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{unique_workspace_title}}\",\n  \"status\": \"not_started\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/workspaces/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "workspaces", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Workspace - empty title",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\",\n  \"status\": \"not_started\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/workspaces/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "workspaces", ""]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test(\"Status code is 400\", function () {",
+                "    pm.response.to.have.status(400);",
+                "});",
+                "pm.test(\"Error for title\", function () {",
+                "    pm.expect(pm.response.json()).to.have.property('title');",
+                "});"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "Create Workspace - long title",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Token {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\n  \"status\": \"not_started\"\n}" },
+            "url": { "raw": "http://localhost:8000/api/workspaces/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "workspaces", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () {", "    pm.response.to.have.status(400);", "});", "pm.test(\"Error for title\", function () {", "    pm.expect(pm.response.json()).to.have.property('title');", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Get Workspace Full Structure",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/workspaces/{{workspace_title}}/full_structure/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "workspaces", "{{workspace_title}}", "full_structure", ""]
+            }
+          }
+        },
+        {
+          "name": "Update Workspace",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{workspace_title}}\",\n  \"status\": \"in_progress\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/workspaces/{{workspace_title}}/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "workspaces", "{{workspace_title}}", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pages",
+      "item": [
+        {
+          "name": "List Pages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/pages/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "pages", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "if (data.title) { pm.collectionVariables.set('page_title', data.title); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My Page\",\n  \"space\": \"{{workspace_title}}\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/pages/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "pages", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Page - empty title",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Token {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"\",\n  \"space\": \"{{workspace_title}}\"\n}" },
+            "url": { "raw": "http://localhost:8000/api/pages/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "pages", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () {", "    pm.response.to.have.status(400);", "});", "pm.test(\"Error for title\", function () {", "    pm.expect(pm.response.json()).to.have.property('title');", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Add Element to Page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 or 400\", function () {",
+                  "    pm.expect([201,400]).to.include(pm.response.code);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "if (data.id) { pm.collectionVariables.set('element_id', data.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"element_type\": \"text\",\n  \"content\": \"Sample text\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/pages/{{page_title}}/add_element/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "pages", "{{page_title}}", "add_element", ""]
+            }
+          }
+        },
+        {
+          "name": "Add Element - empty content",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Token {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"element_type\": \"text\",\n  \"content\": \"\"\n}" },
+            "url": { "raw": "http://localhost:8000/api/pages/{{page_title}}/add_element/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "pages", "{{page_title}}", "add_element", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () {", "    pm.response.to.have.status(400);", "});", "pm.test(\"Error for content\", function () {", "    pm.expect(pm.response.json()).to.have.property('content');", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Add Element - unknown type",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"element_type\": \"unknown_type\",\n  \"content\": \"Sample text\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/pages/{{page_title}}/add_element/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "pages", "{{page_title}}", "add_element", ""]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test(\"Status code is 400\", function () {",
+                "    pm.response.to.have.status(400);",
+                "});",
+                "pm.test(\"Error for element_type\", function () {",
+                "    pm.expect(pm.response.json()).to.have.property('element_type');",
+                "});"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "Update Element on Page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 400\", function () {",
+                  "    pm.expect([200,400]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"element_type\": \"text\",\n  \"content\": \"Updated text\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/pages/{{page_title}}/update-element/{{element_id}}/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "pages", "{{page_title}}", "update-element", "{{element_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Update Element - not found",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Authorization", "value": "Token {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"element_type\": \"text\",\n  \"content\": \"Updated text\"\n}" },
+            "url": { "raw": "http://localhost:8000/api/pages/{{page_title}}/update-element/99999/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "pages", "{{page_title}}", "update-element", "99999", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 404\", function () {", "    pm.response.to.have.status(404);", "});", "pm.test(\"Error for element_type\", function () {", "    pm.expect(pm.response.json()).to.have.property('element_type');", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Remove Element from Page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 204 or 400\", function () {",
+                  "    pm.expect([204,400]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"element_type\": \"text\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/pages/{{page_title}}/remove-element/{{element_id}}/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "pages", "{{page_title}}", "remove-element", "{{element_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Remove Element - not found",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Token {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"element_type\": \"text\"\n}" },
+            "url": { "raw": "http://localhost:8000/api/pages/{{page_title}}/remove-element/99999/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "pages", "{{page_title}}", "remove-element", "99999", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 404\", function () {", "    pm.response.to.have.status(404);", "});", "pm.test(\"Error for element_type\", function () {", "    pm.expect(pm.response.json()).to.have.property('element_type');", "});" ], "type": "text/javascript" } }]
+        },
+        {
+          "name": "Remove Page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 204 or 404\", function () {",
+                  "    pm.expect([204,404]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/pages/{{page_title}}/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "pages", "{{page_title}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Page - unauthorized",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"My Page\",\n  \"space\": \"{{workspace_title}}\"\n}" },
+            "url": { "raw": "http://localhost:8000/api/pages/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "pages", ""] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 401\", function () {", "    pm.response.to.have.status(401);", "});" ], "type": "text/javascript" } }]
+        }
+      ]
+    },
+    {
+      "name": "Guest Workspaces",
+      "item": [
+        {
+          "name": "List Guest Workspaces",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/guest-workspaces/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "guest-workspaces", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Guest Workspace",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.collectionVariables.set('unique_guest_workspace_title', 'Guest Workspace ' + ts);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{unique_guest_workspace_title}}\",\n  \"status\": \"not_started\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/guest-workspaces/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "guest-workspaces", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync & Other",
+      "item": [
+        {
+          "name": "Sync Workspace",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My Workspace\",\n  \"status\": \"not_started\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/sync/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "sync", ""]
+            }
+          }
+        },
+        {
+          "name": "User Workspace Sync (POST)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"local_workspaces\": []\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/user-sync/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "user-sync", ""]
+            }
+          }
+        },
+        {
+          "name": "User Workspace Sync (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolve\": [],\n  \"new\": []\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/user-sync/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "user-sync", ""]
+            }
+          }
+        },
+        {
+          "name": "Delete Workspace",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/workspaces/{{workspace_title}}/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "workspaces", "{{workspace_title}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/logout/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "logout", ""]
+            }
+          }
+        },
+        {
+          "name": "Save Guest Workspaces",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"local_workspaces\": []\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/save-guest-workspaces/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "save-guest-workspaces", ""]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 204, 200 или 400\", function () {",
+                  "    pm.expect([204,200,400]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"testpassword123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/users/me/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "users", "me", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Workspace - unauthorized",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Unauthorized Workspace\",\n  \"status\": \"not_started\"\n}" },
+        "url": { "raw": "http://localhost:8000/api/workspaces/", "protocol": "http", "host": ["localhost"], "port": "8000", "path": ["api", "workspaces", ""] }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 401\", function () {", "    pm.response.to.have.status(401);", "});" ], "type": "text/javascript" } }]
+    }
+  ],
+  "variable": [
+    { "key": "token", "value": "" },
+    { "key": "workspace_title", "value": "My Workspace" },
+    { "key": "page_title", "value": "My Page" },
+    { "key": "element_id", "value": "1" },
+    { "key": "workspace_id", "value": "" },
+    { "key": "page_id", "value": "" }
+  ]
+} 

@@ -1,0 +1,459 @@
+@startuml
+' =====================
+' SINGLETONS (Top Layer: SettingsManager слева, справа столбец из Styles, ErrorHandler, ThemeManager)
+' =====================
+rectangle "Singletons" {
+  class SettingsManager {
+  +theme()
+  +setTheme(theme)
+  +primaryColor()
+  +setPrimaryColor(color)
+  +secondaryColor()
+  +setSecondaryColor(color)
+  +darkMode()
+  +setDarkMode(enabled)
+  +editorFont()
+  +setEditorFont(font)
+  +tabSize()
+  +setTabSize(size)
+  +wordWrap()
+  +setWordWrap(enabled)
+  +lineNumbers()
+  +setLineNumbers(enabled)
+  +syncInterval()
+  +setSyncInterval(minutes)
+  +autoSync()
+  +setAutoSync(enabled)
+  +windowGeometry()
+  +setWindowGeometry(geometry)
+  +windowState()
+  +setWindowState(state)
+  +rememberMe()
+  +setRememberMe(enabled)
+  +lastEmail()
+  +setLastEmail(email)
+  +loadDefaults()
+}
+
+class Styles {
+  +getGlobalStyles()
+  +getButtonStyles()
+  +getLineEditStyles()
+  +getComboBoxStyles()
+  +getCheckBoxStyles()
+  +getSpinBoxStyles()
+  +getScrollBarStyles()
+  +getTabStyles()
+  +getGroupBoxStyles()
+  +getMenuStyles()
+  +getTooltipStyles()
+  +getWorkspaceStyles()
+  +getSplitterStyles()
+  +getEditorStyles()
+  +updateColors(...)
+}
+
+class ErrorHandler {
+  +showError(title, message)
+  +showWarning(title, message)
+  +showInfo(title, message)
+}
+
+class ThemeManager {
+  +applyTheme()
+  +getStylesheet()
+  +getColor(role)
+  +isDarkMode()
+}
+}
+
+SettingsManager -[hidden]right-> Styles
+Styles-[hidden]down-> ErrorHandler
+Styles-[hidden]down-> ThemeManager
+
+' =====================
+' MAIN WINDOW & DIALOGS (Second Layer, one row)
+' =====================
+rectangle "Dialogs" {
+class AuthDialog {
+  +showLoginError(error)
+  +showRegisterError(error)
+}
+
+class UserSyncDialog {
+  +getResolve()
+  +getNewWorkspaces()
+}
+
+class SettingsDialog {
+  +onThemeChanged()
+  +onEditorSettingsChanged()
+  +onSyncSettingsChanged()
+  +onApplyClicked()
+  +onResetClicked()
+}
+}
+
+AuthDialog-[hidden]down-> UserSyncDialog
+UserSyncDialog-[hidden]down-> SettingsDialog
+
+Singletons -[hidden]right-> Dialogs
+Dialogs -[hidden]right-> MainWindow
+
+class MainWindow {
+  -_mainWidget: MainWidget
+  -_userLabel: QLabel
+  -_loginButton: QPushButton
+  -_logoutButton: QPushButton
+  +showSettings()
+  +showAbout()
+  +updateAuthMenu()
+  +onLoginRequested()
+  +onLogoutRequested()
+  +updateWorkspaceList()
+}
+
+MainWindow --> MainWidget
+
+' =====================
+' VIEW LAYER
+' =====================
+class MainWidget {
+  -_workspaceController: WorkspaceController
+  -_apiClient: ApiClient
+  -_localStorage: LocalStorage
+  -_syncManager: SyncManager
+  -_authManager: AuthManager
+  -_leftPanel: LeftPanel
+  -_editorWidget: EditorWidget
+  +createNewWorkspace()
+  +openWorkspace()
+  +saveCurrentWorkspace()
+  +saveWorkspaceAs()
+  +syncWorkspaces()
+  +undo()
+  +redo()
+  +cut()
+  +copy()
+  +paste()
+  +zoomIn()
+  +zoomOut()
+  +zoomReset()
+  +toggleSidebar()
+  +hasUnsavedChanges()
+  +isAuthenticated()
+  +getUsername()
+  +showAuthDialog()
+  +logout()
+}
+
+class LeftPanel {
+  -_workspaceTree: QTreeWidget
+  -_workspaceController: WorkspaceController
+  +setWorkspaceController(controller)
+  +refreshWorkspaceList()
+}
+
+class EditorWidget {
+  -_currentWorkspace: Workspace
+  +setCurrentWorkspace(workspace)
+  +currentWorkspace()
+}
+
+MainWidget --> WorkspaceController
+MainWidget --> ApiClient
+MainWidget --> LocalStorage
+MainWidget --> SyncManager
+MainWidget --> AuthManager
+MainWidget --> LeftPanel
+MainWidget --> EditorWidget
+LeftPanel --> WorkspaceController
+EditorWidget --> Workspace
+
+' =====================
+' CONTROLLER & MANAGERS
+' =====================
+class WorkspaceController {
+  -_workspaces: QList<Workspace*>
+  -_localStorage: LocalStorage
+  +createWorkspace(title)
+  +removeWorkspace(workspace)
+  +getWorkspaceByTitle(title)
+  +getAllWorkspaces()
+  +serialize()
+  +deserialize(json)
+  +saveWorkspaces()
+  +loadWorkspaces(parent)
+  +createSubWorkspace(parent, title)
+  +getRootWorkspaces()
+  +getWorkspace(index)
+  +saveToFile(filePath)
+  +loadFromFile(filePath)
+  +findWorkspaceByTitle(title)
+  +findWorkspaceRecursive(workspace, title)
+}
+
+class LocalStorage {
+  -storagePath: QString
+  -guestPath: QString
+  -userPath: QString
+  -currentUser: QString
+  +saveWorkspace(workspace, isGuest)
+  +loadWorkspace(title, parent, isGuest)
+  +deleteWorkspace(title, isGuest)
+  +syncWorkspaces(serverWorkspaces, keepLocal)
+  +getWorkspacePath(isGuest)
+  +setCurrentUser(username)
+  +getCurrentUser()
+  +clearUserData()
+  +getWorkspaceOwnerPath(ownerUsername)
+}
+
+class ApiClient {
+  -networkManager: QNetworkAccessManager
+  -baseUrl: QString
+  -authToken: QString
+  -_username: QString
+  +setBaseUrl(url)
+  +setAuthToken(token)
+  +isAuthenticated()
+  +getUsername()
+  +login(username, password)
+  +registerUser(email, password, username)
+  +logout()
+  +getWorkspaces()
+  +createWorkspace(workspaceData)
+  +updateWorkspace(title, workspaceData)
+  +deleteWorkspace(title)
+  +getPages(workspaceTitle)
+  +createPage(workspaceTitle, title, isMain)
+  +updatePage(workspaceTitle, title, newTitle, isMain)
+  +deletePage(workspaceTitle, title)
+  +addElement(workspaceTitle, pageTitle, element)
+  +updateElement(workspaceTitle, pageTitle, elementId, element)
+  +removeElement(workspaceTitle, pageTitle, elementId)
+  +syncWorkspace(workspaceTitle, changes)
+  +syncUserWorkspaces()
+  +getCurrentUser()
+  +updateUser(userData)
+  +deleteUser()
+  +postUserSync(localWorkspaces)
+  +patchUserSync(resolve, newWorkspaces)
+}
+
+class AuthManager {
+  -_authToken: QString
+  -_username: QString
+  -_isAuthenticated: bool
+  -_rememberMe: bool
+  -_settings: QSettings*
+  +isAuthenticated()
+  +getUsername()
+  +getAuthToken()
+  +isRememberMeEnabled()
+  +login(token, username, rememberMe)
+  +setRememberMe(enabled)
+  +logout()
+  +registerUser(email, password, username)
+}
+
+class SyncManager {
+  -apiClient: ApiClient
+  -localStorage: LocalStorage
+  -_syncTimer: QTimer
+  -_isSyncing: bool
+  +startAutoSync(intervalMs)
+  +stopAutoSync()
+  +performFullSync()
+  +syncWithVersionSelection(serverWorkspaces)
+  +startUserSync()
+  +applyUserSyncResolution(resolve, newWorkspaces)
+}
+
+WorkspaceController --> Workspace
+WorkspaceController --> LocalStorage
+SyncManager --> ApiClient
+SyncManager --> LocalStorage
+
+' =====================
+' WORKSPACE
+' =====================
+class Workspace {
+  -_title: QString
+  -_version: QString
+  -_owner: QString
+  -_layout: QVBoxLayout
+  -_scrollArea: QScrollArea
+  -_contentWidget: QWidget
+  -_titleLabel: QLabel
+  -_iconLabel: QLabel
+  -_icon: QIcon
+  -_items: QList<AbstractWorkspaceItem*>
+  -_spacerItem: QSpacerItem
+  -_parentWorkspace: Workspace
+  -_subWorkspaces: QList<Workspace*>
+  -_status: Status
+  -_createdAt: QString
+  +getTitle()
+  +setTitle(title)
+  +addItem(item)
+  +removeItem(item)
+  +serialize()
+  +deserialize(json)
+  +deserializeItems(itemsArray)
+  +getItems()
+  +addItemByType(type)
+  +setIcon(icon)
+  +getIconLabel()
+  +getIcon()
+  +getParentWorkspace()
+  +setParentWorkspace(parent)
+  +getSubWorkspaces()
+  +addSubWorkspace(sub)
+  +removeSubWorkspace(sub)
+  +hasSubWorkspaceWithTitle(title)
+  +getFullPathTitle()
+  +getPathChain()
+  +getPath()
+  +getVersion()
+  +setVersion(version)
+  +getOwner()
+  +setOwner(owner)
+  +setStatus(status)
+  +getStatus()
+  +setCreatedAt(createdAt)
+  +getCreatedAt()
+  +getStatusString()
+  +setStatusFromString(status)
+  +serializeBackend(isMain)
+  +deserializeBackend(json, isMain)
+  +getRootWorkspace()
+}
+
+Workspace --> AbstractWorkspaceItem
+Workspace --> Workspace : subWorkspaces
+
+' =====================
+' ELEMENTS (Bottom Layer)
+' =====================
+class AbstractWorkspaceItem {
+  +type()
+  +serialize()
+  +deserialize(json)
+  +deleteItem()
+  -- signals: itemDeleted(item)
+}
+
+class ResizableItem {
+  -_resizing: bool
+  -_resizeDirection: ResizeDirections
+  -_lastMousePos: QPoint
+  -_resizeTimer: QTimer
+  +mousePressEvent(event)
+  +mouseMoveEvent(event)
+  +mouseReleaseEvent(event)
+  +updateResizeDirection(pos)
+  +updateCursor()
+  +eventFilter(watched, event)
+  +autoScrollDuringResize(globalPos)
+  -- signals: resized()
+}
+
+class TextItem {
+  -_textEdit: QTextEdit
+  +type()
+  +serialize()
+  +deserialize(json)
+  +toggleBold()
+  +toggleItalic()
+  +insertOrderedList()
+  +insertUnorderedList()
+}
+
+class ListItem {
+  -_listWidget: QListWidget
+  -_listType: ListType
+  -_clickedIndex: int
+  +type()
+  +addItemToList(text)
+  +removeItemFromList(index)
+  +editItemInList(index)
+  +serialize()
+  +deserialize(json)
+  +addCustomContextMenuActions(contextMenu)
+  +mousePressEvent(event)
+  +createContextMenu(pos)
+  +addNewItem()
+  +removeSelectedItem()
+  +editSelectedItem()
+}
+
+class ImageItem {
+  -_imageLabel: QLabel
+  -_imagePath: QString
+  -_originalPixmap: QPixmap
+  -_imageData: QString
+  +type()
+  +serialize()
+  +deserialize(json)
+  +resizeEvent(event)
+  +addCustomContextMenuActions(contextMenu)
+  +updateImageSize()
+  +imageToBase64(pixmap)
+  +base64ToImage(base64String)
+}
+
+class FileItem {
+  -_fileButton: QPushButton
+  -_filePath: QString
+  +type()
+  +serialize()
+  +deserialize(json)
+  +openFile()
+}
+
+class CheckboxItem {
+  -_checkbox: QCheckBox
+  -_editLine: QLineEdit
+  +type()
+  +serialize()
+  +deserialize(json)
+  +addCustomContextMenuActions(contextMenu)
+  +startEditing()
+  +finishEditing()
+}
+
+class TitleItem {
+  -_titleLabel: QLabel
+  +type()
+  +serialize()
+  +deserialize(json)
+}
+
+class SubspaceLinkItem {
+  -_linkButton: QPushButton
+  -_subspaceTitle: QString
+  -_linkedWorkspace: Workspace
+  +type()
+  +serialize()
+  +deserialize(json)
+  +getLinkedWorkspace()
+  +setLinkedWorkspace(newLinkedWorkspace)
+  +deleteItem()
+  -- signals: subspaceLinkClicked(subspace)
+}
+
+ResizableItem --|> AbstractWorkspaceItem
+TextItem --|> ResizableItem
+ListItem --|> ResizableItem
+ImageItem --|> ResizableItem
+FileItem --|> AbstractWorkspaceItem
+CheckboxItem --|> AbstractWorkspaceItem
+TitleItem --|> AbstractWorkspaceItem
+SubspaceLinkItem --|> AbstractWorkspaceItem
+
+
+ListItem-[hidden]down-> ImageItem
+ImageItem-[hidden]down-> TextItem
+
+@enduml

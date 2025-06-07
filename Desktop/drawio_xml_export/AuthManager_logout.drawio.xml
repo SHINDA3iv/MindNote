@@ -1,0 +1,74 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="AuthManager_logout">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <!-- Старт -->
+        <mxCell id="start" value="Отправить запрос на сервер для выхода" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="20" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="cond1" value="Ответ получен?" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="370" y="90" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="yes1" value="да" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="cond1" target="cond2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="no1" value="нет" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="cond1" target="error1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="cond2" value="Выход успешен?" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="370" y="170" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="yes2" value="да" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="cond2" target="del1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="no2" value="нет" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="cond2" target="error2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="del1" value="Удалить токен пользователя" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="260" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ui1" value="Оповестить интерфейс о выходе" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="320" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="result" value="Завершить" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="380" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="error1" value="Показать сообщение о проблеме соединения" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="180" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="error2" value="Показать сообщение об ошибке выхода" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="320" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="300" y="460" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="s1" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="start" target="cond1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s2" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="cond1" target="cond2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="cond2" target="del1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s4" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="del1" target="ui1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s5" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="ui1" target="result">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s6" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="result" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s7" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="error1" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s8" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="error2" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile> 
