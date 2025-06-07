@@ -10,7 +10,7 @@ SettingsManager& SettingsManager::instance()
 
 SettingsManager::SettingsManager(QObject* parent)
     : QObject(parent)
-    , _settings("MindNote", "Desktop")
+    , _settings("Летописец", "Летописец")
 {
     loadDefaults();
 }
@@ -218,4 +218,4 @@ void SettingsManager::setLastEmail(const QString& email)
 {
     _settings.setValue("auth/lastEmail", email);
     emit authSettingsChanged();
-} 
+}

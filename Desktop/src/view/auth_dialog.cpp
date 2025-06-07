@@ -85,7 +85,7 @@ AuthDialog::AuthDialog(QWidget *parent) : QDialog(parent)
     )");
 
     // Заголовок
-    QLabel *titleLabel = new QLabel("MindNote", this);
+    QLabel *titleLabel = new QLabel("Летописец", this);
     titleLabel->setObjectName("titleLabel");
     titleLabel->setAlignment(Qt::AlignCenter);
     QFont titleFont = titleLabel->font();

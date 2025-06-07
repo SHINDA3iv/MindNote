@@ -23,10 +23,11 @@ class Base64ImageField(serializers.ImageField):
 class ImageElementSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     imageData = serializers.SerializerMethodField()
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ImageElement
-        fields = ['type', 'imageData', 'created_at']
+        fields = ['id', 'type', 'imageData', 'created_at']
         read_only_fields = ['created_at']
 
     def get_type(self, obj):
@@ -45,10 +46,11 @@ class ImageElementSerializer(serializers.ModelSerializer):
 class FileElementSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     filePath = serializers.SerializerMethodField()
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = FileElement
-        fields = ['type', 'filePath', 'created_at']
+        fields = ['id', 'type', 'filePath', 'created_at']
         read_only_fields = ['created_at']
 
     def get_type(self, obj):
@@ -62,10 +64,11 @@ class CheckboxElementSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     label = serializers.CharField(source='text')
     checked = serializers.BooleanField(source='is_checked')
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = CheckboxElement
-        fields = ['type', 'label', 'checked', 'created_at']
+        fields = ['id', 'type', 'label', 'checked', 'created_at']
         read_only_fields = ['created_at']
 
     def get_type(self, obj):
@@ -74,10 +77,11 @@ class CheckboxElementSerializer(serializers.ModelSerializer):
 
 class TextElementSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = TextElement
-        fields = ['type', 'content', 'created_at']
+        fields = ['id', 'type', 'content', 'created_at']
         read_only_fields = ['created_at']
 
     def get_type(self, obj):
@@ -87,10 +91,11 @@ class TextElementSerializer(serializers.ModelSerializer):
 class LinkElementSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     subspaceTitle = serializers.SerializerMethodField()
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = LinkElement
-        fields = ['type', 'subspaceTitle', 'linked_page', 'created_at']
+        fields = ['id', 'type', 'subspaceTitle', 'linked_page', 'created_at']
         read_only_fields = ['created_at']
 
     def get_type(self, obj):
@@ -101,6 +106,7 @@ class LinkElementSerializer(serializers.ModelSerializer):
 
 
 class PageSerializer(serializers.ModelSerializer):
+    space = serializers.SlugRelatedField(slug_field='title', queryset=Workspace.objects.all())
     elements = serializers.SerializerMethodField()
     icon = serializers.SerializerMethodField()
     pages = serializers.SerializerMethodField()
@@ -108,7 +114,7 @@ class PageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Page
         fields = [
-            'title', 'elements', 'created_at', 'icon', 'pages'
+            'title', 'space', 'elements', 'created_at', 'icon', 'pages'
         ]
         read_only_fields = ['created_at']
 
@@ -211,6 +217,24 @@ class WorkspaceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         pages_data = self.initial_data.get('pages', [])
         elements_data = self.initial_data.get('elements', {})
+        # Исправление: если elements_data — список, преобразуем в dict по типам
+        if isinstance(elements_data, list):
+            elements_dict = {
+                'images': [], 'files': [], 'checkboxes': [], 'texts': [], 'links': []
+            }
+            for el in elements_data:
+                el_type = el.get('type')
+                if el_type == 'ImageItem':
+                    elements_dict['images'].append(el)
+                elif el_type == 'FileItem':
+                    elements_dict['files'].append(el)
+                elif el_type == 'CheckboxItem':
+                    elements_dict['checkboxes'].append(el)
+                elif el_type == 'TextItem':
+                    elements_dict['texts'].append(el)
+                elif el_type == 'SubspaceLinkItem':
+                    elements_dict['links'].append(el)
+            elements_data = elements_dict
         icon_b64 = self.initial_data.get('icon')
         title = validated_data['title']
         status = validated_data.get('status', 'not_started')
@@ -220,15 +244,20 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         print("[WorkspaceSerializer.create] elements_data:")
         print(pprint.pformat(elements_data))
         print("[WorkspaceSerializer.create] pages_data:")
-        print(
-            pprint.pformat(pages_data)
-        )  # если понадобится, раскомментировать
+        print(pprint.pformat(pages_data))
 
-        workspace = Workspace.objects.create(
-            title=title,
-            status=status,
-            author=self.context['request'].user
-        )
+        # Исправление: если guest, не передавать author
+        if self.context.get('guest'):
+            workspace = Workspace.objects.create(
+                title=title,
+                status=status
+            )
+        else:
+            workspace = Workspace.objects.create(
+                title=title,
+                status=status,
+                author=self.context['request'].user
+            )
 
         if icon_b64:
             try:
@@ -261,6 +290,24 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         return workspace
     
     def _create_elements(self, obj, elements_data):
+        # Исправление: если elements_data — список, преобразуем в dict по типам
+        if isinstance(elements_data, list):
+            elements_dict = {
+                'images': [], 'files': [], 'checkboxes': [], 'texts': [], 'links': []
+            }
+            for el in elements_data:
+                el_type = el.get('type')
+                if el_type == 'ImageItem':
+                    elements_dict['images'].append(el)
+                elif el_type == 'FileItem':
+                    elements_dict['files'].append(el)
+                elif el_type == 'CheckboxItem':
+                    elements_dict['checkboxes'].append(el)
+                elif el_type == 'TextItem':
+                    elements_dict['texts'].append(el)
+                elif el_type == 'SubspaceLinkItem':
+                    elements_dict['links'].append(el)
+            elements_data = elements_dict
         """
         obj: Workspace или Page
         """

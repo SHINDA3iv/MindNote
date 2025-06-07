@@ -144,7 +144,9 @@ class PageViewSet(viewsets.ModelViewSet):
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response(
-            {"detail": "Неизвестный тип элемента."},
+            {"element_type": [
+                "Неизвестный тип элемента."
+            ]},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -170,7 +172,9 @@ class PageViewSet(viewsets.ModelViewSet):
                 serializer = LinkElementSerializer(element, data=request.data, partial=True)
             else:
                 return Response(
-                    {"detail": "Неизвестный тип элемента."},
+                    {"element_type": [
+                        "Неизвестный тип элемента."
+                    ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if serializer.is_valid():
@@ -181,7 +185,9 @@ class PageViewSet(viewsets.ModelViewSet):
                 CheckboxElement.DoesNotExist, TextElement.DoesNotExist, 
                 LinkElement.DoesNotExist):
             return Response(
-                {"detail": "Элемент не найден."},
+                {"element_type": [
+                    "Элемент не найден."
+                ]},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -202,7 +208,9 @@ class PageViewSet(viewsets.ModelViewSet):
                 element = LinkElement.objects.get(id=element_id, page=page)
             else:
                 return Response(
-                    {"detail": "Неизвестный тип элемента."},
+                    {"element_type": [
+                        "Неизвестный тип элемента."
+                    ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             element.delete()
@@ -211,7 +219,9 @@ class PageViewSet(viewsets.ModelViewSet):
                 CheckboxElement.DoesNotExist, TextElement.DoesNotExist, 
                 LinkElement.DoesNotExist):
             return Response(
-                {"detail": "Элемент не найден."},
+                {"element_type": [
+                    "Элемент не найден."
+                ]},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -308,6 +318,8 @@ class GuestWorkspaceViewSet(viewsets.ModelViewSet):
         return []
 
     def perform_create(self, serializer):
+        # Передаю guest=True в context сериализатора
+        serializer.context['guest'] = True
         workspace = serializer.save(is_guest=True)
         # Сохраняем рабочее пространство локально для гостя
         storage = LocalStorageManager()

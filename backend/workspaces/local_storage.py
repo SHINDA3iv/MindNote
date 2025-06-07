@@ -3,9 +3,8 @@ import shutil
 import json
 from pathlib import Path
 from django.conf import settings
-from django.core.files.storage import default_storage
-from .models import Workspace, Page
 from django.utils.text import slugify
+import uuid
 
 class LocalStorageManager:
     def __init__(self, user=None):
@@ -45,14 +44,34 @@ class LocalStorageManager:
         }
 
         # Сохраняем элементы уровня пространства
-        for el_type, el_list in workspace_data.get('elements', {}).items():
+        elements = workspace_data.get('elements', {})
+        # Исправление: если elements — список, преобразуем в dict по типам
+        if isinstance(elements, list):
+            elements_dict = {
+                'images': [], 'files': [], 'checkboxes': [], 'texts': [], 'links': []
+            }
+            for el in elements:
+                el_type = el.get('type')
+                if el_type == 'ImageItem':
+                    elements_dict['images'].append(el)
+                elif el_type == 'FileItem':
+                    elements_dict['files'].append(el)
+                elif el_type == 'CheckboxItem':
+                    elements_dict['checkboxes'].append(el)
+                elif el_type == 'TextItem':
+                    elements_dict['texts'].append(el)
+                elif el_type == 'SubspaceLinkItem':
+                    elements_dict['links'].append(el)
+            elements = elements_dict
+        for el_type, el_list in elements.items():
             for el in el_list:
                 el_path = workspace_path / el_type
                 el_path.mkdir(exist_ok=True)
                 el_file_path = el_path / f"{uuid.uuid4()}.json"
                 with open(el_file_path, 'w', encoding='utf-8') as f:
                     json.dump(el, f, ensure_ascii=False)
-                metadata['elements'][el_type].append(str(el_file_path.relative_to(workspace_path)))
+                rel_path = str(el_file_path.relative_to(workspace_path))
+                metadata['elements'][el_type].append(rel_path)
 
         # Рекурсивно сохраняем страницы
         def save_pages(pages_data, parent_path):
@@ -64,24 +83,39 @@ class LocalStorageManager:
                 page_metadata = {
                     'title': page_title,
                     'elements': {
-                        'images': [],
-                        'files': [],
-                        'checkboxes': [],
-                        'texts': [],
-                        'links': []
+                        'images': [], 'files': [], 'checkboxes': [], 'texts': [], 'links': []
                     },
                     'pages': []
                 }
 
                 # Сохраняем элементы страницы
-                for el_type, el_list in page_data.get('elements', {}).items():
+                page_elements = page_data.get('elements', {})
+                if isinstance(page_elements, list):
+                    elements_dict = {
+                        'images': [], 'files': [], 'checkboxes': [], 'texts': [], 'links': []
+                    }
+                    for el in page_elements:
+                        el_type = el.get('type')
+                        if el_type == 'ImageItem':
+                            elements_dict['images'].append(el)
+                        elif el_type == 'FileItem':
+                            elements_dict['files'].append(el)
+                        elif el_type == 'CheckboxItem':
+                            elements_dict['checkboxes'].append(el)
+                        elif el_type == 'TextItem':
+                            elements_dict['texts'].append(el)
+                        elif el_type == 'SubspaceLinkItem':
+                            elements_dict['links'].append(el)
+                    page_elements = elements_dict
+                for el_type, el_list in page_elements.items():
                     for el in el_list:
                         el_path = page_path / el_type
                         el_path.mkdir(exist_ok=True)
                         el_file_path = el_path / f"{uuid.uuid4()}.json"
                         with open(el_file_path, 'w', encoding='utf-8') as f:
                             json.dump(el, f, ensure_ascii=False)
-                        page_metadata['elements'][el_type].append(str(el_file_path.relative_to(workspace_path)))
+                        rel_path = str(el_file_path.relative_to(workspace_path))
+                        page_metadata['elements'][el_type].append(rel_path)
 
                 # Рекурсивно сохраняем подстраницы
                 subpages_data = page_data.get('pages', [])

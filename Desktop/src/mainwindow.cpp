@@ -225,11 +225,11 @@ void MainWindow::showSettings()
 void MainWindow::showAbout()
 {
     QMessageBox::about(this, "О программе",
-                       "<h3>MindNote</h3>"
+                       "<h3>Летописец</h3>"
                        "<p>Версия 1.0.0</p>"
-                       "<p>MindNote - это приложение для создания и управления заметками и "
+                       "<p>Летописец - это приложение для создания и управления заметками и "
                        "рабочими пространствами.</p>"
-                       "<p>© 2024 MindNote. Все права защищены.</p>");
+                       "<p>© 2024 Летописец. Все права защищены.</p>");
 }
 
 void MainWindow::restoreWindowState()
