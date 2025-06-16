@@ -59,7 +59,12 @@ public:
     void setOwner(const QString &owner);
 
     // --- BACKEND FIELDS ---
-    enum Status { NotStarted, InProgress, Completed };
+    enum Status
+    {
+        NotStarted,
+        InProgress,
+        Completed
+    };
     void setStatus(Status status);
     Status getStatus() const;
     void setCreatedAt(const QString &createdAt);
@@ -81,24 +86,24 @@ private:
     void updateContentSize();
 
     QString _title;
+    QIcon _icon;
+    QString _createdAt;
+
+    QList<AbstractWorkspaceItem *> _items;
+
+    Workspace *_parentWorkspace { nullptr };
+    QList<Workspace *> _subWorkspaces;
+
     QString _version;
     QString _owner;
+    Status _status = NotStarted;
 
     QPointer<QVBoxLayout> _layout;
     QPointer<QScrollArea> _scrollArea;
     QPointer<QWidget> _contentWidget;
     QPointer<QLabel> _titleLabel;
     QPointer<QLabel> _iconLabel;
-    QIcon _icon;
-
-    QList<AbstractWorkspaceItem *> _items;
     QSpacerItem *_spacerItem { nullptr };
-
-    Workspace *_parentWorkspace { nullptr };
-    QList<Workspace *> _subWorkspaces;
-
-    Status _status = NotStarted;
-    QString _createdAt;
 };
 
 #endif // WORKSPACE_H

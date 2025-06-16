@@ -15,7 +15,9 @@ AuthManager::AuthManager(QObject *parent)
     QDir().mkpath(settingsDir);
     QString authSettingsPath = settingsDir + "/Auth.ini";
     _settings = new QSettings(authSettingsPath, QSettings::IniFormat, this);
-    loadAuthState();
+    if (!loadAuthState()) {
+        qDebug() << "Failed to load valid auth state - user needs to login";
+    }
 }
 
 AuthManager::~AuthManager()
@@ -91,7 +93,16 @@ void AuthManager::saveAuthState()
     }
 }
 
-void AuthManager::loadAuthState()
+bool AuthManager::validateAuthState() const
+{
+    // If remember me is enabled, we must have both token and username
+    if (_rememberMe) {
+        return !_authToken.isEmpty() && !_username.isEmpty();
+    }
+    return true;
+}
+
+bool AuthManager::loadAuthState()
 {
     _rememberMe = _settings->value("rememberMe", false).toBool();
     qDebug() << "Loading auth state - rememberMe:" << _rememberMe;
@@ -101,11 +112,24 @@ void AuthManager::loadAuthState()
         _username = _settings->value("username").toString();
         _isAuthenticated = _settings->value("isAuthenticated", false).toBool();
         qDebug() << "Loaded auth state - token:" << _authToken << "username:" << _username << "isAuthenticated:" << _isAuthenticated;
+        
+        // Validate the loaded state
+        if (!validateAuthState()) {
+            qDebug() << "Invalid auth state detected - clearing credentials";
+            _authToken.clear();
+            _username.clear();
+            _isAuthenticated = false;
+            _rememberMe = false;
+            saveAuthState(); // Save the cleared state
+            return false;
+        }
+        return _isAuthenticated;
     } else {
         qDebug() << "Remember me is disabled, clearing auth state";
         _authToken.clear();
         _username.clear();
         _isAuthenticated = false;
+        return false;
     }
 }
 

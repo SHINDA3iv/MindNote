@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QTextCursor>
 #include <QTextListFormat>
+#include "../theme/theme_manager.h"
 
 TextItem::TextItem(const QString &text, Workspace *parent) :
     ResizableItem(parent),
@@ -13,6 +14,39 @@ TextItem::TextItem(const QString &text, Workspace *parent) :
 
     // Создаем панель инструментов
     QToolBar *toolBar = new QToolBar(this);
+    toolBar->setStyleSheet(QString(R"(
+        QToolBar {
+            spacing: 4px;
+            padding: 2px;
+        }
+        QToolButton {
+            background-color: %1;
+            color: %2;
+            border: 1px solid %3;
+            border-radius: 4px;
+            padding: 4px 8px;
+            min-width: 24px;
+        }
+        QToolButton:hover {
+            background-color: %4;
+            border-color: %5;
+            color: %5;
+        }
+        QToolButton:pressed {
+            background-color: %5;
+            border-color: %5;
+            color: %2;
+        }
+        QToolButton:checked {
+            background-color: %5;
+            border-color: %5;
+            color: %2;
+        }
+    )").arg(ThemeManager::instance().getColor("surface").name())
+       .arg(ThemeManager::instance().getColor("text").name())
+       .arg(ThemeManager::instance().getColor("border").name())
+       .arg(ThemeManager::instance().getColor("hover").name())
+       .arg(ThemeManager::instance().getColor("primary").name()));
 
     // Кнопка для жирного текста
     QAction *boldAction = toolBar->addAction("B");

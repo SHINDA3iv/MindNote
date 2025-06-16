@@ -434,8 +434,8 @@ QString Styles::getEditorStyles() const
             border: 1px solid %3;
         }
         QWidget#EditorWidget QToolButton:hover, QWidget#Workspace QToolButton:hover, QWidget[editorArea="true"] QToolButton:hover {
-            background-color: %6;
-            border-color: %6;
+            background-color: %3;
+            border-color: %3;
         }
         QWidget#EditorWidget QLineEdit, QWidget#Workspace QLineEdit, QWidget[editorArea="true"] QLineEdit {
             background-color: %5;
@@ -470,7 +470,7 @@ QString Styles::getEditorStyles() const
     )")
         .arg(_secondaryColor.name())
         .arg(_textColor.name())
-        .arg(_secondaryColor.darker(110).name())
+        .arg(_primaryColor.name())
         .arg(_secondaryColor.lighter(120).name())
         .arg(_surfaceColor.name())
         .arg(_secondaryColor.lighter(105).name());

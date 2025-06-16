@@ -29,8 +29,9 @@ signals:
     void registrationFailed(const QString &error);
 
 private:
+    bool validateAuthState() const;
+    bool loadAuthState();
     void saveAuthState();
-    void loadAuthState();
 
     QString _authToken;
     QString _username;

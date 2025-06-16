@@ -15,7 +15,13 @@ CheckboxItem::CheckboxItem(const QString &label, Workspace *parent) :
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     setLayout(layout);
-    resize(width(), 25);
+    resize(width(), 35);
+
+    _editLine->setStyleSheet(R"(
+        QLineEdit {
+            padding: 0px;
+        }
+    )");
 
     connect(_editLine, &QLineEdit::editingFinished, this, &CheckboxItem::finishEditing);
 
@@ -53,7 +59,9 @@ void CheckboxItem::startEditing()
     _editLine->setText(_checkbox->text());
     _editLine->setVisible(true);
     _checkbox->setVisible(false);
+    _editLine->setFixedHeight(30); // Ensure fixed height when editing
     _editLine->setFocus();
+    _editLine->selectAll(); // Select all text for easier editing
 }
 
 void CheckboxItem::finishEditing()
@@ -61,6 +69,7 @@ void CheckboxItem::finishEditing()
     _checkbox->setText(_editLine->text());
     _editLine->setVisible(false);
     _checkbox->setVisible(true);
+    _checkbox->setFixedHeight(30); // Match checkbox height with line edit
 }
 
 void CheckboxItem::addCustomContextMenuActions(QMenu *contextMenu)

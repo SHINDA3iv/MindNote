@@ -18,7 +18,13 @@ FileItem::FileItem(const QString &filePath, Workspace *parent) :
     }
 
     connect(_fileButton, &QPushButton::clicked, this, &FileItem::openFile);
-    resize(width(), 50);
+    resize(width(), 60);
+
+    _fileButton->setStyleSheet(R"(
+        QPushButton {
+            padding: 6px;
+        }
+    )");
 }
 
 QString FileItem::type() const
